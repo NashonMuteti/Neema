@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
 import CollectionsDialog from "@/components/projects/CollectionsDialog";
 import ProjectPledgesDialog from "@/components/projects/ProjectPledgesDialog";
+import UploadThumbnailDialog from "@/components/projects/UploadThumbnailDialog"; // Import the new component
 import { showSuccess, showError } from "@/utils/toast";
 import {
   Select,
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Image as ImageIcon } from "lucide-react"; // Import ImageIcon for placeholder
 
 // Placeholder for a privileged user check
 const isAdmin = true; // This should come from user context/authentication
@@ -24,13 +26,14 @@ interface Project {
   name: string;
   description: string;
   status: "Open" | "Closed" | "Deleted";
+  thumbnailUrl?: string; // Added optional thumbnail URL
 }
 
 const Projects = () => {
   const [projects, setProjects] = React.useState<Project[]>([
-    { id: "proj1", name: "Film Production X", description: "Main film project for the year.", status: "Open" },
-    { id: "proj2", name: "Marketing Campaign Y", description: "Promotional activities for new releases.", status: "Open" },
-    { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed" },
+    { id: "proj1", name: "Film Production X", description: "Main film project for the year.", status: "Open", thumbnailUrl: "/placeholder.svg" },
+    { id: "proj2", name: "Marketing Campaign Y", description: "Promotional activities for new releases.", status: "Open", thumbnailUrl: "/placeholder.svg" },
+    { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed", thumbnailUrl: "/placeholder.svg" },
     { id: "proj4", name: "Archived Project A", description: "An old project that was deleted.", status: "Deleted" },
   ]);
   const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "All">("Open");
@@ -48,6 +51,7 @@ const Projects = () => {
       name: projectData.name,
       description: projectData.description,
       status: "Open",
+      thumbnailUrl: "/placeholder.svg", // Default thumbnail for new projects
     };
     setProjects((prev) => [...prev, newProject]);
     console.log("Adding project:", newProject);
@@ -78,6 +82,14 @@ const Projects = () => {
   const handleSaveCollections = (data: any) => {
     console.log("Saving collections data:", data);
     // In a real app, send this data to the backend
+  };
+
+  const handleThumbnailUpload = (projectId: string, newUrl: string) => {
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === projectId ? { ...project, thumbnailUrl: newUrl } : project
+      )
+    );
   };
 
   return (
@@ -114,9 +126,13 @@ const Projects = () => {
                 <CardTitle>{project.name}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Project Image Thumbnail Placeholder */}
+                {/* Project Image Thumbnail */}
                 <div className="w-full h-32 bg-muted rounded-md flex items-center justify-center overflow-hidden">
-                  <img src="/placeholder.svg" alt="Project Thumbnail" className="h-20 w-20 text-muted-foreground" />
+                  {project.thumbnailUrl ? (
+                    <img src={project.thumbnailUrl} alt="Project Thumbnail" className="h-full w-full object-cover" />
+                  ) : (
+                    <ImageIcon className="h-20 w-20 text-muted-foreground" />
+                  )}
                 </div>
                 <p className="text-muted-foreground text-sm">{project.description}</p>
                 <p className="text-sm">Status: <span className="font-medium">{project.status}</span></p>
@@ -145,6 +161,12 @@ const Projects = () => {
                     >
                       Delete
                     </Button>
+                    <UploadThumbnailDialog
+                      projectId={project.id}
+                      projectName={project.name}
+                      currentThumbnailUrl={project.thumbnailUrl}
+                      onThumbnailUpload={handleThumbnailUpload}
+                    />
                   </div>
                 )}
               </CardContent>
