@@ -14,7 +14,7 @@ import AddMemberDialog from "@/components/members/AddMemberDialog";
 import EditMemberDialog from "@/components/members/EditMemberDialog";
 import DeleteMemberDialog from "@/components/members/DeleteMemberDialog";
 import { showSuccess } from "@/utils/toast";
-import { User as UserIcon } from "lucide-react"; // Import User icon for placeholder
+import { User as UserIcon, Printer, FileSpreadsheet } from "lucide-react"; // Import User, Printer, FileSpreadsheet icons
 import {
   Select,
   SelectContent,
@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils"; // Import report utilities
 
 // Placeholder for a privileged user check
 const isAdmin = true; // This should come from user context/authentication
@@ -88,6 +89,22 @@ const Members = () => {
     showSuccess("Member status updated!");
   };
 
+  const reportOptions = {
+    reportName: "Member List Report",
+    brandLogoPath: "/placeholder.svg", // Path to your brand logo
+    tagline: "Your cinematic tagline here.",
+  };
+
+  const handlePrintPdf = () => {
+    exportMembersToPdf(filteredMembers, reportOptions);
+    showSuccess("Generating PDF report...");
+  };
+
+  const handleExportExcel = () => {
+    exportMembersToExcel(filteredMembers, reportOptions);
+    showSuccess("Generating Excel report...");
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary-foreground">Members</h1>
@@ -111,9 +128,19 @@ const Members = () => {
               </SelectContent>
             </Select>
           </div>
-          {isAdmin && (
-            <AddMemberDialog onAddMember={handleAddMember} />
-          )}
+          <div className="flex gap-2">
+            {isAdmin && (
+              <>
+                <Button variant="outline" onClick={handlePrintPdf}>
+                  <Printer className="mr-2 h-4 w-4" /> Print PDF
+                </Button>
+                <Button variant="outline" onClick={handleExportExcel}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
+                </Button>
+                <AddMemberDialog onAddMember={handleAddMember} />
+              </>
+            )}
+          </div>
         </div>
         <Table>
           <TableHeader>
@@ -122,7 +149,7 @@ const Members = () => {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead className="text-center">Login Enabled</TableHead>
-              <TableHead className="text-center">Status</TableHead> {/* New TableHead for Status */}
+              <TableHead className="text-center">Status</TableHead>
               {isAdmin && <TableHead className="text-center">Actions</TableHead>}
             </TableRow>
           </TableHeader>
