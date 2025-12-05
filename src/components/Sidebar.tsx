@@ -3,7 +3,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown } from "lucide-react"; // Added TrendingDown icon
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog } from "lucide-react"; // Added UserCog icon
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible
 
 // Placeholder for a privileged user check
@@ -51,6 +51,12 @@ const navItems = [
     href: "/members",
     icon: Users,
     privileged: false,
+  },
+  {
+    name: "Board Members", // New privileged menu item
+    href: "/board-members",
+    icon: UserCog,
+    privileged: true,
   },
   {
     name: "Reports",

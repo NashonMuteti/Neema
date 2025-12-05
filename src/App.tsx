@@ -20,8 +20,9 @@ import AdminSettings from "./pages/AdminSettings";
 import UserActivityReport from "./pages/Reports/UserActivityReport";
 import InitializeBalances from "./pages/InitializeBalances";
 import DeletedProjectsReport from "./pages/Reports/DeletedProjectsReport";
-import Income from "./pages/Income"; // Import the new Income page
-import Expenditure from "./pages/Expenditure"; // Import the new Expenditure page
+import Income from "./pages/Income";
+import Expenditure from "./pages/Expenditure";
+import BoardMembers from "./pages/BoardMembers"; // Import the new BoardMembers page
 
 const queryClient = new QueryClient();
 
@@ -37,11 +38,12 @@ const App = () => (
             <Route path="/projects" element={<Projects />} />
             <Route path="/petty-cash" element={<PettyCash />} />
             <Route path="/pledges" element={<Pledges />} />
-            <Route path="/income" element={<Income />} /> {/* New route for Income */}
-            <Route path="/expenditure" element={<Expenditure />} /> {/* New route for Expenditure */}
+            <Route path="/income" element={<Income />} />
+            <Route path="/expenditure" element={<Expenditure />} />
+            <Route path="/members" element={<Members />} />
+            <Route path="/board-members" element={<BoardMembers />} /> {/* New route for Board Members */}
             <Route path="/profile" element={<UserSettings />} />
             <Route path="/settings" element={<UserSettings />} />
-            <Route path="/members" element={<Members />} />
             <Route path="/reports/member-contributions" element={<MemberContributions />} />
             <Route path="/reports/petty-cash" element={<PettyCashReport />} />
             <Route path="/reports/pledges" element={<PledgeReport />} />
