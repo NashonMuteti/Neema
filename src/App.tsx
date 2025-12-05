@@ -20,7 +20,8 @@ import AdminSettings from "./pages/AdminSettings";
 import UserActivityReport from "./pages/Reports/UserActivityReport";
 import InitializeBalances from "./pages/InitializeBalances";
 import DeletedProjectsReport from "./pages/Reports/DeletedProjectsReport";
-import IncomeExpenditure from "./pages/IncomeExpenditure"; // Import the new page
+import Income from "./pages/Income"; // Import the new Income page
+import Expenditure from "./pages/Expenditure"; // Import the new Expenditure page
 
 const queryClient = new QueryClient();
 
@@ -36,7 +37,8 @@ const App = () => (
             <Route path="/projects" element={<Projects />} />
             <Route path="/petty-cash" element={<PettyCash />} />
             <Route path="/pledges" element={<Pledges />} />
-            <Route path="/income-expenditure" element={<IncomeExpenditure />} /> {/* New route */}
+            <Route path="/income" element={<Income />} /> {/* New route for Income */}
+            <Route path="/expenditure" element={<Expenditure />} /> {/* New route for Expenditure */}
             <Route path="/profile" element={<UserSettings />} />
             <Route path="/settings" element={<UserSettings />} />
             <Route path="/members" element={<Members />} />

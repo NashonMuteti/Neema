@@ -3,7 +3,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp } from "lucide-react"; // Added TrendingUp icon
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown } from "lucide-react"; // Added TrendingDown icon
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible
 
 // Placeholder for a privileged user check
@@ -35,9 +35,15 @@ const navItems = [
     privileged: false,
   },
   {
-    name: "Income & Expenditure", // New menu item
-    href: "/income-expenditure",
-    icon: TrendingUp, // Using TrendingUp icon for income/expenditure
+    name: "Income", // New menu item
+    href: "/income",
+    icon: TrendingUp,
+    privileged: false,
+  },
+  {
+    name: "Expenditure", // New menu item
+    href: "/expenditure",
+    icon: TrendingDown, // Using TrendingDown icon for expenditure
     privileged: false,
   },
   {
