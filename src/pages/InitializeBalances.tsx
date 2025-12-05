@@ -2,14 +2,14 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import InitializeBalancesDialog from "@/components/admin/InitializeBalancesDialog"; // Import the new dialog
 import { showSuccess, showError } from "@/utils/toast";
 
 const InitializeBalances = () => {
-  const handleInitialize = () => {
+  const handleInitialize = (balances: Record<string, number>) => {
     // In a real application, this would trigger a backend process
     // to reset or set default values for all account balances.
-    console.log("Initializing all account balances...");
+    console.log("Initializing all account balances with:", balances);
     showSuccess("Account balances initialization initiated.");
     // Simulate a potential error
     // showError("Failed to initialize balances. Please try again.");
@@ -31,9 +31,7 @@ const InitializeBalances = () => {
             <span className="font-bold">Warning:</span> This is a critical operation and cannot be easily undone.
             Ensure you have backed up any necessary data before proceeding.
           </p>
-          <Button onClick={handleInitialize} variant="destructive">
-            Initialize All Balances
-          </Button>
+          <InitializeBalancesDialog onInitialize={handleInitialize} /> {/* Use the new dialog */}
         </CardContent>
       </Card>
     </div>

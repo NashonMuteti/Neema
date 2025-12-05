@@ -97,7 +97,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projec
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">Collections</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto"> {/* Adjusted max-width and added scroll */}
         <DialogHeader>
           <DialogTitle>Manage Collections for {projectName}</DialogTitle>
           <DialogDescription>
@@ -105,15 +105,15 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projec
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"> {/* Responsive layout */}
             <div className="flex items-center gap-2">
-              <Label htmlFor="contribution-date">Contribution Date:</Label>
+              <Label htmlFor="contribution-date" className="shrink-0">Contribution Date:</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant={"outline"}
                     className={cn(
-                      "w-[240px] justify-start text-left font-normal",
+                      "w-[180px] justify-start text-left font-normal", // Adjusted width
                       !date && "text-muted-foreground"
                     )}
                   >
@@ -131,7 +131,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projec
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2 mt-2 sm:mt-0"> {/* Responsive buttons */}
               <Button variant="outline" size="sm" onClick={handleExcelUpload}>
                 <Upload className="mr-2 h-4 w-4" /> Upload Excel
               </Button>
@@ -144,8 +144,8 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projec
           <h3 className="text-lg font-semibold mt-4">Member Contributions</h3>
           <div className="space-y-2">
             {dummyMembers.map((member) => (
-              <div key={member.id} className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor={`member-${member.id}`} className="text-right">
+              <div key={member.id} className="grid grid-cols-2 sm:grid-cols-4 items-center gap-4"> {/* Adjusted grid */}
+                <Label htmlFor={`member-${member.id}`} className="text-left sm:text-right">
                   {member.name}
                 </Label>
                 <Input
@@ -153,7 +153,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projec
                   type="number"
                   value={contributions[member.id] || ""}
                   onChange={(e) => handleContributionChange(member.id, e.target.value)}
-                  className="col-span-3"
+                  className="col-span-1 sm:col-span-3"
                   placeholder="Amount"
                 />
               </div>
@@ -161,7 +161,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projec
           </div>
 
           <h3 className="text-lg font-semibold mt-4">Payment Method</h3>
-          <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="flex space-x-4">
+          <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="flex flex-wrap gap-4"> {/* Responsive radio group */}
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="cash" id="r1" />
               <Label htmlFor="r1">Cash</Label>

@@ -7,6 +7,14 @@ import NewProjectDialog from "@/components/projects/NewProjectDialog";
 import CollectionsDialog from "@/components/projects/CollectionsDialog";
 import ProjectPledgesDialog from "@/components/projects/ProjectPledgesDialog";
 import { showSuccess, showError } from "@/utils/toast";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Placeholder for a privileged user check
 const isAdmin = true; // This should come from user context/authentication
@@ -25,8 +33,14 @@ const Projects = () => {
     { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed" },
     { id: "proj4", name: "Archived Project A", description: "An old project that was deleted.", status: "Deleted" },
   ]);
+  const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "All">("Open");
 
-  const openProjects = projects.filter(project => project.status === "Open");
+  const filteredProjects = projects.filter(project => {
+    if (filterStatus === "All") {
+      return project.status !== "Deleted"; // Show all non-deleted projects
+    }
+    return project.status === filterStatus;
+  });
 
   const handleAddProject = (projectData: { name: string; description: string }) => {
     const newProject: Project = {
@@ -72,15 +86,29 @@ const Projects = () => {
       <p className="text-lg text-muted-foreground">
         Manage your project-specific financial contributions and reports here.
       </p>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Open Projects</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold">Projects</h2>
+          <Select value={filterStatus} onValueChange={(value: "Open" | "Closed" | "All") => setFilterStatus(value)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="All">All (Excluding Deleted)</SelectItem>
+                <SelectItem value="Open">Open</SelectItem>
+                <SelectItem value="Closed">Closed</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
         {isAdmin && (
           <NewProjectDialog onAddProject={handleAddProject} />
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {openProjects.length > 0 ? (
-          openProjects.map((project) => (
+        {filteredProjects.length > 0 ? (
+          filteredProjects.map((project) => (
             <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">
               <CardHeader>
                 <CardTitle>{project.name}</CardTitle>
@@ -119,7 +147,7 @@ const Projects = () => {
             </Card>
           ))
         ) : (
-          <p className="text-muted-foreground col-span-full">No open projects found.</p>
+          <p className="text-muted-foreground col-span-full">No projects found with status "{filterStatus}".</p>
         )}
       </div>
     </div>
