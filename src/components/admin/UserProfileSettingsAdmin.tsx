@@ -9,26 +9,17 @@ const UserProfileSettingsAdmin = () => {
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
-        <CardTitle>User Profile Settings</CardTitle>
+        <CardTitle>User Management (Admin)</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-muted-foreground mb-4">
-          Manage individual user profiles and their permissions.
+          As an administrator, you can view, edit, and manage other users' accounts, roles, and group permissions.
         </p>
         <div className="space-y-4">
           <div>
-            <h3 className="font-semibold mb-2">Current User Profile</h3>
+            <h3 className="font-semibold mb-2">Manage Individual User Profiles</h3>
             <p className="text-sm text-muted-foreground mb-2">
-              Access and modify your own profile details.
-            </p>
-            <Link to="/profile">
-              <Button variant="outline">Go to My Profile</Button>
-            </Link>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-2">User Management (Admin)</h3>
-            <p className="text-sm text-muted-foreground mb-2">
-              As an administrator, you can view, edit, and manage other users' accounts and roles.
+              Access and modify specific user details, roles, and the groups they can access.
             </p>
             {/* Placeholder for a link to a dedicated user management page */}
             <Button variant="outline" disabled>Manage All Users (Coming Soon)</Button>

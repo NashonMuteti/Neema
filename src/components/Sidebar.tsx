@@ -51,8 +51,8 @@ const navItems = [
     icon: FileText, // Using FileText for reports, can be changed
   },
   {
-    name: "User Profile",
-    href: "/profile",
+    name: "My Settings", // Renamed from User Profile
+    href: "/settings", // New path for personal settings
     icon: Settings,
   },
 ];
