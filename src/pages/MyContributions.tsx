@@ -28,7 +28,7 @@ const dummyUserContributions = [
   { id: "c7", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-10-01", amount: 25, expected: 50 },
 ];
 
-const MyContributions = () => {
+const MyContributions: React.FC = () => {
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
@@ -93,7 +93,7 @@ const MyContributions = () => {
           <CardHeader>
             <CardTitle>Contribution Calendar</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col items-stretch space-y-4"> {/* Changed items-center to items-stretch */}
+          <CardContent className="flex flex-col items-stretch space-y-4">
             <div className="flex flex-wrap gap-4 justify-center">
               <Select value={filterMonth} onValueChange={setFilterMonth}>
                 <SelectTrigger className="w-[140px]">
@@ -130,7 +130,7 @@ const MyContributions = () => {
               mode="single"
               selected={selectedDate}
               onSelect={setSelectedDate}
-              className="rounded-md border shadow w-full" {/* Added w-full */}
+              className="rounded-md border shadow w-full"
               month={new Date(parseInt(filterYear), parseInt(filterMonth))}
               onMonthChange={(month) => {
                 setFilterMonth(getMonth(month).toString());
