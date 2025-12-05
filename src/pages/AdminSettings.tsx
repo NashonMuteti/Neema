@@ -6,6 +6,7 @@ import SecuritySettings from "@/components/admin/SecuritySettings";
 import AppCustomization from "@/components/admin/AppCustomization";
 import ReportsTemplateCustomization from "@/components/admin/ReportsTemplateCustomization";
 import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmin"; // Placeholder for admin user settings
+import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings"; // Import the new component
 
 const AdminSettings = () => {
   return (
@@ -15,13 +16,17 @@ const AdminSettings = () => {
         Manage application-wide settings, security, customization, and user profiles.
       </p>
 
-      <Tabs defaultValue="security" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="general" className="w-full"> {/* Changed default value to 'general' */}
+        <TabsList className="grid w-full grid-cols-5"> {/* Increased grid columns */}
+          <TabsTrigger value="general">General</TabsTrigger> {/* New tab */}
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="app-customization">App Customization</TabsTrigger>
-          <TabsTrigger value="user-profiles">User Management</TabsTrigger> {/* Renamed tab */}
+          <TabsTrigger value="user-profiles">User Management</TabsTrigger>
           <TabsTrigger value="reports-templates">Reports Templates</TabsTrigger>
         </TabsList>
+        <TabsContent value="general"> {/* New tab content */}
+          <SystemCurrencySettings />
+        </TabsContent>
         <TabsContent value="security">
           <SecuritySettings />
         </TabsContent>
