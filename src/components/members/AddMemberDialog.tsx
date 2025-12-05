@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { showSuccess, showError } from "@/utils/toast"; // Assuming toast utility
+import { showSuccess, showError } from "@/utils/toast";
+import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
 
 interface AddMemberDialogProps {
   onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string }) => void;
@@ -22,10 +23,31 @@ interface AddMemberDialogProps {
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
-  const [imageUrl, setImageUrl] = React.useState(""); // New state for image URL
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // State for the uploaded file
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null); // State for image preview
   const [enableLogin, setEnableLogin] = React.useState(false);
   const [defaultPassword, setDefaultPassword] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    // Clean up the object URL when the component unmounts or file changes
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file)); // Create a URL for immediate preview
+    } else {
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    }
+  };
 
   const handleSubmit = () => {
     if (!name || !email) {
@@ -37,12 +59,27 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       return;
     }
 
-    onAddMember({ name, email, enableLogin, imageUrl: imageUrl || undefined, defaultPassword: enableLogin ? defaultPassword : undefined });
+    let memberImageUrl: string | undefined = undefined;
+    if (selectedFile) {
+      // In a real app, this is where you'd upload the file to a storage service
+      // and get a permanent URL. For now, we use the preview URL.
+      memberImageUrl = previewUrl || undefined;
+    }
+
+    onAddMember({
+      name,
+      email,
+      enableLogin,
+      imageUrl: memberImageUrl,
+      defaultPassword: enableLogin ? defaultPassword : undefined,
+    });
     showSuccess("Member added successfully!");
     setIsOpen(false);
+    // Reset form states
     setName("");
     setEmail("");
-    setImageUrl(""); // Reset image URL
+    setSelectedFile(null);
+    setPreviewUrl(null);
     setEnableLogin(false);
     setDefaultPassword("");
   };
@@ -83,18 +120,24 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               className="col-span-3"
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="imageUrl" className="text-right">
-              Image URL
-            </Label>
-            <Input
-              id="imageUrl"
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="Optional image URL"
-              className="col-span-3"
-            />
+          <div className="flex flex-col items-center gap-4 col-span-full">
+            {previewUrl ? (
+              <img src={previewUrl} alt="Member Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
+            ) : (
+              <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
+                <ImageIcon className="h-12 w-12" />
+              </div>
+            )}
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="member-image-upload" className="text-center">Upload Image</Label>
+              <Input
+                id="member-image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="col-span-3"
+              />
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="enableLogin" className="text-right">
@@ -123,10 +166,12 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
           )}
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit}>Save Member</Button>
+          <Button onClick={handleSubmit} disabled={!name || !email || (enableLogin && !defaultPassword)}>
+            <Upload className="mr-2 h-4 w-4" /> Save Member
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Enabling login and setting passwords requires a backend authentication system (e.g., Supabase).
+          Note: Image storage and serving, along with backend authentication for login, require backend integration (e.g., Supabase).
         </p>
       </DialogContent>
     </Dialog>
