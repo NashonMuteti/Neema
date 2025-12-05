@@ -19,7 +19,8 @@ import PledgeReport from "./pages/Reports/PledgeReport";
 import AdminSettings from "./pages/AdminSettings";
 import UserActivityReport from "./pages/Reports/UserActivityReport";
 import InitializeBalances from "./pages/InitializeBalances";
-import DeletedProjectsReport from "./pages/Reports/DeletedProjectsReport"; // New report
+import DeletedProjectsReport from "./pages/Reports/DeletedProjectsReport";
+import IncomeExpenditure from "./pages/IncomeExpenditure"; // Import the new page
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/projects" element={<Projects />} />
             <Route path="/petty-cash" element={<PettyCash />} />
             <Route path="/pledges" element={<Pledges />} />
+            <Route path="/income-expenditure" element={<IncomeExpenditure />} /> {/* New route */}
             <Route path="/profile" element={<UserSettings />} />
             <Route path="/settings" element={<UserSettings />} />
             <Route path="/members" element={<Members />} />
@@ -42,7 +44,7 @@ const App = () => (
             <Route path="/reports/petty-cash" element={<PettyCashReport />} />
             <Route path="/reports/pledges" element={<PledgeReport />} />
             <Route path="/reports/user-activity" element={<UserActivityReport />} />
-            <Route path="/reports/deleted-projects" element={<DeletedProjectsReport />} /> {/* New route */}
+            <Route path="/reports/deleted-projects" element={<DeletedProjectsReport />} />
             <Route path="/initialize-balances" element={<InitializeBalances />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

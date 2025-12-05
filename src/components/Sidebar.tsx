@@ -3,7 +3,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX } from "lucide-react"; // Added ChevronDown and FolderX icons
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp } from "lucide-react"; // Added TrendingUp icon
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible
 
 // Placeholder for a privileged user check
@@ -32,6 +32,12 @@ const navItems = [
     name: "Pledges",
     href: "/pledges",
     icon: Handshake,
+    privileged: false,
+  },
+  {
+    name: "Income & Expenditure", // New menu item
+    href: "/income-expenditure",
+    icon: TrendingUp, // Using TrendingUp icon for income/expenditure
     privileged: false,
   },
   {
