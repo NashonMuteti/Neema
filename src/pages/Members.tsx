@@ -14,7 +14,7 @@ import AddMemberDialog from "@/components/members/AddMemberDialog";
 import EditMemberDialog from "@/components/members/EditMemberDialog";
 import DeleteMemberDialog from "@/components/members/DeleteMemberDialog";
 import { showSuccess } from "@/utils/toast";
-import { User as UserIcon, Printer, FileSpreadsheet, Search } from "lucide-react"; // Import Search icon
+import { User as UserIcon, Printer, FileSpreadsheet, Search, Eye } from "lucide-react"; // Import Eye icon
 import {
   Select,
   SelectContent,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input"; // Import Input component
 import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils"; // Import report utilities
+import { Link } from "react-router-dom"; // Import Link for navigation
 
 // Placeholder for a privileged user check
 const isAdmin = true; // This should come from user context/authentication
@@ -178,6 +179,7 @@ const Members = () => {
               <TableHead className="text-center">Login Enabled</TableHead>
               <TableHead className="text-center">Status</TableHead>
               {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+              <TableHead className="text-center">Contributions</TableHead> {/* New TableHead */}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -217,6 +219,13 @@ const Members = () => {
                     <DeleteMemberDialog member={member} onDeleteMember={handleDeleteMember} />
                   </TableCell>
                 )}
+                <TableCell className="text-center"> {/* New TableCell for contributions button */}
+                  <Link to={`/members/${member.id}/contributions`}>
+                    <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4 mr-2" /> View
+                    </Button>
+                  </Link>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

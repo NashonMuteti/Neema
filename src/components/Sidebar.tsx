@@ -3,7 +3,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog } from "lucide-react"; // Added UserCog icon
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays } from "lucide-react"; // Added CalendarDays icon
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible
 
 // Placeholder for a privileged user check
@@ -112,6 +112,12 @@ const navItems = [
     name: "My Settings",
     href: "/settings",
     icon: Settings,
+    privileged: false,
+  },
+  {
+    name: "My Contributions", // New menu item for logged-in user's contributions
+    href: "/my-contributions",
+    icon: CalendarDays, // Using CalendarDays icon
     privileged: false,
   },
 ];
