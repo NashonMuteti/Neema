@@ -33,9 +33,10 @@ interface Project {
   id: string;
   name: string;
   description: string;
-  status: "Open" | "Closed" | "Deleted" | "Suspended"; // Added 'Suspended'
+  status: "Open" | "Closed" | "Deleted" | "Suspended";
   thumbnailUrl?: string;
-  dueDate?: Date; // New: Optional due date
+  dueDate?: Date;
+  memberContributionAmount?: number; // New: Amount each member is expected to contribute
 }
 
 interface EditProjectDialogProps {
@@ -46,10 +47,13 @@ interface EditProjectDialogProps {
 const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditProject }) => {
   const [name, setName] = React.useState(project.name);
   const [description, setDescription] = React.useState(project.description);
-  const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted" | "Suspended">(project.status); // Added 'Suspended'
+  const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted" | "Suspended">(project.status);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(project.thumbnailUrl || null);
-  const [dueDate, setDueDate] = React.useState<Date | undefined>(project.dueDate ? new Date(project.dueDate) : undefined); // New: Due date state
+  const [dueDate, setDueDate] = React.useState<Date | undefined>(project.dueDate ? new Date(project.dueDate) : undefined);
+  const [memberContributionAmount, setMemberContributionAmount] = React.useState<string>(
+    project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : ""
+  ); // New: Member contribution amount
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -59,7 +63,8 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       setStatus(project.status);
       setSelectedFile(null);
       setPreviewUrl(project.thumbnailUrl || null);
-      setDueDate(project.dueDate ? new Date(project.dueDate) : undefined); // Reset due date
+      setDueDate(project.dueDate ? new Date(project.dueDate) : undefined);
+      setMemberContributionAmount(project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : "");
     }
     return () => {
       if (previewUrl && previewUrl.startsWith("blob:")) {
@@ -85,6 +90,12 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       return;
     }
 
+    const parsedContributionAmount = parseFloat(memberContributionAmount);
+    if (memberContributionAmount !== "" && (isNaN(parsedContributionAmount) || parsedContributionAmount < 0)) {
+      showError("Please enter a valid non-negative number for member contribution.");
+      return;
+    }
+
     let projectThumbnailUrl: string | undefined = project.thumbnailUrl;
     if (selectedFile && previewUrl) {
       projectThumbnailUrl = previewUrl;
@@ -98,7 +109,8 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       description,
       status,
       thumbnailUrl: projectThumbnailUrl,
-      dueDate, // Pass dueDate
+      dueDate,
+      memberContributionAmount: memberContributionAmount === "" ? undefined : parsedContributionAmount,
     });
     showSuccess("Project updated successfully!");
     setIsOpen(false);
@@ -139,7 +151,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               className="col-span-3"
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4"> {/* New: Due Date field */}
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="due-date" className="text-right">
               Due Date
             </Label>
@@ -166,6 +178,20 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               </PopoverContent>
             </Popover>
           </div>
+          <div className="grid grid-cols-4 items-center gap-4"> {/* New: Member Contribution Amount */}
+            <Label htmlFor="member-contribution" className="text-right">
+              Member Contribution
+            </Label>
+            <Input
+              id="member-contribution"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              value={memberContributionAmount}
+              onChange={(e) => setMemberContributionAmount(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="status" className="text-right">
               Status
@@ -179,7 +205,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
                   <SelectLabel>Project Status</SelectLabel>
                   <SelectItem value="Open">Open</SelectItem>
                   <SelectItem value="Closed">Closed</SelectItem>
-                  <SelectItem value="Suspended">Suspended</SelectItem> {/* Added Suspended */}
+                  <SelectItem value="Suspended">Suspended</SelectItem>
                   <SelectItem value="Deleted">Deleted</SelectItem>
                 </SelectGroup>
               </SelectContent>

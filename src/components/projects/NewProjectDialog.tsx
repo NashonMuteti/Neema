@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"; // Import cn for styling
 import { format } from "date-fns"; // Import format for date display
 
 interface NewProjectDialogProps {
-  onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date }) => void;
+  onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => void;
 }
 
 const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => {
@@ -29,7 +29,8 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   const [description, setDescription] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-  const [dueDate, setDueDate] = React.useState<Date | undefined>(undefined); // New: Due date state
+  const [dueDate, setDueDate] = React.useState<Date | undefined>(undefined);
+  const [memberContributionAmount, setMemberContributionAmount] = React.useState<string>(""); // New: Member contribution amount
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -57,19 +58,32 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
       return;
     }
 
+    const parsedContributionAmount = parseFloat(memberContributionAmount);
+    if (memberContributionAmount !== "" && (isNaN(parsedContributionAmount) || parsedContributionAmount < 0)) {
+      showError("Please enter a valid non-negative number for member contribution.");
+      return;
+    }
+
     let projectThumbnailUrl: string | undefined = undefined;
     if (selectedFile && previewUrl) {
       projectThumbnailUrl = previewUrl;
     }
 
-    onAddProject({ name, description, thumbnailUrl: projectThumbnailUrl, dueDate }); // Pass dueDate
+    onAddProject({
+      name,
+      description,
+      thumbnailUrl: projectThumbnailUrl,
+      dueDate,
+      memberContributionAmount: memberContributionAmount === "" ? undefined : parsedContributionAmount,
+    });
     showSuccess("Project added successfully!");
     setIsOpen(false);
     setName("");
     setDescription("");
     setSelectedFile(null);
     setPreviewUrl(null);
-    setDueDate(undefined); // Reset due date
+    setDueDate(undefined);
+    setMemberContributionAmount(""); // Reset
   };
 
   return (
@@ -107,7 +121,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               className="col-span-3"
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4"> {/* New: Due Date field */}
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="due-date" className="text-right">
               Due Date
             </Label>
@@ -133,6 +147,20 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
                 />
               </PopoverContent>
             </Popover>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4"> {/* New: Member Contribution Amount */}
+            <Label htmlFor="member-contribution" className="text-right">
+              Member Contribution
+            </Label>
+            <Input
+              id="member-contribution"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              value={memberContributionAmount}
+              onChange={(e) => setMemberContributionAmount(e.target.value)}
+              className="col-span-3"
+            />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
             {previewUrl ? (
