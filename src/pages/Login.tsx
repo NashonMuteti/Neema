@@ -2,9 +2,10 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Github, Google } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { showError } from "@/utils/toast";
+import GoogleIcon from "@/components/icons/GoogleIcon"; // Import the new GoogleIcon
+import GithubIcon from "@/components/icons/GithubIcon"; // Import the new GithubIcon
 
 const LoginPage = () => {
   const handleOAuthSignIn = async (provider: "google" | "github") => {
@@ -35,14 +36,14 @@ const LoginPage = () => {
             className="w-full flex items-center justify-center gap-2 py-6 text-lg"
             onClick={() => handleOAuthSignIn("google")}
           >
-            <Google className="h-5 w-5" />
+            <GoogleIcon className="h-5 w-5" />
             Sign in with Google
           </Button>
           <Button
             className="w-full flex items-center justify-center gap-2 py-6 text-lg"
             onClick={() => handleOAuthSignIn("github")}
           >
-            <Github className="h-5 w-5" />
+            <GithubIcon className="h-5 w-5" />
             Sign in with GitHub
           </Button>
         </div>
