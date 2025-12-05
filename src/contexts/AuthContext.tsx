@@ -7,7 +7,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase"; // Import as named export
 import { Session, User } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
 import { showSuccess, showError } from "@/utils/toast";
@@ -30,6 +30,12 @@ export const AuthContextProvider: React.FC<{ children: ReactNode }> = ({
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      console.warn("Supabase client is not initialized. Authentication features are disabled.");
+      return;
+    }
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
@@ -57,6 +63,10 @@ export const AuthContextProvider: React.FC<{ children: ReactNode }> = ({
   }, [navigate]);
 
   const signOut = async () => {
+    if (!supabase) {
+      showError("Supabase is not configured. Cannot sign out.");
+      return;
+    }
     const { error } = await supabase.auth.signOut();
     if (error) {
       showError("Failed to sign out.");
