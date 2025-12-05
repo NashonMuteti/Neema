@@ -4,7 +4,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
-import EditProjectDialog from "@/components/projects/EditProjectDialog"; // Import the new component
+import EditProjectDialog from "@/components/projects/EditProjectDialog";
 import CollectionsDialog from "@/components/projects/CollectionsDialog";
 import ProjectPledgesDialog from "@/components/projects/ProjectPledgesDialog";
 import UploadThumbnailDialog from "@/components/projects/UploadThumbnailDialog";
@@ -17,7 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon } from "lucide-react"; // Import ImageIcon for placeholder
+import { Image as ImageIcon, CalendarIcon } from "lucide-react"; // Import CalendarIcon
+import { format } from "date-fns"; // Import format for date display
 
 // Placeholder for a privileged user check
 const isAdmin = true; // This should come from user context/authentication
@@ -28,31 +29,45 @@ interface Project {
   description: string;
   status: "Open" | "Closed" | "Deleted";
   thumbnailUrl?: string; // Added optional thumbnail URL
+  dueDate?: Date; // New: Optional due date
 }
 
 const Projects = () => {
   const [projects, setProjects] = React.useState<Project[]>([
-    { id: "proj1", name: "Film Production X", description: "Main film project for the year.", status: "Open", thumbnailUrl: "/placeholder.svg" },
-    { id: "proj2", name: "Marketing Campaign Y", description: "Promotional activities for new releases.", status: "Open", thumbnailUrl: "/placeholder.svg" },
-    { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed", thumbnailUrl: "/placeholder.svg" },
+    { id: "proj1", name: "Film Production X", description: "Main film project for the year.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 11, 15) }, // Dec 15, 2024
+    { id: "proj2", name: "Marketing Campaign Y", description: "Promotional activities for new releases.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 7, 30) }, // Aug 30, 2024
+    { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 8, 10) }, // Sep 10, 2024
     { id: "proj4", name: "Archived Project A", description: "An old project that was deleted.", status: "Deleted" },
+    { id: "proj5", name: "Short Film Contest", description: "Submission for a local short film festival.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 6, 20) }, // July 20, 2024
+    { id: "proj6", name: "Documentary Research", description: "Initial research phase for a new documentary.", status: "Open", thumbnailUrl: "/placeholder.svg" }, // No due date
   ]);
   const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "All">("Open");
 
-  const filteredProjects = projects.filter(project => {
-    if (filterStatus === "All") {
-      return project.status !== "Deleted"; // Show all non-deleted projects
-    }
-    return project.status === filterStatus;
-  });
+  const filteredProjects = projects
+    .filter(project => {
+      if (filterStatus === "All") {
+        return project.status !== "Deleted"; // Show all non-deleted projects
+      }
+      return project.status === filterStatus;
+    })
+    .sort((a, b) => {
+      // Sort by due date: soonest due on top, projects without due date last
+      if (a.dueDate && b.dueDate) {
+        return a.dueDate.getTime() - b.dueDate.getTime();
+      }
+      if (a.dueDate) return -1; // a has a due date, b doesn't, so a comes first
+      if (b.dueDate) return 1;  // b has a due date, a doesn't, so b comes first
+      return 0; // Neither has a due date, maintain original order
+    });
 
-  const handleAddProject = (projectData: { name: string; description: string; thumbnailUrl?: string }) => {
+  const handleAddProject = (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date }) => {
     const newProject: Project = {
       id: `proj${projects.length + 1}`,
       name: projectData.name,
       description: projectData.description,
       status: "Open",
       thumbnailUrl: projectData.thumbnailUrl || "/placeholder.svg", // Use uploaded thumbnail or default
+      dueDate: projectData.dueDate,
     };
     setProjects((prev) => [...prev, newProject]);
     console.log("Adding project:", newProject);
@@ -147,6 +162,12 @@ const Projects = () => {
                 </div>
                 <p className="text-muted-foreground text-sm">{project.description}</p>
                 <p className="text-sm">Status: <span className="font-medium">{project.status}</span></p>
+                {project.dueDate && (
+                  <p className="text-sm flex items-center gap-1">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    Due: <span className="font-medium">{format(project.dueDate, "MMM dd, yyyy")}</span>
+                  </p>
+                )}
                 {isAdmin && (
                   <div className="flex flex-wrap gap-2 mt-4">
                     <CollectionsDialog
@@ -158,7 +179,7 @@ const Projects = () => {
                       projectId={project.id}
                       projectName={project.name}
                     />
-                    <EditProjectDialog project={project} onEditProject={handleEditProject} /> {/* New Edit button */}
+                    <EditProjectDialog project={project} onEditProject={handleEditProject} />
                     <Button
                       variant="outline"
                       size="sm"
@@ -173,7 +194,6 @@ const Projects = () => {
                     >
                       Delete
                     </Button>
-                    {/* UploadThumbnailDialog is now redundant as EditProjectDialog handles it */}
                   </div>
                 )}
               </CardContent>

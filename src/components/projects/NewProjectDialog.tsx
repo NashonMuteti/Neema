@@ -13,11 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
+import { Image as ImageIcon, Upload, CalendarIcon } from "lucide-react"; // Import CalendarIcon
 import { showSuccess, showError } from "@/utils/toast";
+import { Calendar } from "@/components/ui/calendar"; // Import Calendar
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Import Popover components
+import { cn } from "@/lib/utils"; // Import cn for styling
+import { format } from "date-fns"; // Import format for date display
 
 interface NewProjectDialogProps {
-  onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string }) => void;
+  onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date }) => void;
 }
 
 const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => {
@@ -25,6 +29,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   const [description, setDescription] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+  const [dueDate, setDueDate] = React.useState<Date | undefined>(undefined); // New: Due date state
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -57,13 +62,14 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
       projectThumbnailUrl = previewUrl;
     }
 
-    onAddProject({ name, description, thumbnailUrl: projectThumbnailUrl });
+    onAddProject({ name, description, thumbnailUrl: projectThumbnailUrl, dueDate }); // Pass dueDate
     showSuccess("Project added successfully!");
     setIsOpen(false);
     setName("");
     setDescription("");
     setSelectedFile(null);
     setPreviewUrl(null);
+    setDueDate(undefined); // Reset due date
   };
 
   return (
@@ -100,6 +106,33 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               onChange={(e) => setDescription(e.target.value)}
               className="col-span-3"
             />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4"> {/* New: Due Date field */}
+            <Label htmlFor="due-date" className="text-right">
+              Due Date
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "col-span-3 justify-start text-left font-normal",
+                    !dueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dueDate}
+                  onSelect={setDueDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
             {previewUrl ? (

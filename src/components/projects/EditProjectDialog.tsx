@@ -22,8 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon, Upload } from "lucide-react";
+import { Image as ImageIcon, Upload, CalendarIcon } from "lucide-react"; // Import CalendarIcon
 import { showSuccess, showError } from "@/utils/toast";
+import { Calendar } from "@/components/ui/calendar"; // Import Calendar
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Import Popover components
+import { cn } from "@/lib/utils"; // Import cn for styling
+import { format } from "date-fns"; // Import format for date display
 
 interface Project {
   id: string;
@@ -31,6 +35,7 @@ interface Project {
   description: string;
   status: "Open" | "Closed" | "Deleted";
   thumbnailUrl?: string;
+  dueDate?: Date; // New: Optional due date
 }
 
 interface EditProjectDialogProps {
@@ -44,6 +49,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted">(project.status);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(project.thumbnailUrl || null);
+  const [dueDate, setDueDate] = React.useState<Date | undefined>(project.dueDate ? new Date(project.dueDate) : undefined); // New: Due date state
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -53,6 +59,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       setStatus(project.status);
       setSelectedFile(null);
       setPreviewUrl(project.thumbnailUrl || null);
+      setDueDate(project.dueDate ? new Date(project.dueDate) : undefined); // Reset due date
     }
     return () => {
       if (previewUrl && previewUrl.startsWith("blob:")) {
@@ -91,6 +98,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       description,
       status,
       thumbnailUrl: projectThumbnailUrl,
+      dueDate, // Pass dueDate
     });
     showSuccess("Project updated successfully!");
     setIsOpen(false);
@@ -131,24 +139,32 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               className="col-span-3"
             />
           </div>
-          <div className="flex flex-col items-center gap-4 col-span-full">
-            {previewUrl ? (
-              <img src={previewUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
-            ) : (
-              <div className="w-32 h-32 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
-                <ImageIcon className="h-12 w-12" />
-              </div>
-            )}
-            <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="project-image-upload" className="text-center">Upload Thumbnail</Label>
-              <Input
-                id="project-image-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="col-span-3"
-              />
-            </div>
+          <div className="grid grid-cols-4 items-center gap-4"> {/* New: Due Date field */}
+            <Label htmlFor="due-date" className="text-right">
+              Due Date
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "col-span-3 justify-start text-left font-normal",
+                    !dueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dueDate}
+                  onSelect={setDueDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="status" className="text-right">
@@ -167,6 +183,25 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
                 </SelectGroup>
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex flex-col items-center gap-4 col-span-full">
+            {previewUrl ? (
+              <img src={previewUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
+            ) : (
+              <div className="w-32 h-32 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
+                <ImageIcon className="h-12 w-12" />
+              </div>
+            )}
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="project-image-upload" className="text-center">Upload Thumbnail</Label>
+              <Input
+                id="project-image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="col-span-3"
+              />
+            </div>
           </div>
         </div>
         <div className="flex justify-end">
