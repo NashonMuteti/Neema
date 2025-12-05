@@ -3,6 +3,7 @@
 import React from "react";
 import SoonDueProjectsGraph from "@/components/dashboard/SoonDueProjectsGraph"; // Import the new graph component
 import ContributionsProgressGraph from "@/components/dashboard/ContributionsProgressGraph"; // Import the new contributions graph
+import IncomeExpenditureGraph from "@/components/dashboard/IncomeExpenditureGraph"; // Import the new income/expenditure graph
 
 // Define a simplified Project interface for the dashboard's dummy data
 interface DashboardProject {
@@ -34,6 +35,24 @@ const Index = () => {
     { name: "Budget Review", expected: 800, actual: 800 },
   ];
 
+  // Dummy data for income and expenditure graph for a specific year (e.g., 2024)
+  const dummyFinancialData = [
+    { month: "Jan", income: 1200, expenditure: 800 },
+    { month: "Feb", income: 1500, expenditure: 1000 },
+    { month: "Mar", income: 1000, expenditure: 1100 },
+    { month: "Apr", income: 1800, expenditure: 1300 },
+    { month: "May", income: 2000, expenditure: 1500 },
+    { month: "Jun", income: 1700, expenditure: 900 },
+    { month: "Jul", income: 2200, expenditure: 1600 },
+    { month: "Aug", income: 1900, expenditure: 1200 },
+    { month: "Sep", income: 2500, expenditure: 1800 },
+    { month: "Oct", income: 1600, expenditure: 1400 },
+    { month: "Nov", income: 2100, expenditure: 1700 },
+    { month: "Dec", income: 2300, expenditure: 1900 },
+  ];
+
+  const availableYears = [2022, 2023, 2024, 2025]; // Dummy years for the filter
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary-foreground">Dashboard</h1>
@@ -42,19 +61,12 @@ const Index = () => {
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Placeholder for Dashboard content */}
-        <div className="bg-card p-6 rounded-lg shadow-lg border transition-all duration-300 ease-in-out hover:shadow-xl">
-          <h2 className="text-xl font-semibold mb-2">Weekly Summary</h2>
-          <p className="text-muted-foreground">Collections vs. expenses for the current week.</p>
-          {/* More content will go here */}
-        </div>
-        <div className="bg-card p-6 rounded-lg shadow-lg border transition-all duration-300 ease-in-out hover:shadow-xl">
-          <h2 className="text-xl font-semibold mb-2">Monthly Summary</h2>
-          <p className="text-muted-foreground">Collections vs. expenses for the current month.</p>
-          {/* More content will go here */}
-        </div>
+        {/* Income and Expenditure Graph (full width) */}
+        <IncomeExpenditureGraph financialData={dummyFinancialData} availableYears={availableYears} />
+        
         {/* Soon Due Projects Graph */}
         <SoonDueProjectsGraph projects={dummyDashboardProjects} />
+        
         {/* Contributions Progress Graph */}
         <ContributionsProgressGraph projectsData={dummyContributionsData} />
       </div>
