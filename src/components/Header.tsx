@@ -12,9 +12,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User } from "lucide-react";
-import { ThemeToggle } from "./ThemeToggle"; // Import ThemeToggle
-import { GroupSelector } from "./GroupSelector"; // Import GroupSelector
+import { LogOut, Settings, User, Shield } from "lucide-react"; // Added Shield icon for Admin
+import { ThemeToggle } from "./ThemeToggle";
+import { GroupSelector } from "./GroupSelector";
 
 const Header = () => {
   // Placeholder for user data, will be replaced with actual user context from Supabase
@@ -22,6 +22,7 @@ const Header = () => {
     name: "John Doe",
     email: "john.doe@example.com",
     initials: "JD",
+    isAdmin: true, // Assume admin for now to show the menu
   };
 
   return (
@@ -33,8 +34,28 @@ const Header = () => {
         </Link>
       </div>
       <div className="flex items-center space-x-4">
-        <GroupSelector /> {/* Add GroupSelector */}
-        <ThemeToggle /> {/* Add ThemeToggle */}
+        <GroupSelector />
+        <ThemeToggle />
+        {user.isAdmin && ( // Only show Admin menu if user is admin
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Shield className="h-[1.2rem] w-[1.2rem]" />
+                <span className="sr-only">Admin Menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Admin</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/admin/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -53,13 +74,15 @@ const Header = () => {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
+            <DropdownMenuItem asChild>
+              <Link to="/profile">
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
+              <span>Settings</span> {/* This could be personal settings */}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
