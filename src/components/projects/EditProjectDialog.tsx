@@ -13,27 +13,53 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Image as ImageIcon, Upload } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 
-interface NewProjectDialogProps {
-  onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string }) => void;
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  status: "Open" | "Closed" | "Deleted";
+  thumbnailUrl?: string;
 }
 
-const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => {
-  const [name, setName] = React.useState("");
-  const [description, setDescription] = React.useState("");
+interface EditProjectDialogProps {
+  project: Project;
+  onEditProject: (projectData: Project) => void;
+}
+
+const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditProject }) => {
+  const [name, setName] = React.useState(project.name);
+  const [description, setDescription] = React.useState(project.description);
+  const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted">(project.status);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(project.thumbnailUrl || null);
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
+    if (isOpen) {
+      setName(project.name);
+      setDescription(project.description);
+      setStatus(project.status);
+      setSelectedFile(null);
+      setPreviewUrl(project.thumbnailUrl || null);
+    }
     return () => {
-      if (previewUrl) {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(previewUrl);
       }
     };
-  }, [previewUrl]);
+  }, [isOpen, project, previewUrl]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -42,7 +68,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
       setPreviewUrl(URL.createObjectURL(file));
     } else {
       setSelectedFile(null);
-      setPreviewUrl(null);
+      setPreviewUrl(project.thumbnailUrl || null);
     }
   };
 
@@ -52,30 +78,34 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
       return;
     }
 
-    let projectThumbnailUrl: string | undefined = undefined;
+    let projectThumbnailUrl: string | undefined = project.thumbnailUrl;
     if (selectedFile && previewUrl) {
       projectThumbnailUrl = previewUrl;
+    } else if (!selectedFile && !project.thumbnailUrl) {
+      projectThumbnailUrl = undefined;
     }
 
-    onAddProject({ name, description, thumbnailUrl: projectThumbnailUrl });
-    showSuccess("Project added successfully!");
+    onEditProject({
+      ...project,
+      name,
+      description,
+      status,
+      thumbnailUrl: projectThumbnailUrl,
+    });
+    showSuccess("Project updated successfully!");
     setIsOpen(false);
-    setName("");
-    setDescription("");
-    setSelectedFile(null);
-    setPreviewUrl(null);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button>New Project</Button>
+        <Button variant="outline" size="sm">Edit</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Project</DialogTitle>
+          <DialogTitle>Edit Project</DialogTitle>
           <DialogDescription>
-            Enter the details for your new project.
+            Make changes to {project.name}'s details.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -120,9 +150,27 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               />
             </div>
           </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="status" className="text-right">
+              Status
+            </Label>
+            <Select value={status} onValueChange={(value: "Open" | "Closed" | "Deleted") => setStatus(value)}>
+              <SelectTrigger id="status" className="col-span-3">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Project Status</SelectLabel>
+                  <SelectItem value="Open">Open</SelectItem>
+                  <SelectItem value="Closed">Closed</SelectItem>
+                  <SelectItem value="Deleted">Deleted</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit}>Save Project</Button>
+          <Button onClick={handleSubmit}>Save Changes</Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Note: Image storage and serving require backend integration.
@@ -132,4 +180,4 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   );
 };
 
-export default NewProjectDialog;
+export default EditProjectDialog;

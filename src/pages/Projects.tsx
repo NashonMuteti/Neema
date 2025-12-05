@@ -4,9 +4,10 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
+import EditProjectDialog from "@/components/projects/EditProjectDialog"; // Import the new component
 import CollectionsDialog from "@/components/projects/CollectionsDialog";
 import ProjectPledgesDialog from "@/components/projects/ProjectPledgesDialog";
-import UploadThumbnailDialog from "@/components/projects/UploadThumbnailDialog"; // Import the new component
+import UploadThumbnailDialog from "@/components/projects/UploadThumbnailDialog";
 import { showSuccess, showError } from "@/utils/toast";
 import {
   Select,
@@ -45,16 +46,26 @@ const Projects = () => {
     return project.status === filterStatus;
   });
 
-  const handleAddProject = (projectData: { name: string; description: string }) => {
+  const handleAddProject = (projectData: { name: string; description: string; thumbnailUrl?: string }) => {
     const newProject: Project = {
       id: `proj${projects.length + 1}`,
       name: projectData.name,
       description: projectData.description,
       status: "Open",
-      thumbnailUrl: "/placeholder.svg", // Default thumbnail for new projects
+      thumbnailUrl: projectData.thumbnailUrl || "/placeholder.svg", // Use uploaded thumbnail or default
     };
     setProjects((prev) => [...prev, newProject]);
     console.log("Adding project:", newProject);
+  };
+
+  const handleEditProject = (updatedProject: Project) => {
+    setProjects((prev) =>
+      prev.map((project) =>
+        project.id === updatedProject.id ? updatedProject : project
+      )
+    );
+    showSuccess(`Project '${updatedProject.name}' updated successfully!`);
+    console.log("Editing project:", updatedProject);
   };
 
   const handleCloseProject = (projectId: string) => {
@@ -147,6 +158,7 @@ const Projects = () => {
                       projectId={project.id}
                       projectName={project.name}
                     />
+                    <EditProjectDialog project={project} onEditProject={handleEditProject} /> {/* New Edit button */}
                     <Button
                       variant="outline"
                       size="sm"
@@ -161,12 +173,7 @@ const Projects = () => {
                     >
                       Delete
                     </Button>
-                    <UploadThumbnailDialog
-                      projectId={project.id}
-                      projectName={project.name}
-                      currentThumbnailUrl={project.thumbnailUrl}
-                      onThumbnailUpload={handleThumbnailUpload}
-                    />
+                    {/* UploadThumbnailDialog is now redundant as EditProjectDialog handles it */}
                   </div>
                 )}
               </CardContent>
