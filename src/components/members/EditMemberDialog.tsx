@@ -20,6 +20,7 @@ interface Member {
   name: string;
   email: string;
   enableLogin: boolean;
+  imageUrl?: string; // Added optional imageUrl
   // Add other member fields as needed
 }
 
@@ -31,6 +32,7 @@ interface EditMemberDialogProps {
 const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMember }) => {
   const [name, setName] = React.useState(member.name);
   const [email, setEmail] = React.useState(member.email);
+  const [imageUrl, setImageUrl] = React.useState(member.imageUrl || ""); // New state for image URL
   const [enableLogin, setEnableLogin] = React.useState(member.enableLogin);
   const [defaultPassword, setDefaultPassword] = React.useState(""); // For resetting password
   const [isOpen, setIsOpen] = React.useState(false);
@@ -39,6 +41,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
     if (isOpen) {
       setName(member.name);
       setEmail(member.email);
+      setImageUrl(member.imageUrl || ""); // Reset image URL on open
       setEnableLogin(member.enableLogin);
       setDefaultPassword(""); // Clear password field on open
     }
@@ -53,7 +56,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
     // For simplicity, we'll assume if defaultPassword is not empty, it's a reset.
     // In a real app, you'd have separate "reset password" functionality.
 
-    onEditMember({ ...member, name, email, enableLogin });
+    onEditMember({ ...member, name, email, enableLogin, imageUrl: imageUrl || undefined });
     showSuccess("Member updated successfully!");
     setIsOpen(false);
   };
@@ -91,6 +94,19 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="imageUrl" className="text-right">
+              Image URL
+            </Label>
+            <Input
+              id="imageUrl"
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="Optional image URL"
               className="col-span-3"
             />
           </div>

@@ -14,6 +14,7 @@ import AddMemberDialog from "@/components/members/AddMemberDialog";
 import EditMemberDialog from "@/components/members/EditMemberDialog";
 import DeleteMemberDialog from "@/components/members/DeleteMemberDialog";
 import { showSuccess } from "@/utils/toast";
+import { User as UserIcon } from "lucide-react"; // Import User icon for placeholder
 
 // Placeholder for a privileged user check
 const isAdmin = true; // This should come from user context/authentication
@@ -23,22 +24,24 @@ interface Member {
   name: string;
   email: string;
   enableLogin: boolean;
+  imageUrl?: string; // Added optional imageUrl
   // Add other member fields as needed
 }
 
 const Members = () => {
   const [members, setMembers] = React.useState<Member[]>([
-    { id: "m1", name: "Alice Johnson", email: "alice@example.com", enableLogin: true },
-    { id: "m2", name: "Bob Williams", email: "bob@example.com", enableLogin: false },
-    { id: "m3", name: "Charlie Brown", email: "charlie@example.com", enableLogin: true },
+    { id: "m1", name: "Alice Johnson", email: "alice@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice" },
+    { id: "m2", name: "Bob Williams", email: "bob@example.com", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob" },
+    { id: "m3", name: "Charlie Brown", email: "charlie@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie" },
   ]);
 
-  const handleAddMember = (memberData: { name: string; email: string; enableLogin: boolean; defaultPassword?: string }) => {
+  const handleAddMember = (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string }) => {
     const newMember: Member = {
       id: `m${members.length + 1}`, // Simple ID generation
       name: memberData.name,
       email: memberData.email,
       enableLogin: memberData.enableLogin,
+      imageUrl: memberData.imageUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${memberData.name}`, // Use provided URL or generate default
     };
     setMembers((prev) => [...prev, newMember]);
     // In a real app, you'd send memberData to a backend, including defaultPassword if login is enabled.
@@ -75,6 +78,7 @@ const Members = () => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[60px]">Image</TableHead> {/* New TableHead for image */}
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead className="text-center">Login Enabled</TableHead>
@@ -84,6 +88,15 @@ const Members = () => {
           <TableBody>
             {members.map((member) => (
               <TableRow key={member.id}>
+                <TableCell>
+                  {member.imageUrl ? (
+                    <img src={member.imageUrl} alt={member.name} className="h-8 w-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                      <UserIcon className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="font-medium">{member.name}</TableCell>
                 <TableCell>{member.email}</TableCell>
                 <TableCell className="text-center">

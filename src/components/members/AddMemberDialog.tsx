@@ -16,12 +16,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast"; // Assuming toast utility
 
 interface AddMemberDialogProps {
-  onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; defaultPassword?: string }) => void;
+  onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string }) => void;
 }
 
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
+  const [imageUrl, setImageUrl] = React.useState(""); // New state for image URL
   const [enableLogin, setEnableLogin] = React.useState(false);
   const [defaultPassword, setDefaultPassword] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
@@ -36,11 +37,12 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       return;
     }
 
-    onAddMember({ name, email, enableLogin, defaultPassword: enableLogin ? defaultPassword : undefined });
+    onAddMember({ name, email, enableLogin, imageUrl: imageUrl || undefined, defaultPassword: enableLogin ? defaultPassword : undefined });
     showSuccess("Member added successfully!");
     setIsOpen(false);
     setName("");
     setEmail("");
+    setImageUrl(""); // Reset image URL
     setEnableLogin(false);
     setDefaultPassword("");
   };
@@ -78,6 +80,19 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="imageUrl" className="text-right">
+              Image URL
+            </Label>
+            <Input
+              id="imageUrl"
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="Optional image URL"
               className="col-span-3"
             />
           </div>
