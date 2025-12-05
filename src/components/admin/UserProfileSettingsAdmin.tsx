@@ -21,7 +21,7 @@ const UserProfileSettingsAdmin = () => {
             <p className="text-sm text-muted-foreground mb-2">
               Access and modify specific user details, roles, and the groups they can access.
             </p>
-            {/* Placeholder for a link to a dedicated user management page */}
+            {/* This button would link to a comprehensive user management table/page */}
             <Button variant="outline" disabled>Manage All Users (Coming Soon)</Button>
           </div>
         </div>

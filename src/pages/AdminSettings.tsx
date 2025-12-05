@@ -19,7 +19,7 @@ const AdminSettings = () => {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="app-customization">App Customization</TabsTrigger>
-          <TabsTrigger value="user-profiles">User Profiles</TabsTrigger>
+          <TabsTrigger value="user-profiles">User Management</TabsTrigger> {/* Renamed tab */}
           <TabsTrigger value="reports-templates">Reports Templates</TabsTrigger>
         </TabsList>
         <TabsContent value="security">
