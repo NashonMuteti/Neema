@@ -114,6 +114,10 @@ const Projects = () => {
                 <CardTitle>{project.name}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Project Image Thumbnail Placeholder */}
+                <div className="w-full h-32 bg-muted rounded-md flex items-center justify-center overflow-hidden">
+                  <img src="/placeholder.svg" alt="Project Thumbnail" className="h-20 w-20 text-muted-foreground" />
+                </div>
                 <p className="text-muted-foreground text-sm">{project.description}</p>
                 <p className="text-sm">Status: <span className="font-medium">{project.status}</span></p>
                 {isAdmin && (
