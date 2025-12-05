@@ -3,7 +3,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText } from "lucide-react"; // Added new icons
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake } from "lucide-react"; // Added Handshake icon
 
 const navItems = [
   {
@@ -22,28 +22,38 @@ const navItems = [
     icon: Wallet,
   },
   {
-    name: "Members", // New item
+    name: "Pledges", // New item
+    href: "/pledges",
+    icon: Handshake, // Icon for pledges
+  },
+  {
+    name: "Members",
     href: "/members",
     icon: Users,
   },
   {
-    name: "Reports", // Section header
+    name: "Reports",
     type: "heading",
   },
   {
-    name: "Member Contributions", // New report
+    name: "Member Contributions",
     href: "/reports/member-contributions",
     icon: BarChart2,
   },
   {
-    name: "Petty Cash Report", // New report
+    name: "Petty Cash Report",
     href: "/reports/petty-cash",
     icon: FileText,
   },
   {
+    name: "Pledge Report", // New report
+    href: "/reports/pledges",
+    icon: FileText, // Using FileText for reports, can be changed
+  },
+  {
     name: "User Profile",
     href: "/profile",
-    icon: Settings, // Changed icon to Settings for profile
+    icon: Settings,
   },
 ];
 
