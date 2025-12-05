@@ -93,7 +93,7 @@ const MyContributions = () => {
           <CardHeader>
             <CardTitle>Contribution Calendar</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col items-center space-y-4">
+          <CardContent className="flex flex-col items-stretch space-y-4"> {/* Changed items-center to items-stretch */}
             <div className="flex flex-wrap gap-4 justify-center">
               <Select value={filterMonth} onValueChange={setFilterMonth}>
                 <SelectTrigger className="w-[140px]">
@@ -130,7 +130,7 @@ const MyContributions = () => {
               mode="single"
               selected={selectedDate}
               onSelect={setSelectedDate}
-              className="rounded-md border shadow"
+              className="rounded-md border shadow w-full" {/* Added w-full */}
               month={new Date(parseInt(filterYear), parseInt(filterMonth))}
               onMonthChange={(month) => {
                 setFilterMonth(getMonth(month).toString());
