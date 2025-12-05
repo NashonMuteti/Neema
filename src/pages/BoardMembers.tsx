@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddEditBoardMemberDialog, { BoardMember } from "@/components/board-members/AddEditBoardMemberDialog";
 import { showSuccess, showError } from "@/utils/toast";
-import { PlusCircle, Edit, Trash2, UserCog } from "lucide-react";
+import { PlusCircle, Edit, Trash2, UserCog, User as UserIcon } from "lucide-react"; // Added UserIcon
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,9 +31,9 @@ const isAdmin = true; // This should come from user context/authentication
 
 const BoardMembers = () => {
   const [boardMembers, setBoardMembers] = React.useState<BoardMember[]>([
-    { id: "bm1", name: "Jane Doe", role: "Chairperson", email: "jane.doe@example.com", phone: "555-123-4567", address: "123 Main St, Anytown", notes: "Oversees strategic direction." },
-    { id: "bm2", name: "Richard Roe", role: "Treasurer", email: "richard.roe@example.com", phone: "555-987-6543", notes: "Manages financial oversight." },
-    { id: "bm3", name: "Emily White", role: "Secretary", email: "emily.white@example.com", phone: "555-111-2222" },
+    { id: "bm1", name: "Jane Doe", role: "Chairperson", email: "jane.doe@example.com", phone: "555-123-4567", address: "123 Main St, Anytown", notes: "Oversees strategic direction.", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Jane" },
+    { id: "bm2", name: "Richard Roe", role: "Treasurer", email: "richard.roe@example.com", phone: "555-987-6543", notes: "Manages financial oversight.", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Richard" },
+    { id: "bm3", name: "Emily White", role: "Secretary", email: "emily.white@example.com", phone: "555-111-2222", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Emily" },
   ]);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
@@ -44,6 +44,7 @@ const BoardMembers = () => {
     const newMember: BoardMember = {
       id: `bm${boardMembers.length + 1}`, // Simple ID generation
       ...newMemberData,
+      imageUrl: newMemberData.imageUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${newMemberData.name}`,
     };
     setBoardMembers((prev) => [...prev, newMember]);
   };
@@ -94,6 +95,7 @@ const BoardMembers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[60px]">Image</TableHead> {/* New TableHead */}
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Email</TableHead>
@@ -106,6 +108,15 @@ const BoardMembers = () => {
               <TableBody>
                 {boardMembers.map((member) => (
                   <TableRow key={member.id}>
+                    <TableCell>
+                      {member.imageUrl ? (
+                        <img src={member.imageUrl} alt={member.name} className="h-8 w-8 rounded-full object-cover" />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                          <UserIcon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{member.name}</TableCell>
                     <TableCell>{member.role}</TableCell>
                     <TableCell>{member.email}</TableCell>

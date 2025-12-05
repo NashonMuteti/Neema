@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { showSuccess, showError } from "@/utils/toast";
-import { PlusCircle, Save } from "lucide-react";
+import { PlusCircle, Save, Image as ImageIcon } from "lucide-react"; // Added ImageIcon
 
 export interface BoardMember {
   id: string;
@@ -24,6 +24,7 @@ export interface BoardMember {
   phone: string;
   address?: string;
   notes?: string;
+  imageUrl?: string; // Added imageUrl
 }
 
 interface AddEditBoardMemberDialogProps {
@@ -45,6 +46,8 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
   const [phone, setPhone] = React.useState(initialData?.phone || "");
   const [address, setAddress] = React.useState(initialData?.address || "");
   const [notes, setNotes] = React.useState(initialData?.notes || "");
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -54,13 +57,41 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       setPhone(initialData?.phone || "");
       setAddress(initialData?.address || "");
       setNotes(initialData?.notes || "");
+      setSelectedFile(null); // Reset selected file
+      setPreviewUrl(initialData?.imageUrl || null); // Reset preview to current image
     }
-  }, [isOpen, initialData]);
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [isOpen, initialData, previewUrl]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setSelectedFile(null);
+      setPreviewUrl(initialData?.imageUrl || null);
+    }
+  };
 
   const handleSubmit = () => {
     if (!name || !role || !email || !phone) {
       showError("Name, Role, Email, and Phone are required.");
       return;
+    }
+
+    let memberImageUrl: string | undefined = initialData?.imageUrl;
+    if (selectedFile && previewUrl) {
+      // In a real app, this is where you'd upload the file to a storage service
+      // and get a permanent URL. For now, we use the preview URL.
+      memberImageUrl = previewUrl;
+    } else if (!selectedFile && !initialData?.imageUrl) {
+      // If no new file and no existing image, ensure imageUrl is undefined
+      memberImageUrl = undefined;
     }
 
     const memberData: Omit<BoardMember, 'id'> & { id?: string } = {
@@ -70,6 +101,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       phone,
       address: address || undefined,
       notes: notes || undefined,
+      imageUrl: memberImageUrl,
     };
 
     if (initialData?.id) {
@@ -91,6 +123,25 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          <div className="flex flex-col items-center gap-4 col-span-full">
+            {previewUrl ? (
+              <img src={previewUrl} alt="Board Member Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
+            ) : (
+              <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
+                <ImageIcon className="h-12 w-12" />
+              </div>
+            )}
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="member-image-upload" className="text-center">Upload Image</Label>
+              <Input
+                id="member-image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="col-span-3"
+              />
+            </div>
+          </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
               Name
@@ -167,6 +218,9 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
             <Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add Member"}
           </Button>
         </div>
+        <p className="text-sm text-muted-foreground mt-2">
+          Note: Image storage and serving require backend integration.
+        </p>
       </DialogContent>
     </Dialog>
   );
