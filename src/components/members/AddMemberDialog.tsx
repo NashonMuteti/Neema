@@ -17,7 +17,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
 
 interface AddMemberDialogProps {
-  onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string }) => void;
+  onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string; status: "Active" | "Inactive" }) => void;
 }
 
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
@@ -72,6 +72,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       enableLogin,
       imageUrl: memberImageUrl,
       defaultPassword: enableLogin ? defaultPassword : undefined,
+      status: "Active", // Default status for new members
     });
     showSuccess("Member added successfully!");
     setIsOpen(false);

@@ -13,14 +13,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { showSuccess, showError } from "@/utils/toast"; // Assuming toast utility
+import { showSuccess, showError } from "@/utils/toast";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Member {
   id: string;
   name: string;
   email: string;
   enableLogin: boolean;
-  imageUrl?: string; // Added optional imageUrl
+  imageUrl?: string;
+  status: "Active" | "Inactive"; // Added status property
   // Add other member fields as needed
 }
 
@@ -32,18 +42,20 @@ interface EditMemberDialogProps {
 const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMember }) => {
   const [name, setName] = React.useState(member.name);
   const [email, setEmail] = React.useState(member.email);
-  const [imageUrl, setImageUrl] = React.useState(member.imageUrl || ""); // New state for image URL
+  const [imageUrl, setImageUrl] = React.useState(member.imageUrl || "");
   const [enableLogin, setEnableLogin] = React.useState(member.enableLogin);
-  const [defaultPassword, setDefaultPassword] = React.useState(""); // For resetting password
+  const [status, setStatus] = React.useState<"Active" | "Inactive">(member.status); // New state for status
+  const [defaultPassword, setDefaultPassword] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
       setName(member.name);
       setEmail(member.email);
-      setImageUrl(member.imageUrl || ""); // Reset image URL on open
+      setImageUrl(member.imageUrl || "");
       setEnableLogin(member.enableLogin);
-      setDefaultPassword(""); // Clear password field on open
+      setStatus(member.status); // Reset status on open
+      setDefaultPassword("");
     }
   }, [isOpen, member]);
 
@@ -52,11 +64,8 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       showError("Name and Email are required.");
       return;
     }
-    // Password is only required if login is enabled AND a new password is being set
-    // For simplicity, we'll assume if defaultPassword is not empty, it's a reset.
-    // In a real app, you'd have separate "reset password" functionality.
 
-    onEditMember({ ...member, name, email, enableLogin, imageUrl: imageUrl || undefined });
+    onEditMember({ ...member, name, email, enableLogin, imageUrl: imageUrl || undefined, status });
     showSuccess("Member updated successfully!");
     setIsOpen(false);
   };
@@ -136,6 +145,23 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               />
             </div>
           )}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="status" className="text-right">
+              Status
+            </Label>
+            <Select value={status} onValueChange={(value: "Active" | "Inactive") => setStatus(value)}>
+              <SelectTrigger id="status" className="col-span-3">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Member Status</SelectLabel>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex justify-end">
           <Button onClick={handleSubmit}>Save Changes</Button>
