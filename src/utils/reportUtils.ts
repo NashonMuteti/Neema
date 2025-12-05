@@ -8,7 +8,7 @@ interface Member {
   email: string;
   enableLogin: boolean;
   imageUrl?: string;
-  status: "Active" | "Inactive";
+  status: "Active" | "Inactive" | "Suspended";
 }
 
 interface ReportOptions {

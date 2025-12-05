@@ -17,7 +17,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
 
 interface AddMemberDialogProps {
-  onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string; status: "Active" | "Inactive" }) => void;
+  onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string; status: "Active" | "Inactive" | "Suspended" }) => void;
 }
 
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
@@ -25,7 +25,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [email, setEmail] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // State for the uploaded file
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null); // State for image preview
-  const [enableLogin, setEnableLogin] = React.useState(false);
+  const [enableLogin, setEnableLogin] => React.useState(false);
   const [defaultPassword, setDefaultPassword] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
 

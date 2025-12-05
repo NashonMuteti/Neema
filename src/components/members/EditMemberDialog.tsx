@@ -31,7 +31,7 @@ interface Member {
   email: string;
   enableLogin: boolean;
   imageUrl?: string;
-  status: "Active" | "Inactive"; // Added status property
+  status: "Active" | "Inactive" | "Suspended"; // Added status property
   // Add other member fields as needed
 }
 
@@ -46,7 +46,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // New state for uploaded file
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(member.imageUrl || null); // New state for image preview
   const [enableLogin, setEnableLogin] = React.useState(member.enableLogin);
-  const [status, setStatus] = React.useState<"Active" | "Inactive">(member.status);
+  const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(member.status);
   const [defaultPassword, setDefaultPassword] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
 
@@ -185,7 +185,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
             <Label htmlFor="status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Active" | "Inactive") => setStatus(value)}>
+            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)}>
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -194,6 +194,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
                   <SelectLabel>Member Status</SelectLabel>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Suspended">Suspended</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>

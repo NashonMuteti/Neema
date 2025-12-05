@@ -34,7 +34,7 @@ interface Member {
   email: string;
   enableLogin: boolean;
   imageUrl?: string;
-  status: "Active" | "Inactive"; // Added status property
+  status: "Active" | "Inactive" | "Suspended"; // Added status property
   // Add other member fields as needed
 }
 
@@ -43,8 +43,9 @@ const Members = () => {
     { id: "m1", name: "Alice Johnson", email: "alice@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice", status: "Active" },
     { id: "m2", name: "Bob Williams", email: "bob@example.com", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob", status: "Inactive" },
     { id: "m3", name: "Charlie Brown", email: "charlie@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie", status: "Active" },
+    { id: "m4", name: "David Green", email: "david@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David", status: "Suspended" }, // Added a suspended member
   ]);
-  const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Inactive">("All");
+  const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Inactive" | "Suspended">("All");
 
   const filteredMembers = members.filter(member => {
     if (filterStatus === "All") {
@@ -105,6 +106,19 @@ const Members = () => {
     showSuccess("Generating Excel report...");
   };
 
+  const getStatusBadgeClasses = (status: Member['status']) => {
+    switch (status) {
+      case "Active":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      case "Inactive":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+      case "Suspended":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary-foreground">Members</h1>
@@ -115,7 +129,7 @@ const Members = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-semibold">Member List</h2>
-            <Select value={filterStatus} onValueChange={(value: "All" | "Active" | "Inactive") => setFilterStatus(value)}>
+            <Select value={filterStatus} onValueChange={(value: "All" | "Active" | "Inactive" | "Suspended") => setFilterStatus(value)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -124,6 +138,7 @@ const Members = () => {
                   <SelectItem value="All">All Members</SelectItem>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Suspended">Suspended</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -171,22 +186,22 @@ const Members = () => {
                   {member.enableLogin ? "Yes" : "No"}
                 </TableCell>
                 <TableCell className="text-center">
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                    member.status === "Active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                  }`}>
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClasses(member.status)}`}>
                     {member.status}
                   </span>
                 </TableCell>
                 {isAdmin && (
                   <TableCell className="flex justify-center space-x-2">
                     <EditMemberDialog member={member} onEditMember={handleEditMember} />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleMemberStatus(member.id)}
-                    >
-                      {member.status === "Active" ? "Deactivate" : "Activate"}
-                    </Button>
+                    {member.status !== "Suspended" && ( // Only show toggle if not suspended
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleMemberStatus(member.id)}
+                      >
+                        {member.status === "Active" ? "Deactivate" : "Activate"}
+                      </Button>
+                    )}
                     <DeleteMemberDialog member={member} onDeleteMember={handleDeleteMember} />
                   </TableCell>
                 )}
