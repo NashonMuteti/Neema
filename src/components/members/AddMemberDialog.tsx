@@ -25,7 +25,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [email, setEmail] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // State for the uploaded file
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null); // State for image preview
-  const [enableLogin, setEnableLogin] => React.useState(false);
+  const [enableLogin, setEnableLogin] = React.useState(false); // Corrected line
   const [defaultPassword, setDefaultPassword] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
 
