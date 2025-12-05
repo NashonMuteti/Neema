@@ -33,7 +33,7 @@ interface Project {
   id: string;
   name: string;
   description: string;
-  status: "Open" | "Closed" | "Deleted";
+  status: "Open" | "Closed" | "Deleted" | "Suspended"; // Added 'Suspended'
   thumbnailUrl?: string;
   dueDate?: Date; // New: Optional due date
 }
@@ -46,7 +46,7 @@ interface EditProjectDialogProps {
 const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditProject }) => {
   const [name, setName] = React.useState(project.name);
   const [description, setDescription] = React.useState(project.description);
-  const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted">(project.status);
+  const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted" | "Suspended">(project.status); // Added 'Suspended'
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(project.thumbnailUrl || null);
   const [dueDate, setDueDate] = React.useState<Date | undefined>(project.dueDate ? new Date(project.dueDate) : undefined); // New: Due date state
@@ -170,7 +170,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
             <Label htmlFor="status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Open" | "Closed" | "Deleted") => setStatus(value)}>
+            <Select value={status} onValueChange={(value: "Open" | "Closed" | "Deleted" | "Suspended") => setStatus(value)}>
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -179,6 +179,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
                   <SelectLabel>Project Status</SelectLabel>
                   <SelectItem value="Open">Open</SelectItem>
                   <SelectItem value="Closed">Closed</SelectItem>
+                  <SelectItem value="Suspended">Suspended</SelectItem> {/* Added Suspended */}
                   <SelectItem value="Deleted">Deleted</SelectItem>
                 </SelectGroup>
               </SelectContent>

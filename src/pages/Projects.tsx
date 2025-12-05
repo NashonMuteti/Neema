@@ -27,7 +27,7 @@ interface Project {
   id: string;
   name: string;
   description: string;
-  status: "Open" | "Closed" | "Deleted";
+  status: "Open" | "Closed" | "Deleted" | "Suspended"; // Added 'Suspended'
   thumbnailUrl?: string; // Added optional thumbnail URL
   dueDate?: Date; // New: Optional due date
 }
@@ -40,8 +40,9 @@ const Projects = () => {
     { id: "proj4", name: "Archived Project A", description: "An old project that was deleted.", status: "Deleted" },
     { id: "proj5", name: "Short Film Contest", description: "Submission for a local short film festival.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 6, 20) }, // July 20, 2024
     { id: "proj6", name: "Documentary Research", description: "Initial research phase for a new documentary.", status: "Open", thumbnailUrl: "/placeholder.svg" }, // No due date
+    { id: "proj7", name: "Suspended Feature Film", description: "Production paused due to funding issues.", status: "Suspended", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2025, 0, 1) }, // Added a suspended project
   ]);
-  const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "All">("Open");
+  const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "Suspended" | "All">("Open"); // Added 'Suspended' to filter
 
   const filteredProjects = projects
     .filter(project => {
@@ -83,16 +84,27 @@ const Projects = () => {
     console.log("Editing project:", updatedProject);
   };
 
-  const handleCloseProject = (projectId: string) => {
+  const handleToggleProjectStatus = (projectId: string, currentStatus: Project['status']) => {
+    let newStatus: Project['status'];
+    if (currentStatus === "Open") {
+      newStatus = "Suspended";
+    } else if (currentStatus === "Suspended") {
+      newStatus = "Closed";
+    } else if (currentStatus === "Closed") {
+      newStatus = "Open";
+    } else {
+      newStatus = "Open"; // Default for "Deleted" or unexpected status
+    }
+
     setProjects((prev) =>
       prev.map((project) =>
         project.id === projectId
-          ? { ...project, status: project.status === "Open" ? "Closed" : "Open" }
+          ? { ...project, status: newStatus }
           : project
       )
     );
-    showSuccess("Project status updated!");
-    console.log("Toggling project status for:", projectId);
+    showSuccess(`Project status updated to '${newStatus}'!`);
+    console.log(`Toggling project status for: ${projectId} to ${newStatus}`);
   };
 
   const handleDeleteProject = (projectId: string, projectName: string) => {
@@ -127,7 +139,7 @@ const Projects = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">Projects</h2>
-          <Select value={filterStatus} onValueChange={(value: "Open" | "Closed" | "All") => setFilterStatus(value)}>
+          <Select value={filterStatus} onValueChange={(value: "Open" | "Closed" | "Suspended" | "All") => setFilterStatus(value)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
@@ -136,6 +148,7 @@ const Projects = () => {
                 <SelectItem value="All">All (Excluding Deleted)</SelectItem>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="Closed">Closed</SelectItem>
+                <SelectItem value="Suspended">Suspended</SelectItem> {/* Added Suspended to filter */}
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -183,9 +196,9 @@ const Projects = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleCloseProject(project.id)}
+                      onClick={() => handleToggleProjectStatus(project.id, project.status)}
                     >
-                      {project.status === "Open" ? "Close Project" : "Reopen Project"}
+                      {project.status === "Open" ? "Suspend" : project.status === "Suspended" ? "Close" : "Reopen"}
                     </Button>
                     <Button
                       variant="destructive"
