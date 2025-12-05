@@ -14,7 +14,7 @@ import AddMemberDialog from "@/components/members/AddMemberDialog";
 import EditMemberDialog from "@/components/members/EditMemberDialog";
 import DeleteMemberDialog from "@/components/members/DeleteMemberDialog";
 import { showSuccess } from "@/utils/toast";
-import { User as UserIcon, Printer, FileSpreadsheet } from "lucide-react"; // Import User, Printer, FileSpreadsheet icons
+import { User as UserIcon, Printer, FileSpreadsheet, Search } from "lucide-react"; // Import Search icon
 import {
   Select,
   SelectContent,
@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input"; // Import Input component
 import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils"; // Import report utilities
 
 // Placeholder for a privileged user check
@@ -46,12 +47,13 @@ const Members = () => {
     { id: "m4", name: "David Green", email: "david@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David", status: "Suspended" }, // Added a suspended member
   ]);
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Inactive" | "Suspended">("All");
+  const [searchQuery, setSearchQuery] = React.useState(""); // New state for search query
 
   const filteredMembers = members.filter(member => {
-    if (filterStatus === "All") {
-      return true;
-    }
-    return member.status === filterStatus;
+    const matchesStatus = filterStatus === "All" || member.status === filterStatus;
+    const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          member.email.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesStatus && matchesSearch;
   });
 
   const handleAddMember = (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string }) => {
@@ -127,7 +129,7 @@ const Members = () => {
       </p>
       <div className="bg-card p-6 rounded-lg shadow-lg border transition-all duration-300 ease-in-out hover:shadow-xl">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4"> {/* Use flex-wrap for responsiveness */}
             <h2 className="text-xl font-semibold">Member List</h2>
             <Select value={filterStatus} onValueChange={(value: "All" | "Active" | "Inactive" | "Suspended") => setFilterStatus(value)}>
               <SelectTrigger className="w-[180px]">
@@ -142,6 +144,16 @@ const Members = () => {
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <div className="relative flex items-center">
+              <Input
+                type="text"
+                placeholder="Search members..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8" // Add padding for the icon
+              />
+              <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+            </div>
           </div>
           <div className="flex gap-2">
             {isAdmin && (
@@ -210,7 +222,7 @@ const Members = () => {
           </TableBody>
         </Table>
         {filteredMembers.length === 0 && (
-          <p className="text-muted-foreground text-center mt-4">No members found with status "{filterStatus}".</p>
+          <p className="text-muted-foreground text-center mt-4">No members found with status "{filterStatus}" or matching your search.</p>
         )}
       </div>
     </div>
