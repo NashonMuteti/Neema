@@ -2,6 +2,7 @@
 
 import React from "react";
 import SoonDueProjectsGraph from "@/components/dashboard/SoonDueProjectsGraph"; // Import the new graph component
+import ContributionsProgressGraph from "@/components/dashboard/ContributionsProgressGraph"; // Import the new contributions graph
 
 // Define a simplified Project interface for the dashboard's dummy data
 interface DashboardProject {
@@ -25,6 +26,14 @@ const Index = () => {
     { id: "dp9", name: "Deleted Project C", status: "Deleted", dueDate: new Date(2024, 4, 15) }, // Deleted project
   ];
 
+  // Dummy data for contributions progress graph
+  const dummyContributionsData = [
+    { name: "Film Production X", expected: 1000, actual: 750 },
+    { name: "Marketing Campaign Y", expected: 500, actual: 600 },
+    { name: "Short Film Contest", expected: 200, actual: 180 },
+    { name: "Budget Review", expected: 800, actual: 800 },
+  ];
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary-foreground">Dashboard</h1>
@@ -34,11 +43,6 @@ const Index = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Placeholder for Dashboard content */}
-        <div className="bg-card p-6 rounded-lg shadow-lg border transition-all duration-300 ease-in-out hover:shadow-xl">
-          <h2 className="text-xl font-semibold mb-2">Active Accounts</h2>
-          <p className="text-muted-foreground">Summary of active project contributions and deficits.</p>
-          {/* More content will go here */}
-        </div>
         <div className="bg-card p-6 rounded-lg shadow-lg border transition-all duration-300 ease-in-out hover:shadow-xl">
           <h2 className="text-xl font-semibold mb-2">Weekly Summary</h2>
           <p className="text-muted-foreground">Collections vs. expenses for the current week.</p>
@@ -51,6 +55,8 @@ const Index = () => {
         </div>
         {/* Soon Due Projects Graph */}
         <SoonDueProjectsGraph projects={dummyDashboardProjects} />
+        {/* Contributions Progress Graph */}
+        <ContributionsProgressGraph projectsData={dummyContributionsData} />
       </div>
     </div>
   );
