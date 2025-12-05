@@ -35,6 +35,7 @@ export function LanguageSelector() {
           <SelectItem value="es">Español</SelectItem>
           <SelectItem value="fr">Français</SelectItem>
           <SelectItem value="de">Deutsch</SelectItem>
+          <SelectItem value="sw">Kiswahili</SelectItem> {/* Added Swahili */}
         </SelectGroup>
       </SelectContent>
     </Select>
