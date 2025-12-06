@@ -13,18 +13,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Image as ImageIcon, Upload, CalendarIcon } from "lucide-react"; // Import CalendarIcon
+import { Image as ImageIcon, Upload, CalendarIcon } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
-import { Calendar } from "@/components/ui/calendar"; // Import Calendar
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Import Popover components
-import { cn } from "@/lib/utils"; // Import cn for styling
-import { format } from "date-fns"; // Import format for date display
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { useForm, Controller } from "react-hook-form"; // Import useForm and Controller
+import { zodResolver } from "@hookform/resolvers/zod"; // Import zodResolver
+import { z } from "zod"; // Import z from zod
 
 interface NewProjectDialogProps {
   onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => void;
 }
+
+// Define the schema for form validation
+const newProjectSchema = z.object({
+  name: z.string().min(1, "Project Name is required."),
+  description: z.string().optional(),
+  dueDate: z.date().optional().nullable(), // Due date can be optional
+  memberContributionAmount: z.preprocess(
+    (val) => (val === "" ? undefined : Number(val)),
+    z.number().min(0, "Amount cannot be negative.").optional().nullable()
+  ),
+});
+
+type NewProjectFormValues = z.infer<typeof newProjectSchema>;
 
 const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => {
   const { currentUser } = useAuth();
@@ -34,13 +50,25 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   const canManageProjects = currentUserPrivileges.includes("Manage Projects");
 
-  const [name, setName] = React.useState("");
-  const [description, setDescription] = React.useState("");
+  const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-  const [dueDate, setDueDate] = React.useState<Date | undefined>(undefined);
-  const [memberContributionAmount, setMemberContributionAmount] = React.useState<string>(""); // New: Member contribution amount
-  const [isOpen, setIsOpen] = React.useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm<NewProjectFormValues>({
+    resolver: zodResolver(newProjectSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      dueDate: undefined,
+      memberContributionAmount: undefined,
+    },
+  });
 
   React.useEffect(() => {
     return () => {
@@ -61,38 +89,24 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
     }
   };
 
-  const handleSubmit = () => {
-    if (!name) {
-      showError("Project Name is required.");
-      return;
-    }
-
-    const parsedContributionAmount = parseFloat(memberContributionAmount);
-    if (memberContributionAmount !== "" && (isNaN(parsedContributionAmount) || parsedContributionAmount < 0)) {
-      showError("Please enter a valid non-negative number for member contribution.");
-      return;
-    }
-
+  const onSubmit = (data: NewProjectFormValues) => {
     let projectThumbnailUrl: string | undefined = undefined;
     if (selectedFile && previewUrl) {
       projectThumbnailUrl = previewUrl;
     }
 
     onAddProject({
-      name,
-      description,
+      name: data.name,
+      description: data.description || "",
       thumbnailUrl: projectThumbnailUrl,
-      dueDate,
-      memberContributionAmount: memberContributionAmount === "" ? undefined : parsedContributionAmount,
+      dueDate: data.dueDate || undefined,
+      memberContributionAmount: data.memberContributionAmount || undefined,
     });
     showSuccess("Project added successfully!");
     setIsOpen(false);
-    setName("");
-    setDescription("");
+    reset(); // Reset form fields
     setSelectedFile(null);
     setPreviewUrl(null);
-    setDueDate(undefined);
-    setMemberContributionAmount(""); // Reset
   };
 
   return (
@@ -107,18 +121,18 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
             Enter the details for your new project.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
               Name
             </Label>
             <Input
               id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              {...register("name")}
               className="col-span-3"
               disabled={!canManageProjects}
             />
+            {errors.name && <p className="col-span-4 text-right text-sm text-destructive">{errors.name.message}</p>}
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="description" className="text-right">
@@ -126,8 +140,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
             </Label>
             <Textarea
               id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              {...register("description")}
               className="col-span-3"
               disabled={!canManageProjects}
             />
@@ -136,31 +149,37 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
             <Label htmlFor="due-date" className="text-right">
               Due Date
             </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "col-span-3 justify-start text-left font-normal",
-                    !dueDate && "text-muted-foreground"
-                  )}
-                  disabled={!canManageProjects}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dueDate}
-                  onSelect={setDueDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <Controller
+              name="dueDate"
+              control={control}
+              render={({ field }) => (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "col-span-3 justify-start text-left font-normal",
+                        !field.value && "text-muted-foreground"
+                      )}
+                      disabled={!canManageProjects}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value || undefined}
+                      onSelect={field.onChange}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4"> {/* New: Member Contribution Amount */}
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="member-contribution" className="text-right">
               Member Contribution
             </Label>
@@ -169,11 +188,11 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               type="number"
               step="0.01"
               placeholder="0.00"
-              value={memberContributionAmount}
-              onChange={(e) => setMemberContributionAmount(e.target.value)}
+              {...register("memberContributionAmount")}
               className="col-span-3"
               disabled={!canManageProjects}
             />
+            {errors.memberContributionAmount && <p className="col-span-4 text-right text-sm text-destructive">{errors.memberContributionAmount.message}</p>}
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
             {previewUrl ? (
@@ -195,13 +214,13 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               />
             </div>
           </div>
-        </div>
-        <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManageProjects}>Save Project</Button>
-        </div>
-        <p className="text-sm text-muted-foreground mt-2">
-          Note: Image storage and serving require backend integration.
-        </p>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={!canManageProjects}>Save Project</Button>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Note: Image storage and serving require backend integration.
+          </p>
+        </form>
       </DialogContent>
     </Dialog>
   );
