@@ -23,8 +23,9 @@ import DeletedProjectsReport from "./pages/Reports/DeletedProjectsReport";
 import Income from "./pages/Income";
 import Expenditure from "./pages/Expenditure";
 import BoardMembers from "./pages/BoardMembers";
-import MyContributions from "./pages/MyContributions"; // Import the new MyContributions page
-import MemberContributionsDetail from "./pages/MemberContributionsDetail"; // Import the new MemberContributionsDetail page
+import MyContributions from "./pages/MyContributions";
+import MemberContributionsDetail from "./pages/MemberContributionsDetail";
+import ProjectFinancialsDetail from "./pages/ProjectFinancialsDetail"; // Import the new ProjectFinancialsDetail page
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/projects" element={<Projects />} />
+            <Route path="/projects/:projectId/financials" element={<ProjectFinancialsDetail />} /> {/* New route for Project Financials Detail */}
             <Route path="/petty-cash" element={<PettyCash />} />
             <Route path="/pledges" element={<Pledges />} />
             <Route path="/income" element={<Income />} />
@@ -46,8 +48,8 @@ const App = () => (
             <Route path="/board-members" element={<BoardMembers />} />
             <Route path="/profile" element={<UserSettings />} />
             <Route path="/settings" element={<UserSettings />} />
-            <Route path="/my-contributions" element={<MyContributions />} /> {/* New route for My Contributions */}
-            <Route path="/members/:memberId/contributions" element={<MemberContributionsDetail />} /> {/* New route for Member Contributions Detail */}
+            <Route path="/my-contributions" element={<MyContributions />} />
+            <Route path="/members/:memberId/contributions" element={<MemberContributionsDetail />} />
             <Route path="/reports/member-contributions" element={<MemberContributions />} />
             <Route path="/reports/petty-cash" element={<PettyCashReport />} />
             <Route path="/reports/pledges" element={<PledgeReport />} />

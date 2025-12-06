@@ -17,8 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon, CalendarIcon } from "lucide-react"; // Import CalendarIcon
+import { Image as ImageIcon, CalendarIcon, DollarSign } from "lucide-react"; // Import DollarSign icon
 import { format } from "date-fns"; // Import format for date display
+import { Link } from "react-router-dom"; // Import Link for navigation
 
 // Placeholder for a privileged user check
 const isAdmin = true; // This should come from user context/authentication
@@ -199,6 +200,11 @@ const Projects = () => {
                   </p>
                   {isAdmin && (
                     <div className="flex flex-wrap gap-2 mt-4">
+                      <Link to={`/projects/${project.id}/financials`}> {/* New button linking to financial details page */}
+                        <Button variant="outline" size="sm">
+                          <DollarSign className="mr-2 h-4 w-4" /> View Financials
+                        </Button>
+                      </Link>
                       <CollectionsDialog
                         projectId={project.id}
                         projectName={project.name}
