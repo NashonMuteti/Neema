@@ -23,12 +23,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Image as ImageIcon, Save, Upload } from "lucide-react";
+import { UserRole as UserRoleType } from './AddEditUserRoleDialog'; // Import UserRoleType
 
+// Define User interface here to be consistent and allow custom roles
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: "Admin" | "Member";
+  role: string; // Changed to string to support custom roles
   status: "Active" | "Inactive" | "Suspended";
   enableLogin: boolean;
   imageUrl?: string;
@@ -39,6 +41,7 @@ interface AddEditUserDialogProps {
   setIsOpen: (open: boolean) => void;
   initialData?: User; // For editing existing user
   onSave: (userData: Omit<User, 'id'> & { id?: string; defaultPassword?: string }) => void;
+  availableRoles: UserRoleType[]; // New prop: list of available roles
 }
 
 const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
@@ -46,10 +49,11 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   setIsOpen,
   initialData,
   onSave,
+  availableRoles,
 }) => {
   const [name, setName] = React.useState(initialData?.name || "");
   const [email, setEmail] = React.useState(initialData?.email || "");
-  const [role, setRole] = React.useState<"Admin" | "Member">(initialData?.role || "Member");
+  const [role, setRole] = React.useState<string>(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : "")); // Initialize with first available role or empty
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(initialData?.status || "Active");
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
   const [defaultPassword, setDefaultPassword] = React.useState("");
@@ -60,7 +64,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     if (isOpen) {
       setName(initialData?.name || "");
       setEmail(initialData?.email || "");
-      setRole(initialData?.role || "Member");
+      setRole(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : "")); // Re-initialize role
       setStatus(initialData?.status || "Active");
       setEnableLogin(initialData?.enableLogin || false);
       setDefaultPassword(""); // Always clear password field on open
@@ -72,7 +76,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         URL.revokeObjectURL(previewUrl);
       }
     };
-  }, [isOpen, initialData, previewUrl]);
+  }, [isOpen, initialData, previewUrl, availableRoles]); // Added availableRoles to dependencies
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -92,6 +96,10 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     }
     if (enableLogin && !initialData && !defaultPassword) { // Require password only for new users with login enabled
       showError("Default password is required if login is enabled for a new user.");
+      return;
+    }
+    if (!role) {
+      showError("User Role is required.");
       return;
     }
 
@@ -177,15 +185,18 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             <Label htmlFor="role" className="text-right">
               Role
             </Label>
-            <Select value={role} onValueChange={(value: "Admin" | "Member") => setRole(value)}>
+            <Select value={role} onValueChange={(value: string) => setRole(value)}>
               <SelectTrigger id="role" className="col-span-3">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>User Role</SelectLabel>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Member">Member</SelectItem>
+                  {availableRoles.map((r) => (
+                    <SelectItem key={r.id} value={r.name}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
                 </SelectGroup>
               </SelectContent>
             </Select>

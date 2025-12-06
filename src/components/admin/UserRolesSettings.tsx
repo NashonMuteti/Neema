@@ -25,28 +25,25 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showSuccess, showError } from "@/utils/toast";
 import AddEditUserRoleDialog, { UserRole } from "./AddEditUserRoleDialog";
+import { useUserRoles } from "@/context/UserRolesContext"; // Import useUserRoles
 
 // Dummy data for users (reusing from UserProfileSettingsAdmin)
 interface User {
   id: string;
   name: string;
   email: string;
-  role: "Admin" | "Member"; // Simplified role for display
+  role: string; // Updated to string to support custom roles
 }
 
 const dummyUsers: User[] = [
   { id: "u1", name: "Alice Johnson", email: "alice@example.com", role: "Admin" },
-  { id: "u2", name: "Bob Williams", email: "bob@example.com", role: "Member" },
-  { id: "u3", name: "Charlie Brown", email: "charlie@example.com", role: "Member" },
-  { id: "u4", name: "David Green", email: "david@example.com", role: "Member" },
+  { id: "u2", name: "Bob Williams", email: "bob@example.com", role: "Project Manager" },
+  { id: "u3", name: "Charlie Brown", email: "charlie@example.com", role: "Contributor" },
+  { id: "u4", name: "David Green", email: "david@example.com", role: "Contributor" },
 ];
 
 const UserRolesSettings = () => {
-  const [userRoles, setUserRoles] = React.useState<UserRole[]>([
-    { id: "r1", name: "Admin", description: "Full access to all features and settings.", memberUserIds: ["u1"], menuPrivileges: ["Dashboard", "Project Accounts", "Petty Cash", "Pledges", "Income", "Expenditure", "Members", "Board Members", "Reports", "Member Contributions", "Petty Cash Report", "Pledge Report", "Table Banking Summary", "User Activity Report", "Deleted Projects Report", "Actions", "Initialize Balances", "My Contributions", "Admin Settings"] },
-    { id: "r2", name: "Project Manager", description: "Can create and manage projects, view reports.", memberUserIds: ["u2"], menuPrivileges: ["Dashboard", "Project Accounts", "Petty Cash", "Pledges", "Income", "Expenditure", "Members", "Reports", "Member Contributions", "Petty Cash Report", "Pledge Report", "Table Banking Summary", "My Contributions"] },
-    { id: "r3", name: "Contributor", description: "Can record contributions and view personal reports.", memberUserIds: ["u3", "u4"], menuPrivileges: ["Dashboard", "My Contributions"] },
-  ]);
+  const { userRoles, addRole, updateRole, deleteRole } = useUserRoles(); // Use context
   const [isAddEditRoleDialogOpen, setIsAddEditRoleDialogOpen] = React.useState(false);
   const [editingRole, setEditingRole] = React.useState<UserRole | undefined>(undefined);
   const [deletingRoleId, setDeletingRoleId] = React.useState<string | undefined>(undefined);
@@ -60,22 +57,16 @@ const UserRolesSettings = () => {
   const handleSaveRole = (roleData: Omit<UserRole, 'id'> & { id?: string }) => {
     if (roleData.id) {
       // Edit existing role
-      setUserRoles(prev => prev.map(r => r.id === roleData.id ? { ...r, ...roleData, id: r.id } : r));
+      updateRole(roleData as UserRole); // Cast to UserRole as it now has an ID
     } else {
       // Add new role
-      const newRole: UserRole = {
-        ...roleData,
-        id: `r${userRoles.length + 1}`, // Simple ID generation
-        memberUserIds: [], // New roles start with no members
-        menuPrivileges: roleData.menuPrivileges || [], // Ensure privileges are saved
-      };
-      setUserRoles(prev => [...prev, newRole]);
+      addRole(roleData);
     }
   };
 
   const handleDeleteRole = () => {
     if (deletingRoleId) {
-      setUserRoles(prev => prev.filter(role => role.id !== deletingRoleId));
+      deleteRole(deletingRoleId);
       showSuccess("User role deleted successfully!");
       setDeletingRoleId(undefined);
     }

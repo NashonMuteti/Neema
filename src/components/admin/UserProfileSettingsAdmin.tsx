@@ -28,17 +28,30 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showSuccess } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext";
-import AddEditUserDialog, { User } from "./AddEditUserDialog"; // Import the new dialog and User interface
+import AddEditUserDialog from "./AddEditUserDialog"; // Import the new dialog
+import { useUserRoles } from "@/context/UserRolesContext"; // Import useUserRoles
+
+// Define User interface here to be consistent and allow custom roles
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string; // Changed to string to support custom roles
+  status: "Active" | "Inactive" | "Suspended";
+  enableLogin: boolean;
+  imageUrl?: string;
+}
 
 const dummyUsers: User[] = [
   { id: "m1", name: "Alice Johnson", email: "alice@example.com", role: "Admin", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice" },
-  { id: "m2", name: "Bob Williams", email: "bob@example.com", role: "Member", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob" },
-  { id: "m3", name: "Charlie Brown", email: "charlie@example.com", role: "Member", status: "Inactive", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie" },
-  { id: "m4", name: "David Green", email: "david@example.com", role: "Member", status: "Suspended", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David" },
+  { id: "m2", name: "Bob Williams", email: "bob@example.com", role: "Project Manager", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob" },
+  { id: "m3", name: "Charlie Brown", email: "charlie@example.com", role: "Contributor", status: "Inactive", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie" },
+  { id: "m4", name: "David Green", email: "david@example.com", role: "Contributor", status: "Suspended", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David" },
 ];
 
 const UserProfileSettingsAdmin = () => {
   const { isAdmin } = useAuth();
+  const { userRoles } = useUserRoles(); // Get userRoles from context
   const [users, setUsers] = React.useState<User[]>(dummyUsers);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [deletingUserId, setDeletingUserId] = React.useState<string | undefined>(undefined);
@@ -205,6 +218,7 @@ const UserProfileSettingsAdmin = () => {
         setIsOpen={setIsAddEditUserDialogOpen}
         initialData={editingUser}
         onSave={handleSaveUser}
+        availableRoles={userRoles} {/* Pass available roles */}
       />
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingUserId} onOpenChange={(open) => !open && setDeletingUserId(undefined)}>
