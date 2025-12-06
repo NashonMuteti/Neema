@@ -38,6 +38,7 @@ import {
   parseISO,
 } from "date-fns";
 import { CalendarIcon } from "lucide-react";
+import { Label } from "@/components/ui/label"; // Added Label import
 
 interface FinancialAccount {
   id: string;
