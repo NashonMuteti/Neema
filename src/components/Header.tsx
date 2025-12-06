@@ -28,7 +28,7 @@ const Header = () => {
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b bg-card shadow-sm transition-all duration-300 ease-in-out">
       <div className="flex items-center">
-        <Link to="/" className="text-xl font-bold text-primary-foreground flex items-center">
+        <Link to="/" className="text-xl font-bold text-foreground flex items-center">
           <img src="/placeholder.svg" alt="Logo" className="h-8 w-auto mr-2" />
           Group Finance
         </Link>
