@@ -90,7 +90,7 @@ export const navItems: SidebarItem[] = [ // Added export here
     name: "Members",
     href: "/members",
     icon: Users,
-    requiredRoles: ["Admin", "Project Manager"],
+    requiredRoles: ["Admin", "Project Manager", "Manage Members"], // Added "Manage Members"
   },
   {
     name: "Board Members",
@@ -170,15 +170,21 @@ export const navItems: SidebarItem[] = [ // Added export here
 
 const Sidebar = () => {
   const location = useLocation();
-  const { userRoles } = useAuth(); // Use userRoles from AuthContext
+  const { currentUser } = useAuth(); // Use currentUser from AuthContext
+  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
   const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false); // New state for Sales Management
 
-  // Helper to check if user has any of the required roles
+  // Get the current user's role definition to check privileges
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+
+  // Helper to check if user has any of the required roles or specific privileges
   const hasRequiredRole = (requiredRoles?: string[]) => {
     if (!requiredRoles || requiredRoles.length === 0) return true; // No roles required, so accessible
-    return requiredRoles.some(role => userRoles.includes(role));
+    // Check if the user's current role name is in requiredRoles OR if any of the user's privileges are in requiredRoles
+    return requiredRoles.some(role => currentUser?.role === role || currentUserPrivileges.includes(role));
   };
 
   // Open reports/actions/sales management collapsible if any child route is active and user has access
@@ -209,7 +215,7 @@ const Sidebar = () => {
     } else {
       setIsSalesManagementOpen(false); // Close if no child is active
     }
-  }, [location.pathname, userRoles]);
+  }, [location.pathname, currentUser, currentUserPrivileges, definedRoles]);
 
 
   return (

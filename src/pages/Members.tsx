@@ -28,6 +28,7 @@ import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { useBranding } from "@/context/BrandingContext"; // Import useBranding
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface Member {
   id: string;
@@ -40,8 +41,14 @@ interface Member {
 }
 
 const Members = () => {
-  const { isAdmin } = useAuth(); // Use the auth context
+  const { currentUser } = useAuth(); // Use the auth context to get current user
+  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
   const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
+
+  // Determine if the current user has the "Manage Members" privilege
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const canManageMembers = currentUserRoleDefinition?.menuPrivileges.includes("Manage Members") || false;
+
   const [members, setMembers] = React.useState<Member[]>([
     { id: "m1", name: "Alice Johnson", email: "alice@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice", status: "Active" },
     { id: "m2", name: "Bob Williams", email: "bob@example.com", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob", status: "Inactive" },
@@ -158,7 +165,7 @@ const Members = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            {isAdmin && (
+            {canManageMembers && (
               <>
                 <Button variant="outline" onClick={handlePrintPdf}>
                   <Printer className="mr-2 h-4 w-4" /> Print PDF
@@ -179,7 +186,7 @@ const Members = () => {
               <TableHead>Email</TableHead>
               <TableHead className="text-center">Login Enabled</TableHead>
               <TableHead className="text-center">Status</TableHead>
-              {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+              {canManageMembers && <TableHead className="text-center">Actions</TableHead>}
               <TableHead className="text-center">Contributions</TableHead>
             </TableRow>
           </TableHeader>
@@ -205,7 +212,7 @@ const Members = () => {
                     {member.status}
                   </span>
                 </TableCell>
-                {isAdmin && (
+                {canManageMembers && (
                   <TableCell className="flex justify-center space-x-2">
                     <EditMemberDialog member={member} onEditMember={handleEditMember} />
                     {member.status !== "Suspended" && (
