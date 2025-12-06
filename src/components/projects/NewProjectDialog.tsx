@@ -19,12 +19,21 @@ import { Calendar } from "@/components/ui/calendar"; // Import Calendar
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Import Popover components
 import { cn } from "@/lib/utils"; // Import cn for styling
 import { format } from "date-fns"; // Import format for date display
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface NewProjectDialogProps {
   onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => void;
 }
 
 const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -89,7 +98,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button>New Project</Button>
+        <Button disabled={!canManageProjects}>New Project</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -108,6 +117,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
+              disabled={!canManageProjects}
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -119,6 +129,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="col-span-3"
+              disabled={!canManageProjects}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -133,6 +144,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
                     "col-span-3 justify-start text-left font-normal",
                     !dueDate && "text-muted-foreground"
                   )}
+                  disabled={!canManageProjects}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
@@ -160,6 +172,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               value={memberContributionAmount}
               onChange={(e) => setMemberContributionAmount(e.target.value)}
               className="col-span-3"
+              disabled={!canManageProjects}
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
@@ -178,12 +191,13 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
+                disabled={!canManageProjects}
               />
             </div>
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit}>Save Project</Button>
+          <Button onClick={handleSubmit} disabled={!canManageProjects}>Save Project</Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Note: Image storage and serving require backend integration.

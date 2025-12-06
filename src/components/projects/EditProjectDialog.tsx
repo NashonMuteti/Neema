@@ -28,6 +28,8 @@ import { Calendar } from "@/components/ui/calendar"; // Import Calendar
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Import Popover components
 import { cn } from "@/lib/utils"; // Import cn for styling
 import { format } from "date-fns"; // Import format for date display
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface Project {
   id: string;
@@ -45,6 +47,13 @@ interface EditProjectDialogProps {
 }
 
 const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditProject }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+
   const [name, setName] = React.useState(project.name);
   const [description, setDescription] = React.useState(project.description);
   const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted" | "Suspended">(project.status);
@@ -119,7 +128,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">Edit</Button>
+        <Button variant="outline" size="sm" disabled={!canManageProjects}>Edit</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -138,6 +147,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
+              disabled={!canManageProjects}
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -149,6 +159,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="col-span-3"
+              disabled={!canManageProjects}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -163,6 +174,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
                     "col-span-3 justify-start text-left font-normal",
                     !dueDate && "text-muted-foreground"
                   )}
+                  disabled={!canManageProjects}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
@@ -190,13 +202,14 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               value={memberContributionAmount}
               onChange={(e) => setMemberContributionAmount(e.target.value)}
               className="col-span-3"
+              disabled={!canManageProjects}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Open" | "Closed" | "Deleted" | "Suspended") => setStatus(value)}>
+            <Select value={status} onValueChange={(value: "Open" | "Closed" | "Deleted" | "Suspended") => setStatus(value)} disabled={!canManageProjects}>
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -227,12 +240,13 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
+                disabled={!canManageProjects}
               />
             </div>
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit}>Save Changes</Button>
+          <Button onClick={handleSubmit} disabled={!canManageProjects}>Save Changes</Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Note: Image storage and serving require backend integration.

@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Image as ImageIcon, Upload } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface UploadThumbnailDialogProps {
   projectId: string;
@@ -28,6 +30,13 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
   currentThumbnailUrl,
   onThumbnailUpload,
 }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(currentThumbnailUrl || null);
@@ -69,7 +78,7 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" disabled={!canManageProjects}>
           <ImageIcon className="mr-2 h-4 w-4" />
           {currentThumbnailUrl ? "Change Image" : "Upload Image"}
         </Button>
@@ -92,12 +101,12 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
             )}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="thumbnail-upload">Select Image</Label>
-              <Input id="thumbnail-upload" type="file" accept="image/*" onChange={handleFileChange} />
+              <Input id="thumbnail-upload" type="file" accept="image/*" onChange={handleFileChange} disabled={!canManageProjects} />
             </div>
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleUpload} disabled={!selectedFile}>
+          <Button onClick={handleUpload} disabled={!selectedFile || !canManageProjects}>
             <Upload className="mr-2 h-4 w-4" /> Upload
           </Button>
         </div>
