@@ -15,24 +15,25 @@ import {
 import { LogOut, Settings, User, Shield, ToggleLeft, ToggleRight } from "lucide-react"; // Added ToggleLeft/Right icons
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSelector } from "./LanguageSelector";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext";
+import { useBranding } from "@/context/BrandingContext"; // Import useBranding
 
 const Header = () => {
-  const { isAdmin, toggleAdmin } = useAuth(); // Use the auth context
+  const { isAdmin, toggleAdmin } = useAuth();
+  const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
 
   // Placeholder for user data, will be replaced with actual user context from Supabase
   const user = {
     name: "John Doe",
     email: "john.doe@example.com",
     initials: "JD",
-    // isAdmin: true, // This is now managed by AuthContext
   };
 
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b bg-card shadow-sm transition-all duration-300 ease-in-out">
       <div className="flex items-center">
         <Link to="/" className="text-xl font-bold text-foreground flex items-center">
-          <img src="/placeholder.svg" alt="Logo" className="h-8 w-auto mr-2" />
+          <img src={brandLogoUrl} alt="Logo" className="h-8 w-auto mr-2" /> {/* Use dynamic logo */}
           Group Finance
         </Link>
       </div>
@@ -49,7 +50,7 @@ const Header = () => {
           <span className="sr-only">Toggle Admin Mode</span>
         </Button>
 
-        {isAdmin && ( // Only show Admin menu if user is admin
+        {isAdmin && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -88,13 +89,13 @@ const Header = () => {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/profile"> {/* Link to user's profile page */}
+              <Link to="/profile">
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to="/settings"> {/* Link to user's personal settings page */}
+              <Link to="/settings">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </Link>

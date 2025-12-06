@@ -4,12 +4,15 @@ import React from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import { MadeWithDyad } from "./made-with-dyad";
+import { useBranding } from "@/context/BrandingContext"; // Import useBranding
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { tagline } = useBranding(); // Use the branding context
+
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar />
@@ -19,7 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {children}
         </main>
         <footer className="p-4 text-center text-sm text-muted-foreground border-t shadow-inner transition-all duration-300 ease-in-out">
-          <p>Your cinematic tagline here.</p>
+          <p>{tagline}</p> {/* Use dynamic tagline */}
           <MadeWithDyad />
         </footer>
       </div>

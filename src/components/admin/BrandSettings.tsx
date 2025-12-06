@@ -7,13 +7,19 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Save, Image as ImageIcon, Upload } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import { useBranding } from "@/context/BrandingContext"; // Import useBranding
 
 const BrandSettings = () => {
-  // In a real app, these would be fetched from a backend/global state
-  const [brandLogoUrl, setBrandLogoUrl] = React.useState<string | undefined>("/placeholder.svg");
-  const [tagline, setTagline] = React.useState("Your cinematic tagline here.");
+  const { brandLogoUrl, tagline, setBrandLogoUrl, setTagline } = useBranding(); // Use the branding context
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(brandLogoUrl || null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(brandLogoUrl);
+  const [localTagline, setLocalTagline] = React.useState(tagline);
+
+  React.useEffect(() => {
+    // Update local state when context changes
+    setPreviewUrl(brandLogoUrl);
+    setLocalTagline(tagline);
+  }, [brandLogoUrl, tagline]);
 
   React.useEffect(() => {
     // Cleanup object URL when component unmounts or file changes
@@ -31,20 +37,24 @@ const BrandSettings = () => {
       setPreviewUrl(URL.createObjectURL(file));
     } else {
       setSelectedFile(null);
-      setPreviewUrl(brandLogoUrl || null);
+      setPreviewUrl(brandLogoUrl); // Revert to current global logo if no file selected
     }
   };
 
   const handleSaveBranding = () => {
-    // In a real app, this would involve uploading the file and saving settings to a backend
     if (selectedFile && previewUrl) {
-      // Simulate upload and update URL
+      // Simulate upload and update global URL
       setBrandLogoUrl(previewUrl);
       showSuccess("Brand logo uploaded and settings saved!");
+    } else if (!selectedFile && previewUrl !== brandLogoUrl) {
+      // If user cleared selection and there was a previous logo, clear it
+      setBrandLogoUrl(""); // Or set to a default empty state
+      showSuccess("Brand logo cleared and settings saved!");
     } else {
       showSuccess("Branding settings saved!");
     }
-    console.log("Saving brand settings:", { brandLogoUrl, tagline });
+    setTagline(localTagline); // Update global tagline
+    console.log("Saving brand settings:", { brandLogoUrl: previewUrl, tagline: localTagline });
   };
 
   return (
@@ -83,8 +93,8 @@ const BrandSettings = () => {
           <Input
             id="app-tagline"
             type="text"
-            value={tagline}
-            onChange={(e) => setTagline(e.target.value)}
+            value={localTagline}
+            onChange={(e) => setLocalTagline(e.target.value)}
             placeholder="Your cinematic tagline here."
           />
           <p className="text-sm text-muted-foreground">This tagline appears in reports and footers.</p>

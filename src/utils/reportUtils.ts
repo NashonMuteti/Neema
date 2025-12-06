@@ -11,14 +11,16 @@ interface Member {
   status: "Active" | "Inactive" | "Suspended";
 }
 
-// ReportOptions no longer includes brandLogoPath and tagline directly
 interface ReportOptions {
   reportName: string;
+  // In a real app, brandLogoPath and tagline would be passed here or fetched from a global state/context
+  // For this example, we'll use placeholders and assume they are globally available.
 }
 
 // Placeholder for global branding settings (in a real app, these would be fetched from a context/backend)
-const GLOBAL_BRAND_LOGO_PATH = "/placeholder.svg";
-const GLOBAL_TAGLINE = "Your cinematic tagline here.";
+// For now, we'll use static placeholders as direct context access isn't feasible in a pure utility function
+const REPORT_BRAND_LOGO_PATH = "/placeholder.svg"; // This would ideally come from BrandingContext
+const REPORT_TAGLINE = "Your cinematic tagline here."; // This would ideally come from BrandingContext
 
 export const exportMembersToPdf = (members: Member[], options: ReportOptions) => {
   const doc = new jsPDF();
@@ -26,9 +28,9 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
   // Add Header
   doc.setFontSize(18);
   doc.text(options.reportName, 14, 22);
-  if (GLOBAL_BRAND_LOGO_PATH) {
+  if (REPORT_BRAND_LOGO_PATH) {
     const img = new Image();
-    img.src = GLOBAL_BRAND_LOGO_PATH;
+    img.src = REPORT_BRAND_LOGO_PATH;
     // Ensure the image is loaded before adding it to the PDF
     img.onload = () => {
       doc.addImage(img, "PNG", 170, 10, 20, 20); // Adjust position and size as needed
@@ -78,7 +80,7 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(10);
-      doc.text(GLOBAL_TAGLINE, 14, doc.internal.pageSize.height - 10);
+      doc.text(REPORT_TAGLINE, 14, doc.internal.pageSize.height - 10);
       doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
     }
 
