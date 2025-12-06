@@ -48,6 +48,8 @@ const Members = () => {
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   const canManageMembers = currentUserPrivileges.includes("Manage Members"); // Check for the specific privilege
+  const canExportPdf = currentUserPrivileges.includes("Export Member List PDF"); // New privilege check
+  const canExportExcel = currentUserPrivileges.includes("Export Member List Excel"); // New privilege check
 
   const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
 
@@ -167,16 +169,18 @@ const Members = () => {
             </div>
           </div>
           <div className="flex gap-2">
+            {canExportPdf && (
+              <Button variant="outline" onClick={handlePrintPdf}>
+                <Printer className="mr-2 h-4 w-4" /> Print PDF
+              </Button>
+            )}
+            {canExportExcel && (
+              <Button variant="outline" onClick={handleExportExcel}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
+              </Button>
+            )}
             {canManageMembers && (
-              <>
-                <Button variant="outline" onClick={handlePrintPdf}>
-                  <Printer className="mr-2 h-4 w-4" /> Print PDF
-                </Button>
-                <Button variant="outline" onClick={handleExportExcel}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
-                </Button>
-                <AddMemberDialog onAddMember={handleAddMember} />
-              </>
+              <AddMemberDialog onAddMember={handleAddMember} />
             )}
           </div>
         </div>

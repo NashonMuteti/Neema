@@ -35,7 +35,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         "View Income", "Manage Income",
         "View Expenditure", "Manage Expenditure",
         "View Sales Management", "View Stocks", "View Daily Sales", "View Debts",
-        "View Members",
+        "View Members", "Export Member List PDF", "Export Member List Excel", // Added new export privileges
         "View Reports", "View Member Contributions Report", "View Petty Cash Report", "View Pledge Report", "View Table Banking Summary",
         "View My Contributions",
       ]
