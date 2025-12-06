@@ -26,7 +26,7 @@ import { Link } from "react-router-dom";
 import { format, getMonth, getYear, parseISO } from "date-fns";
 
 // Dummy data for all members' contributions (aggregated from various sources)
-const allMembersContributions = [
+export const allMembersContributions = [ // Exported for reuse
   { memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-07-10", amount: 50, expected: 100 },
   { memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj5", projectName: "Short Film Contest", date: "2024-07-15", amount: 20, expected: 20 },
   { memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-08-01", amount: 50, expected: 100 },
