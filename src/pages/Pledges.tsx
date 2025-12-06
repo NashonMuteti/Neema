@@ -18,7 +18,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { format, getMonth, getYear, isBefore, startOfDay } from "date-fns";
-import { CalendarIcon, Edit, Trash2, CheckCircle, Search } from "lucide-react";
+import { CalendarIcon, Edit, Trash2, CheckCircle, Search } from "lucide-react"; // Added Search icon
 import { showSuccess, showError } from "@/utils/toast";
 import {
   Table,
