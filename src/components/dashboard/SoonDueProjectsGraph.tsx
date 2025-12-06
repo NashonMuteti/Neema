@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { addDays, isBefore, isAfter, startOfDay } from "date-fns";
+import { addDays, isBefore, startOfDay } from "date-fns";
 
 interface Project {
   id: string;
@@ -16,41 +16,76 @@ interface SoonDueProjectsGraphProps {
   projects: Project[];
 }
 
+interface CategorizedProjectData {
+  name: string;
+  count: number;
+  fill: string;
+  projectNames: string[]; // Added to store project names
+}
+
 const SoonDueProjectsGraph: React.FC<SoonDueProjectsGraphProps> = ({ projects }) => {
   const today = startOfDay(new Date());
   const sevenDaysFromNow = addDays(today, 7);
   const thirtyDaysFromNow = addDays(today, 30);
 
-  const categorizeProjects = (allProjects: Project[]) => {
-    let dueThisWeek = 0;
-    let dueNext30Days = 0;
-    let dueLater = 0;
-    let overdue = 0;
+  const categorizeProjects = (allProjects: Project[]): CategorizedProjectData[] => {
+    const categories: Record<string, { count: number; projects: string[]; fill: string }> = {
+      "Overdue": { count: 0, projects: [], fill: "hsl(var(--destructive))" },
+      "This Week": { count: 0, projects: [], fill: "hsl(var(--primary))" },
+      "Next 30 Days": { count: 0, projects: [], fill: "hsl(var(--secondary))" },
+      "Later": { count: 0, projects: [], fill: "hsl(var(--muted-foreground))" },
+    };
 
     allProjects.forEach(project => {
       if (project.status === "Open" && project.dueDate) {
         const dueDate = startOfDay(new Date(project.dueDate));
         if (isBefore(dueDate, today)) {
-          overdue++;
+          categories["Overdue"].count++;
+          categories["Overdue"].projects.push(project.name);
         } else if (isBefore(dueDate, sevenDaysFromNow)) {
-          dueThisWeek++;
+          categories["This Week"].count++;
+          categories["This Week"].projects.push(project.name);
         } else if (isBefore(dueDate, thirtyDaysFromNow)) {
-          dueNext30Days++;
+          categories["Next 30 Days"].count++;
+          categories["Next 30 Days"].projects.push(project.name);
         } else {
-          dueLater++;
+          categories["Later"].count++;
+          categories["Later"].projects.push(project.name);
         }
       }
     });
 
-    return [
-      { name: "Overdue", count: overdue, fill: "hsl(var(--destructive))" },
-      { name: "This Week", count: dueThisWeek, fill: "hsl(var(--primary))" },
-      { name: "Next 30 Days", count: dueNext30Days, fill: "hsl(var(--secondary))" },
-      { name: "Later", count: dueLater, fill: "hsl(var(--muted-foreground))" },
-    ];
+    return Object.keys(categories).map(key => ({
+      name: key,
+      count: categories[key].count,
+      fill: categories[key].fill,
+      projectNames: categories[key].projects,
+    }));
   };
 
   const data = categorizeProjects(projects);
+
+  // Custom Tooltip component
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const dataPoint = payload[0].payload as CategorizedProjectData;
+      return (
+        <div className="rounded-lg border bg-popover p-3 text-popover-foreground shadow-md">
+          <p className="text-sm font-semibold mb-1">{label} ({dataPoint.count} projects)</p>
+          {dataPoint.projectNames.length > 0 ? (
+            <ul className="list-disc list-inside text-xs space-y-0.5">
+              {dataPoint.projectNames.map((projectName, index) => (
+                <li key={index}>{projectName}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted-foreground">No projects in this category.</p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
@@ -65,13 +100,7 @@ const SoonDueProjectsGraph: React.FC<SoonDueProjectsGraphProps> = ({ projects })
             <YAxis allowDecimals={false} stroke="hsl(var(--foreground))" />
             <Tooltip
               cursor={{ fill: "hsl(var(--accent))", opacity: 0.2 }}
-              contentStyle={{
-                backgroundColor: "hsl(var(--popover))",
-                borderColor: "hsl(var(--border))",
-                borderRadius: "var(--radius)",
-              }}
-              labelStyle={{ color: "hsl(var(--foreground))" }}
-              itemStyle={{ color: "hsl(var(--foreground))" }}
+              content={<CustomTooltip />} // Use the custom tooltip
             />
             <Bar dataKey="count" fill="var(--fill)" />
           </BarChart>
