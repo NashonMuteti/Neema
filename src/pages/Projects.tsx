@@ -17,11 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon, CalendarIcon, DollarSign, Handshake } from "lucide-react"; // Added Handshake icon
+import { Image as ImageIcon, CalendarIcon, DollarSign, Handshake, Search } from "lucide-react"; // Added Search icon
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook
+import { Input } from "@/components/ui/input"; // Import Input for search bar
 
 interface Project {
   id: string;
@@ -49,13 +50,14 @@ const Projects = () => {
     { id: "proj7", name: "Suspended Feature Film", description: "Production paused due to funding issues.", status: "Suspended", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2025, 0, 1), memberContributionAmount: 150 },
   ]);
   const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "Suspended" | "All">("Open");
+  const [searchQuery, setSearchQuery] = React.useState(""); // New: Search query state
 
   const filteredProjects = projects
     .filter(project => {
-      if (filterStatus === "All") {
-        return project.status !== "Deleted";
-      }
-      return project.status === filterStatus;
+      const matchesStatus = filterStatus === "All" || project.status === filterStatus;
+      const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            project.description.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesStatus && matchesSearch;
     })
     .sort((a, b) => {
       if (a.dueDate && b.dueDate) {
@@ -142,7 +144,7 @@ const Projects = () => {
         Manage your project-specific financial contributions and reports here.
       </p>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <h2 className="text-xl font-semibold">Projects</h2>
           <Select value={filterStatus} onValueChange={(value: "Open" | "Closed" | "Suspended" | "All") => setFilterStatus(value)}>
             <SelectTrigger className="w-[180px]">
@@ -157,6 +159,17 @@ const Projects = () => {
               </SelectGroup>
             </SelectContent>
           </Select>
+          {/* New: Search Input */}
+          <div className="relative flex items-center">
+            <Input
+              type="text"
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8"
+            />
+            <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+          </div>
         </div>
         {isAdmin && (
           <NewProjectDialog onAddProject={handleAddProject} />
@@ -248,7 +261,7 @@ const Projects = () => {
             );
           })
         ) : (
-          <p className="text-muted-foreground col-span-full">No projects found with status "{filterStatus}".</p>
+          <p className="text-muted-foreground col-span-full">No projects found with status "{filterStatus}" or matching your search.</p>
         )}
       </div>
     </div>
