@@ -7,7 +7,7 @@ import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handsha
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
-interface NavItem {
+export interface NavItem { // Exported NavItem
   name: string;
   href: string;
   icon: React.ElementType;
@@ -15,7 +15,7 @@ interface NavItem {
   type?: "item"; // Explicitly define type for NavItem
 }
 
-interface NavHeading {
+export interface NavHeading { // Exported NavHeading
   name: string;
   type: "heading";
   requiredRoles?: string[]; // Roles required to see this heading

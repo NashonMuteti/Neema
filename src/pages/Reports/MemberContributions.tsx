@@ -27,15 +27,15 @@ import { format, getMonth, getYear, parseISO } from "date-fns";
 
 // Dummy data for all members' contributions (aggregated from various sources)
 export const allMembersContributions = [ // Exported for reuse
-  { memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-07-10", amount: 50, expected: 100 },
-  { memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj5", projectName: "Short Film Contest", date: "2024-07-15", amount: 20, expected: 20 },
-  { memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-08-01", amount: 50, expected: 100 },
-  { memberId: "m2", memberName: "Bob Williams", memberEmail: "bob@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-08-10", amount: 25, expected: 50 },
-  { memberId: "m2", memberName: "Bob Williams", memberEmail: "bob@example.com", projectId: "proj5", projectName: "Short Film Contest", date: "2024-09-05", amount: 10, expected: 20 },
-  { memberId: "m3", memberName: "Charlie Brown", memberEmail: "charlie@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-09-20", amount: 25, expected: 100 },
-  { memberId: "m3", memberName: "Charlie Brown", memberEmail: "charlie@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-10-01", amount: 25, expected: 50 },
-  { memberId: "m4", memberName: "David Green", memberEmail: "david@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-07-22", amount: 70, expected: 100 },
-  { memberId: "m4", memberName: "David Green", memberEmail: "david@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-08-15", amount: 30, expected: 50 },
+  { id: "mc1", memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-07-10", amount: 50, expected: 100 },
+  { id: "mc2", memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj5", projectName: "Short Film Contest", date: "2024-07-15", amount: 20, expected: 20 },
+  { id: "mc3", memberId: "m1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-08-01", amount: 50, expected: 100 },
+  { id: "mc4", memberId: "m2", memberName: "Bob Williams", memberEmail: "bob@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-08-10", amount: 25, expected: 50 },
+  { id: "mc5", memberId: "m2", memberName: "Bob Williams", memberEmail: "bob@example.com", projectId: "proj5", projectName: "Short Film Contest", date: "2024-09-05", amount: 10, expected: 20 },
+  { id: "mc6", memberId: "m3", memberName: "Charlie Brown", memberEmail: "charlie@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-09-20", amount: 25, expected: 100 },
+  { id: "mc7", memberId: "m3", memberName: "Charlie Brown", memberEmail: "charlie@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-10-01", amount: 25, expected: 50 },
+  { id: "mc8", memberId: "m4", memberName: "David Green", memberEmail: "david@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-07-22", amount: 70, expected: 100 },
+  { id: "mc9", memberId: "m4", memberName: "David Green", memberEmail: "david@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-08-15", amount: 30, expected: 50 },
 ];
 
 interface MemberSummary {
