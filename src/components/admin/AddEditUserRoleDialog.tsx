@@ -15,21 +15,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { showSuccess, showError } from "@/utils/toast";
 import { Save } from "lucide-react";
 
-export interface UserGroup {
+export interface UserRole {
   id: string;
   name: string;
   description: string;
-  memberUserIds: string[]; // IDs of users belonging to this group
+  memberUserIds: string[]; // IDs of users belonging to this role
 }
 
-interface AddEditUserGroupDialogProps {
+interface AddEditUserRoleDialogProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  initialData?: UserGroup; // For editing existing group
-  onSave: (group: Omit<UserGroup, 'id'> & { id?: string }) => void;
+  initialData?: UserRole; // For editing existing role
+  onSave: (role: Omit<UserRole, 'id'> & { id?: string }) => void;
 }
 
-const AddEditUserGroupDialog: React.FC<AddEditUserGroupDialogProps> = ({
+const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
   isOpen,
   setIsOpen,
   initialData,
@@ -47,22 +47,22 @@ const AddEditUserGroupDialog: React.FC<AddEditUserGroupDialogProps> = ({
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      showError("Group Name is required.");
+      showError("Role Name is required.");
       return;
     }
 
-    const groupData: Omit<UserGroup, 'id'> & { id?: string } = {
+    const roleData: Omit<UserRole, 'id'> & { id?: string } = {
       name: name.trim(),
       description: description.trim(),
       memberUserIds: initialData?.memberUserIds || [], // Preserve existing members or start empty
     };
 
     if (initialData?.id) {
-      groupData.id = initialData.id;
+      roleData.id = initialData.id;
     }
 
-    onSave(groupData);
-    showSuccess(`User group ${initialData ? "updated" : "added"} successfully!`);
+    onSave(roleData);
+    showSuccess(`User role ${initialData ? "updated" : "added"} successfully!`);
     setIsOpen(false);
   };
 
@@ -70,39 +70,39 @@ const AddEditUserGroupDialog: React.FC<AddEditUserGroupDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{initialData ? "Edit User Group" : "Add New User Group"}</DialogTitle>
+          <DialogTitle>{initialData ? "Edit User Role" : "Add New User Role"}</DialogTitle>
           <DialogDescription>
-            {initialData ? `Make changes to the ${initialData.name} group.` : "Define a new group for managing user rights."}
+            {initialData ? `Make changes to the ${initialData.name} role.` : "Define a new role for managing user rights."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="group-name" className="text-right">
-              Group Name
+            <Label htmlFor="role-name" className="text-right">
+              Role Name
             </Label>
             <Input
-              id="group-name"
+              id="role-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="group-description" className="text-right">
+            <Label htmlFor="role-description" className="text-right">
               Description
             </Label>
             <Textarea
-              id="group-description"
+              id="role-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="col-span-3"
-              placeholder="Briefly describe the purpose or permissions of this group."
+              placeholder="Briefly describe the purpose or permissions of this role."
             />
           </div>
         </div>
         <div className="flex justify-end">
           <Button onClick={handleSubmit}>
-            <Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add Group"}
+            <Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add Role"}
           </Button>
         </div>
       </DialogContent>
@@ -110,4 +110,4 @@ const AddEditUserGroupDialog: React.FC<AddEditUserGroupDialogProps> = ({
   );
 };
 
-export default AddEditUserGroupDialog;
+export default AddEditUserRoleDialog;

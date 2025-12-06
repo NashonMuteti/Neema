@@ -5,10 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SecuritySettings from "@/components/admin/SecuritySettings";
 import AppCustomization from "@/components/admin/AppCustomization";
 import ReportsTemplateCustomization from "@/components/admin/ReportsTemplateCustomization";
-import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmin"; // Placeholder for admin user settings
-import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings"; // Import the new component
-import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization"; // Import MemberFieldCustomization
-import UserGroupsSettings from "@/components/admin/UserGroupsSettings"; // Import the new UserGroupsSettings component
+import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmin";
+import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings";
+import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization";
+import UserRolesSettings from "@/components/admin/UserRolesSettings"; // Import the renamed component
 
 const AdminSettings = () => {
   return (
@@ -19,13 +19,13 @@ const AdminSettings = () => {
       </p>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-7"> {/* Increased grid columns to 7 */}
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="app-customization">App Customization</TabsTrigger>
           <TabsTrigger value="member-fields">Member Fields</TabsTrigger>
           <TabsTrigger value="user-profiles">User Management</TabsTrigger>
-          <TabsTrigger value="user-groups">User Groups</TabsTrigger> {/* New tab trigger */}
+          <TabsTrigger value="user-roles">User Roles</TabsTrigger> {/* Updated tab trigger */}
           <TabsTrigger value="reports-templates">Reports Templates</TabsTrigger>
         </TabsList>
         <TabsContent value="general">
@@ -43,8 +43,8 @@ const AdminSettings = () => {
         <TabsContent value="user-profiles">
           <UserProfileSettingsAdmin />
         </TabsContent>
-        <TabsContent value="user-groups"> {/* New tab content */}
-          <UserGroupsSettings />
+        <TabsContent value="user-roles"> {/* Updated tab content */}
+          <UserRolesSettings />
         </TabsContent>
         <TabsContent value="reports-templates">
           <ReportsTemplateCustomization />

@@ -7,108 +7,124 @@ import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handsha
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
-const navItems = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  requiredRoles?: string[]; // Roles required to see this item
+}
+
+interface NavHeading {
+  name: string;
+  type: "heading";
+  requiredRoles?: string[]; // Roles required to see this heading
+  children: NavItem[];
+}
+
+type SidebarItem = NavItem | NavHeading;
+
+const navItems: SidebarItem[] = [
   {
     name: "Dashboard",
     href: "/",
     icon: Home,
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager", "Contributor"],
   },
   {
     name: "Project Accounts",
     href: "/projects",
     icon: DollarSign,
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager"],
   },
   {
     name: "Petty Cash",
     href: "/petty-cash",
     icon: Wallet,
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager"],
   },
   {
     name: "Pledges",
     href: "/pledges",
     icon: Handshake,
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager"],
   },
   {
     name: "Income",
     href: "/income",
     icon: TrendingUp,
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager"],
   },
   {
     name: "Expenditure",
     href: "/expenditure",
     icon: TrendingDown,
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager"],
   },
   {
     name: "Members",
     href: "/members",
     icon: Users,
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager"],
   },
   {
     name: "Board Members",
     href: "/board-members",
     icon: UserCog,
-    privileged: true,
+    requiredRoles: ["Admin"], // Only Admin can see this
   },
   {
     name: "Reports",
     type: "heading",
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager", "Contributor"],
     children: [
       {
         name: "Member Contributions",
         href: "/reports/member-contributions",
         icon: BarChart2,
-        privileged: false,
+        requiredRoles: ["Admin", "Project Manager"],
       },
       {
         name: "Petty Cash Report",
         href: "/reports/petty-cash",
         icon: FileText,
-        privileged: false,
+        requiredRoles: ["Admin", "Project Manager"],
       },
       {
         name: "Pledge Report",
         href: "/reports/pledges",
         icon: FileText,
-        privileged: false,
+        requiredRoles: ["Admin", "Project Manager"],
       },
       {
         name: "Table Banking Summary",
         href: "/reports/table-banking-summary",
         icon: Banknote,
-        privileged: false,
+        requiredRoles: ["Admin", "Project Manager"],
       },
       {
         name: "User Activity Report",
         href: "/reports/user-activity",
         icon: Activity,
-        privileged: true,
+        requiredRoles: ["Admin"], // Only Admin can see this
       },
       {
         name: "Deleted Projects Report",
         href: "/reports/deleted-projects",
         icon: FolderX,
-        privileged: true,
+        requiredRoles: ["Admin"], // Only Admin can see this
       },
     ],
   },
   {
     name: "Actions",
     type: "heading",
-    privileged: true,
+    requiredRoles: ["Admin"], // Only Admin can see this heading
     children: [
       {
         name: "Initialize Balances",
         href: "/initialize-balances",
         icon: RefreshCcw,
-        privileged: true,
+        requiredRoles: ["Admin"], // Only Admin can see this
       },
     ],
   },
@@ -116,38 +132,68 @@ const navItems = [
     name: "My Contributions",
     href: "/my-contributions",
     icon: CalendarDays,
-    privileged: false,
+    requiredRoles: ["Admin", "Project Manager", "Contributor"],
+  },
+  {
+    name: "Admin Settings",
+    href: "/admin/settings",
+    icon: Settings,
+    requiredRoles: ["Admin"], // Only Admin can see this
   },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
-  const { isAdmin } = useAuth(); // Use the auth context
+  const { userRoles } = useAuth(); // Use userRoles from AuthContext
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
 
-  // Open reports collapsible if any child route is active
+  // Helper to check if user has any of the required roles
+  const hasRequiredRole = (requiredRoles?: string[]) => {
+    if (!requiredRoles || requiredRoles.length === 0) return true; // No roles required, so accessible
+    return requiredRoles.some(role => userRoles.includes(role));
+  };
+
+  // Open reports/actions collapsible if any child route is active and user has access
   React.useEffect(() => {
     const isChildOfReports = navItems.some(item =>
-      item.type === "heading" && item.name === "Reports" && item.children?.some(child => location.pathname.startsWith(child.href))
+      item.type === "heading" && item.name === "Reports" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
     );
     if (isChildOfReports) {
       setIsReportsOpen(true);
+    } else {
+      setIsReportsOpen(false); // Close if no child is active
     }
-  }, [location.pathname]);
+
+    const isChildOfActions = navItems.some(item =>
+      item.type === "heading" && item.name === "Actions" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
+    );
+    if (isChildOfActions) {
+      setIsActionsOpen(true);
+    } else {
+      setIsActionsOpen(false); // Close if no child is active
+    }
+  }, [location.pathname, userRoles]);
 
 
   return (
     <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">
       <nav className="flex-1 space-y-2">
         {navItems.map((item) => {
-          if (item.privileged && !isAdmin) {
-            return null;
+          if (!hasRequiredRole(item.requiredRoles)) {
+            return null; // Hide item if user doesn't have required roles
           }
 
           if (item.type === "heading") {
             const isOpen = item.name === "Reports" ? isReportsOpen : isActionsOpen;
             const setIsOpen = item.name === "Reports" ? setIsReportsOpen : setIsActionsOpen;
+
+            // Filter children based on user roles
+            const visibleChildren = item.children.filter(child => hasRequiredRole(child.requiredRoles));
+
+            if (visibleChildren.length === 0) {
+              return null; // Hide heading if no children are visible
+            }
 
             return (
               <Collapsible key={item.name} open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
@@ -156,24 +202,19 @@ const Sidebar = () => {
                   <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isOpen && "rotate-180")} />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-1 pl-4">
-                  {item.children?.map((child) => {
-                    if (child.privileged && !isAdmin) {
-                      return null;
-                    }
-                    return (
-                      <Link
-                        key={child.name}
-                        to={child.href}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                          location.pathname === child.href && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
-                        )}
-                      >
-                        <child.icon className="h-5 w-5" />
-                        {child.name}
-                      </Link>
-                    );
-                  })}
+                  {visibleChildren.map((child) => (
+                    <Link
+                      key={child.name}
+                      to={child.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
+                        location.pathname === child.href && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                      )}
+                    >
+                      <child.icon className="h-5 w-5" />
+                      {child.name}
+                    </Link>
+                  ))}
                 </CollapsibleContent>
               </Collapsible>
             );

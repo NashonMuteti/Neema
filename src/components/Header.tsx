@@ -12,15 +12,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User, Shield, ToggleLeft, ToggleRight } from "lucide-react"; // Added ToggleLeft/Right icons
+import { LogOut, Settings, User, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSelector } from "./LanguageSelector";
 import { useAuth } from "@/context/AuthContext";
-import { useBranding } from "@/context/BrandingContext"; // Import useBranding
+import { useBranding } from "@/context/BrandingContext";
 
 const Header = () => {
-  const { isAdmin, toggleAdmin } = useAuth();
-  const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
+  const { isAdmin, toggleAdmin } = useAuth(); // Use isAdmin and toggleAdmin from AuthContext
+  const { brandLogoUrl, tagline } = useBranding();
 
   // Placeholder for user data, will be replaced with actual user context from Supabase
   const user = {
@@ -33,7 +33,7 @@ const Header = () => {
     <header className="flex items-center justify-between h-16 px-6 border-b bg-card shadow-sm transition-all duration-300 ease-in-out">
       <div className="flex items-center">
         <Link to="/" className="text-xl font-bold text-foreground flex items-center">
-          <img src={brandLogoUrl} alt="Logo" className="h-8 w-auto mr-2" /> {/* Use dynamic logo */}
+          <img src={brandLogoUrl} alt="Logo" className="h-8 w-auto mr-2" />
           Group Finance
         </Link>
       </div>
