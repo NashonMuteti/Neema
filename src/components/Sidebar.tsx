@@ -3,11 +3,9 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote } from "lucide-react"; // Added Banknote icon
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible
-
-// Placeholder for a privileged user check
-const isAdmin = true; // This should come from user context/authentication
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 const navItems = [
   {
@@ -35,15 +33,15 @@ const navItems = [
     privileged: false,
   },
   {
-    name: "Income", // New menu item
+    name: "Income",
     href: "/income",
     icon: TrendingUp,
     privileged: false,
   },
   {
-    name: "Expenditure", // New menu item
+    name: "Expenditure",
     href: "/expenditure",
-    icon: TrendingDown, // Using TrendingDown icon for expenditure
+    icon: TrendingDown,
     privileged: false,
   },
   {
@@ -53,7 +51,7 @@ const navItems = [
     privileged: false,
   },
   {
-    name: "Board Members", // New privileged menu item
+    name: "Board Members",
     href: "/board-members",
     icon: UserCog,
     privileged: true,
@@ -61,7 +59,7 @@ const navItems = [
   {
     name: "Reports",
     type: "heading",
-    privileged: false, // Heading itself doesn't need privilege, but its children might
+    privileged: false,
     children: [
       {
         name: "Member Contributions",
@@ -82,9 +80,9 @@ const navItems = [
         privileged: false,
       },
       {
-        name: "Table Banking Summary", // New report item
+        name: "Table Banking Summary",
         href: "/reports/table-banking-summary",
-        icon: Banknote, // Using Banknote icon
+        icon: Banknote,
         privileged: false,
       },
       {
@@ -94,7 +92,7 @@ const navItems = [
         privileged: true,
       },
       {
-        name: "Deleted Projects Report", // New privileged report
+        name: "Deleted Projects Report",
         href: "/reports/deleted-projects",
         icon: FolderX,
         privileged: true,
@@ -114,17 +112,17 @@ const navItems = [
       },
     ],
   },
-  // Removed "My Settings" from here
   {
-    name: "My Contributions", // New menu item for logged-in user's contributions
+    name: "My Contributions",
     href: "/my-contributions",
-    icon: CalendarDays, // Using CalendarDays icon
+    icon: CalendarDays,
     privileged: false,
   },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
+  const { isAdmin } = useAuth(); // Use the auth context
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
 

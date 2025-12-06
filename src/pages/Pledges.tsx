@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 // Dummy data for members and projects (should come from backend in a real app)
 const dummyMembers = [
@@ -53,10 +54,8 @@ interface Pledge {
   status: "Active" | "Paid" | "Overdue";
 }
 
-// Placeholder for a privileged user check
-const isAdmin = true; // This should come from user context/authentication
-
 const Pledges = () => {
+  const { isAdmin } = useAuth(); // Use the auth context
   // Form State
   const [newPledgeMemberId, setNewPledgeMemberId] = React.useState<string | undefined>(undefined);
   const [newPledgeProjectId, setNewPledgeProjectId] = React.useState<string | undefined>(undefined);

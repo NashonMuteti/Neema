@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 // Dummy financial accounts (should ideally come from a backend/admin setup)
 const financialAccounts = [
@@ -46,10 +47,8 @@ interface ExpenditureTransaction {
   purpose: string;
 }
 
-// Placeholder for a privileged user check
-const isAdmin = true; // This should come from user context/authentication
-
 const Expenditure = () => {
+  const { isAdmin } = useAuth(); // Use the auth context
   // Form State
   const [expenditureDate, setExpenditureDate] = React.useState<Date | undefined>(new Date());
   const [expenditureAmount, setExpenditureAmount] = React.useState("");

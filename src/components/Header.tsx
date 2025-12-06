@@ -12,17 +12,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User, Shield } from "lucide-react"; // Added Shield icon for Admin
+import { LogOut, Settings, User, Shield, ToggleLeft, ToggleRight } from "lucide-react"; // Added ToggleLeft/Right icons
 import { ThemeToggle } from "./ThemeToggle";
-import { LanguageSelector } from "./LanguageSelector"; // Import LanguageSelector
+import { LanguageSelector } from "./LanguageSelector";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 const Header = () => {
+  const { isAdmin, toggleAdmin } = useAuth(); // Use the auth context
+
   // Placeholder for user data, will be replaced with actual user context from Supabase
   const user = {
     name: "John Doe",
     email: "john.doe@example.com",
     initials: "JD",
-    isAdmin: true, // Assume admin for now to show the menu
+    // isAdmin: true, // This is now managed by AuthContext
   };
 
   return (
@@ -34,9 +37,19 @@ const Header = () => {
         </Link>
       </div>
       <div className="flex items-center space-x-4">
-        <LanguageSelector /> {/* Integrated LanguageSelector */}
+        <LanguageSelector />
         <ThemeToggle />
-        {user.isAdmin && ( // Only show Admin menu if user is admin
+        {/* Admin Toggle Button */}
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleAdmin}>
+          {isAdmin ? (
+            <ToggleRight className="h-[1.2rem] w-[1.2rem] text-primary" />
+          ) : (
+            <ToggleLeft className="h-[1.2rem] w-[1.2rem] text-muted-foreground" />
+          )}
+          <span className="sr-only">Toggle Admin Mode</span>
+        </Button>
+
+        {isAdmin && ( // Only show Admin menu if user is admin
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">

@@ -14,7 +14,7 @@ import AddMemberDialog from "@/components/members/AddMemberDialog";
 import EditMemberDialog from "@/components/members/EditMemberDialog";
 import DeleteMemberDialog from "@/components/members/DeleteMemberDialog";
 import { showSuccess } from "@/utils/toast";
-import { User as UserIcon, Printer, FileSpreadsheet, Search, Eye } from "lucide-react"; // Import Eye icon
+import { User as UserIcon, Printer, FileSpreadsheet, Search, Eye } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -23,12 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input"; // Import Input component
-import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils"; // Import report utilities
-import { Link } from "react-router-dom"; // Import Link for navigation
-
-// Placeholder for a privileged user check
-const isAdmin = true; // This should come from user context/authentication
+import { Input } from "@/components/ui/input";
+import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 interface Member {
   id: string;
@@ -36,19 +34,20 @@ interface Member {
   email: string;
   enableLogin: boolean;
   imageUrl?: string;
-  status: "Active" | "Inactive" | "Suspended"; // Added status property
+  status: "Active" | "Inactive" | "Suspended";
   // Add other member fields as needed
 }
 
 const Members = () => {
+  const { isAdmin } = useAuth(); // Use the auth context
   const [members, setMembers] = React.useState<Member[]>([
     { id: "m1", name: "Alice Johnson", email: "alice@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice", status: "Active" },
     { id: "m2", name: "Bob Williams", email: "bob@example.com", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob", status: "Inactive" },
     { id: "m3", name: "Charlie Brown", email: "charlie@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie", status: "Active" },
-    { id: "m4", name: "David Green", email: "david@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David", status: "Suspended" }, // Added a suspended member
+    { id: "m4", name: "David Green", email: "david@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David", status: "Suspended" },
   ]);
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Inactive" | "Suspended">("All");
-  const [searchQuery, setSearchQuery] = React.useState(""); // New state for search query
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   const filteredMembers = members.filter(member => {
     const matchesStatus = filterStatus === "All" || member.status === filterStatus;
@@ -130,7 +129,7 @@ const Members = () => {
       </p>
       <div className="bg-card p-6 rounded-lg shadow-lg border transition-all duration-300 ease-in-out hover:shadow-xl">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <div className="flex flex-wrap items-center gap-4"> {/* Use flex-wrap for responsiveness */}
+          <div className="flex flex-wrap items-center gap-4">
             <h2 className="text-xl font-semibold">Member List</h2>
             <Select value={filterStatus} onValueChange={(value: "All" | "Active" | "Inactive" | "Suspended") => setFilterStatus(value)}>
               <SelectTrigger className="w-[180px]">
@@ -151,7 +150,7 @@ const Members = () => {
                 placeholder="Search members..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8" // Add padding for the icon
+                className="pl-8"
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
@@ -179,7 +178,7 @@ const Members = () => {
               <TableHead className="text-center">Login Enabled</TableHead>
               <TableHead className="text-center">Status</TableHead>
               {isAdmin && <TableHead className="text-center">Actions</TableHead>}
-              <TableHead className="text-center">Contributions</TableHead> {/* New TableHead */}
+              <TableHead className="text-center">Contributions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -207,7 +206,7 @@ const Members = () => {
                 {isAdmin && (
                   <TableCell className="flex justify-center space-x-2">
                     <EditMemberDialog member={member} onEditMember={handleEditMember} />
-                    {member.status !== "Suspended" && ( // Only show toggle if not suspended
+                    {member.status !== "Suspended" && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -219,7 +218,7 @@ const Members = () => {
                     <DeleteMemberDialog member={member} onDeleteMember={handleDeleteMember} />
                   </TableCell>
                 )}
-                <TableCell className="text-center"> {/* New TableCell for contributions button */}
+                <TableCell className="text-center">
                   <Link to={`/members/${member.id}/contributions`}>
                     <Button variant="outline" size="sm">
                       <Eye className="h-4 w-4 mr-2" /> View

@@ -17,54 +17,52 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon, CalendarIcon, DollarSign } from "lucide-react"; // Import DollarSign icon
-import { format } from "date-fns"; // Import format for date display
-import { Link } from "react-router-dom"; // Import Link for navigation
-
-// Placeholder for a privileged user check
-const isAdmin = true; // This should come from user context/authentication
+import { Image as ImageIcon, CalendarIcon, DollarSign } from "lucide-react";
+import { format } from "date-fns";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 interface Project {
   id: string;
   name: string;
   description: string;
   status: "Open" | "Closed" | "Deleted" | "Suspended";
-  thumbnailUrl?: string; // Added optional thumbnail URL
-  dueDate?: Date; // New: Optional due date
-  memberContributionAmount?: number; // New: Amount each member is expected to contribute
+  thumbnailUrl?: string;
+  dueDate?: Date;
+  memberContributionAmount?: number;
 }
 
 const Projects = () => {
+  const { isAdmin } = useAuth(); // Use the auth context
   // In a real application, this would come from your member management system
   // For now, we'll use a dummy value.
-  const activeMembersCount = 5; 
+  const activeMembersCount = 5;
 
   const [projects, setProjects] = React.useState<Project[]>([
-    { id: "proj1", name: "Film Production X", description: "Main film project for the year.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 11, 15), memberContributionAmount: 100 }, // Dec 15, 2024
-    { id: "proj2", name: "Marketing Campaign Y", description: "Promotional activities for new releases.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 7, 30), memberContributionAmount: 50 }, // Aug 30, 2024
-    { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 8, 10), memberContributionAmount: 75 }, // Sep 10, 2024
+    { id: "proj1", name: "Film Production X", description: "Main film project for the year.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 11, 15), memberContributionAmount: 100 },
+    { id: "proj2", name: "Marketing Campaign Y", description: "Promotional activities for new releases.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 7, 30), memberContributionAmount: 50 },
+    { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 8, 10), memberContributionAmount: 75 },
     { id: "proj4", name: "Archived Project A", description: "An old project that was deleted.", status: "Deleted" },
-    { id: "proj5", name: "Short Film Contest", description: "Submission for a local short film festival.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 6, 20), memberContributionAmount: 20 }, // July 20, 2024
-    { id: "proj6", name: "Documentary Research", description: "Initial research phase for a new documentary.", status: "Open", thumbnailUrl: "/placeholder.svg", memberContributionAmount: 0 }, // No due date
-    { id: "proj7", name: "Suspended Feature Film", description: "Production paused due to funding issues.", status: "Suspended", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2025, 0, 1), memberContributionAmount: 150 }, // Added a suspended project
+    { id: "proj5", name: "Short Film Contest", description: "Submission for a local short film festival.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 6, 20), memberContributionAmount: 20 },
+    { id: "proj6", name: "Documentary Research", description: "Initial research phase for a new documentary.", status: "Open", thumbnailUrl: "/placeholder.svg", memberContributionAmount: 0 },
+    { id: "proj7", name: "Suspended Feature Film", description: "Production paused due to funding issues.", status: "Suspended", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2025, 0, 1), memberContributionAmount: 150 },
   ]);
-  const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "Suspended" | "All">("Open"); // Added 'Suspended' to filter
+  const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "Suspended" | "All">("Open");
 
   const filteredProjects = projects
     .filter(project => {
       if (filterStatus === "All") {
-        return project.status !== "Deleted"; // Show all non-deleted projects
+        return project.status !== "Deleted";
       }
       return project.status === filterStatus;
     })
     .sort((a, b) => {
-      // Sort by due date: soonest due on top, projects without due date last
       if (a.dueDate && b.dueDate) {
         return a.dueDate.getTime() - b.dueDate.getTime();
       }
-      if (a.dueDate) return -1; // a has a due date, b doesn't, so a comes first
-      if (b.dueDate) return 1;  // b has a due date, a doesn't, so b comes first
-      return 0; // Neither has a due date, maintain original order
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return 0;
     });
 
   const handleAddProject = (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => {
@@ -73,7 +71,7 @@ const Projects = () => {
       name: projectData.name,
       description: projectData.description,
       status: "Open",
-      thumbnailUrl: projectData.thumbnailUrl || "/placeholder.svg", // Use uploaded thumbnail or default
+      thumbnailUrl: projectData.thumbnailUrl || "/placeholder.svg",
       dueDate: projectData.dueDate,
       memberContributionAmount: projectData.memberContributionAmount,
     };
@@ -100,7 +98,7 @@ const Projects = () => {
     } else if (currentStatus === "Closed") {
       newStatus = "Open";
     } else {
-      newStatus = "Open"; // Default for "Deleted" or unexpected status
+      newStatus = "Open";
     }
 
     setProjects((prev) =>
@@ -126,7 +124,6 @@ const Projects = () => {
 
   const handleSaveCollections = (data: any) => {
     console.log("Saving collections data:", data);
-    // In a real app, send this data to the backend
   };
 
   const handleThumbnailUpload = (projectId: string, newUrl: string) => {
@@ -155,7 +152,7 @@ const Projects = () => {
                 <SelectItem value="All">All (Excluding Deleted)</SelectItem>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="Closed">Closed</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem> {/* Added Suspended to filter */}
+                <SelectItem value="Suspended">Suspended</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -200,7 +197,7 @@ const Projects = () => {
                   </p>
                   {isAdmin && (
                     <div className="flex flex-wrap gap-2 mt-4">
-                      <Link to={`/projects/${project.id}/financials`}> {/* New button linking to financial details page */}
+                      <Link to={`/projects/${project.id}/financials`}>
                         <Button variant="outline" size="sm">
                           <DollarSign className="mr-2 h-4 w-4" /> View Financials
                         </Button>

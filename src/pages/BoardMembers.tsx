@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddEditBoardMemberDialog, { BoardMember } from "@/components/board-members/AddEditBoardMemberDialog";
 import { showSuccess, showError } from "@/utils/toast";
-import { PlusCircle, Edit, Trash2, UserCog, User as UserIcon, Search } from "lucide-react"; // Added Search icon
+import { PlusCircle, Edit, Trash2, UserCog, User as UserIcon, Search } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,12 +25,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input"; // Import Input component
-
-// Placeholder for a privileged user check
-const isAdmin = true; // This should come from user context/authentication
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 const BoardMembers = () => {
+  const { isAdmin } = useAuth(); // Use the auth context
   const [boardMembers, setBoardMembers] = React.useState<BoardMember[]>([
     { id: "bm1", name: "Jane Doe", role: "Chairperson", email: "jane.doe@example.com", phone: "555-123-4567", address: "123 Main St, Anytown", notes: "Oversees strategic direction.", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Jane" },
     { id: "bm2", name: "Richard Roe", role: "Treasurer", email: "richard.roe@example.com", phone: "555-987-6543", notes: "Manages financial oversight.", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Richard" },
@@ -40,7 +39,7 @@ const BoardMembers = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editingMember, setEditingMember] = React.useState<BoardMember | undefined>(undefined);
   const [deletingMemberId, setDeletingMemberId] = React.useState<string | undefined>(undefined);
-  const [searchQuery, setSearchQuery] = React.useState(""); // New state for search query
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   const filteredBoardMembers = boardMembers.filter(member => {
     const query = searchQuery.toLowerCase();
@@ -103,7 +102,7 @@ const BoardMembers = () => {
                 placeholder="Search board members..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8" // Add padding for the icon
+                className="pl-8"
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
