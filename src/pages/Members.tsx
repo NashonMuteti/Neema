@@ -43,11 +43,13 @@ interface Member {
 const Members = () => {
   const { currentUser } = useAuth(); // Use the auth context to get current user
   const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
-  const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
 
   // Determine if the current user has the "Manage Members" privilege
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const canManageMembers = currentUserRoleDefinition?.menuPrivileges.includes("Manage Members") || false;
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageMembers = currentUserPrivileges.includes("Manage Members"); // Check for the specific privilege
+
+  const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
 
   const [members, setMembers] = React.useState<Member[]>([
     { id: "m1", name: "Alice Johnson", email: "alice@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice", status: "Active" },

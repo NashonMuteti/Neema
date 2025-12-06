@@ -97,7 +97,7 @@ export const navItems: SidebarItem[] = [
     name: "Members",
     href: "/members",
     icon: Users,
-    requiredRoles: ["Admin", "Project Manager", "Manage Members"],
+    requiredRoles: ["Admin", "Project Manager", "Contributor"], // Allow more roles to view the page
   },
   {
     name: "Board Members",
