@@ -11,11 +11,14 @@ interface Member {
   status: "Active" | "Inactive" | "Suspended";
 }
 
+// ReportOptions no longer includes brandLogoPath and tagline directly
 interface ReportOptions {
   reportName: string;
-  brandLogoPath: string;
-  tagline: string;
 }
+
+// Placeholder for global branding settings (in a real app, these would be fetched from a context/backend)
+const GLOBAL_BRAND_LOGO_PATH = "/placeholder.svg";
+const GLOBAL_TAGLINE = "Your cinematic tagline here.";
 
 export const exportMembersToPdf = (members: Member[], options: ReportOptions) => {
   const doc = new jsPDF();
@@ -23,9 +26,9 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
   // Add Header
   doc.setFontSize(18);
   doc.text(options.reportName, 14, 22);
-  if (options.brandLogoPath) {
+  if (GLOBAL_BRAND_LOGO_PATH) {
     const img = new Image();
-    img.src = options.brandLogoPath;
+    img.src = GLOBAL_BRAND_LOGO_PATH;
     // Ensure the image is loaded before adding it to the PDF
     img.onload = () => {
       doc.addImage(img, "PNG", 170, 10, 20, 20); // Adjust position and size as needed
@@ -75,7 +78,7 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(10);
-      doc.text(options.tagline, 14, doc.internal.pageSize.height - 10);
+      doc.text(GLOBAL_TAGLINE, 14, doc.internal.pageSize.height - 10);
       doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
     }
 

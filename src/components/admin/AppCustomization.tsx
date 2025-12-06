@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// MemberFieldCustomization is no longer imported here as it's moved to its own tab
+import BrandSettings from "./BrandSettings"; // Import the new component
 
 const AppCustomization = () => {
   return (
@@ -18,11 +18,6 @@ const AppCustomization = () => {
           {/* Placeholder for app customization forms/options */}
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between">
-              <label htmlFor="app-logo" className="text-sm font-medium">App Logo</label>
-              {/* Placeholder for a File Input component */}
-              <span className="text-sm text-muted-foreground">Upload Logo</span>
-            </div>
-            <div className="flex items-center justify-between">
               <label htmlFor="default-theme" className="text-sm font-medium">Default Theme</label>
               {/* Placeholder for a Select component */}
               <span className="text-sm text-muted-foreground">System</span>
@@ -30,7 +25,7 @@ const AppCustomization = () => {
           </div>
         </CardContent>
       </Card>
-      {/* MemberFieldCustomization is now in its own tab */}
+      <BrandSettings /> {/* Add the new BrandSettings component */}
     </div>
   );
 };

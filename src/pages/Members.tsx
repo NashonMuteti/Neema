@@ -92,10 +92,9 @@ const Members = () => {
     showSuccess("Member status updated!");
   };
 
+  // Removed brandLogoPath and tagline from reportOptions as they are now global placeholders
   const reportOptions = {
     reportName: "Member List Report",
-    brandLogoPath: "/placeholder.svg", // Path to your brand logo
-    tagline: "Your cinematic tagline here.",
   };
 
   const handlePrintPdf = () => {
