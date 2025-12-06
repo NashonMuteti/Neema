@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { UserRole as UserRoleType } from '@/components/admin/AddEditUserRoleDialog'; // Import the UserRole interface
+import { allPrivilegeNames } from '@/lib/privileges'; // Import allPrivilegeNames
 
 interface UserRolesContextType {
   userRoles: UserRoleType[];
@@ -19,21 +20,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       name: "Admin",
       description: "Full access to all features and settings.",
       memberUserIds: ["u1"],
-      menuPrivileges: [
-        "View Dashboard",
-        "View Project Accounts", "Manage Projects",
-        "View Petty Cash", "Manage Petty Cash",
-        "View Pledges", "Manage Pledges",
-        "View Income", "Manage Income",
-        "View Expenditure", "Manage Expenditure",
-        "View Sales Management", "View Stocks", "Manage Stocks", "View Daily Sales", "Manage Daily Sales", "View Debts", "Manage Debts",
-        "View Members", "Manage Members",
-        "View Board Members", "Manage Board Members",
-        "View Reports", "View Member Contributions Report", "View Petty Cash Report", "View Pledge Report", "View Table Banking Summary", "View User Activity Report", "View Deleted Projects Report", "Manage Reports Templates",
-        "Perform Admin Actions", "Initialize Balances",
-        "View My Contributions",
-        "Access Admin Settings", "Manage User Profiles", "Manage User Roles", "Manage App Customization", "Manage System Currency", "Manage Member Fields", "Manage Database Maintenance",
-      ]
+      menuPrivileges: allPrivilegeNames, // Admin role gets all privileges
     },
     {
       id: "r2",

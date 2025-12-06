@@ -7,30 +7,26 @@ import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handsha
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
+// No longer importing PrivilegeItem or deriving privileges from navItems here
 
 export interface NavItem {
   name: string;
   href: string;
   icon: React.ElementType;
-  requiredPrivileges?: string[]; // Changed from requiredRoles
+  requiredPrivileges?: string[];
   type?: "item";
 }
 
 export interface NavHeading {
   name: string;
   type: "heading";
-  requiredPrivileges?: string[]; // Changed from requiredRoles
+  requiredPrivileges?: string[];
   children: NavItem[];
 }
 
-export interface PrivilegeItem {
-  name: string;
-  type: "privilege";
-  // requiredPrivileges here would define who can *assign* this privilege, not who can *access* it.
-  // For now, we'll keep it simple and assume 'Admin' can assign all privileges.
-}
+// Removed PrivilegeItem interface as privileges are now defined separately
 
-type SidebarItem = NavItem | NavHeading | PrivilegeItem;
+type SidebarItem = NavItem | NavHeading; // Only navigation items and headings
 
 export const navItems: SidebarItem[] = [
   {
@@ -98,7 +94,7 @@ export const navItems: SidebarItem[] = [
     name: "Members",
     href: "/members",
     icon: Users,
-    requiredPrivileges: ["View Members"], // Allow more roles to view the page
+    requiredPrivileges: ["View Members"],
   },
   {
     name: "Board Members",
@@ -112,7 +108,7 @@ export const navItems: SidebarItem[] = [
     requiredPrivileges: ["View Reports"],
     children: [
       {
-        name: "Member Contributions Report", // Renamed for clarity
+        name: "Member Contributions Report",
         href: "/reports/member-contributions",
         icon: BarChart2,
         requiredPrivileges: ["View Member Contributions Report"],
@@ -174,74 +170,6 @@ export const navItems: SidebarItem[] = [
     icon: Settings,
     requiredPrivileges: ["Access Admin Settings"],
   },
-  {
-    name: "Manage Members", // This is a privilege, not a navigation item
-    type: "privilege",
-  },
-  {
-    name: "Manage Projects", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Pledges", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Income", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Expenditure", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Petty Cash", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Board Members", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage User Profiles", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage User Roles", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage App Customization", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage System Currency", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Member Fields", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Reports Templates", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Database Maintenance", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Stocks", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Daily Sales", // New privilege
-    type: "privilege",
-  },
-  {
-    name: "Manage Debts", // New privilege
-    type: "privilege",
-  },
 ];
 
 const Sidebar = () => {
@@ -295,11 +223,9 @@ const Sidebar = () => {
     <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">
       <nav className="flex-1 space-y-2">
         {navItems.map((item) => {
-          if (item.type === "privilege") { // Do not render privilege-only items as links
-            return null;
-          }
+          // No longer checking for item.type === "privilege" here as they are removed from navItems
 
-          if (!hasAccess(item.requiredPrivileges)) { // Use hasAccess
+          if (!hasAccess(item.requiredPrivileges)) {
             return null;
           }
 
@@ -322,7 +248,7 @@ const Sidebar = () => {
               setIsOpen = () => {};
             }
 
-            const visibleChildren = headingItem.children.filter(child => hasAccess(child.requiredPrivileges)); // Use hasAccess
+            const visibleChildren = headingItem.children.filter(child => hasAccess(child.requiredPrivileges));
 
             if (visibleChildren.length === 0) {
               return null;

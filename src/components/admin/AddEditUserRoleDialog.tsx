@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast";
 import { Save } from "lucide-react";
-import { navItems, NavItem, NavHeading, PrivilegeItem } from "@/components/Sidebar"; // Import NavItem, NavHeading, and PrivilegeItem
+import { allPrivilegeNames } from "@/lib/privileges"; // Import allPrivilegeNames
 
 export interface UserRole {
   id: string;
@@ -77,40 +77,6 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
     showSuccess(`User role ${initialData ? "updated" : "added"} successfully!`);
     setIsOpen(false);
   };
-
-  // Flatten all possible privilege names from navItems for display in the dialog
-  const allPrivilegeNames = React.useMemo(() => {
-    const privileges: string[] = [];
-    navItems.forEach(item => {
-      if (item.type === "privilege") {
-        privileges.push(item.name);
-      } else if (item.type === "item") {
-        if (item.requiredPrivileges) {
-          privileges.push(...item.requiredPrivileges);
-        } else {
-          // If an item has no requiredPrivileges, its name itself can be a privilege
-          privileges.push(item.name);
-        }
-      } else if (item.type === "heading") {
-        if (item.requiredPrivileges) {
-          privileges.push(...item.requiredPrivileges);
-        } else {
-          // If a heading has no requiredPrivileges, its name itself can be a privilege
-          privileges.push(item.name);
-        }
-        item.children.forEach(child => {
-          if (child.requiredPrivileges) {
-            privileges.push(...child.requiredPrivileges);
-          } else {
-            privileges.push(child.name);
-          }
-        });
-      }
-    });
-    // Ensure uniqueness and sort for consistent display
-    return Array.from(new Set(privileges)).sort();
-  }, []);
-
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
