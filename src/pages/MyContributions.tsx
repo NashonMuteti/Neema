@@ -15,6 +15,14 @@ import {
 import { format, getMonth, getYear, isSameDay, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Dummy data for the logged-in user's contributions
 // In a real app, this would be fetched from a backend for the current user
@@ -27,6 +35,25 @@ const dummyUserContributions = [
   { id: "c6", projectId: "proj1", projectName: "Film Production X", date: "2024-09-20", amount: 25, expected: 100 },
   { id: "c7", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-10-01", amount: 25, expected: 50 },
 ];
+
+interface UserContribution {
+  id: string;
+  projectId: string;
+  projectName: string;
+  date: string; // ISO string
+  amount: number; // Actual contributed
+  expected: number; // Expected contribution
+}
+
+const getContributionStatus = (amount: number, expected: number) => {
+  if (amount >= expected) {
+    return { text: "Met", variant: "default" };
+  } else if (amount > 0) {
+    return { text: "Partial", variant: "secondary" };
+  } else {
+    return { text: "Deficit", variant: "destructive" };
+  }
+};
 
 const MyContributions: React.FC = () => {
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
@@ -44,13 +71,13 @@ const MyContributions: React.FC = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const filteredContributions = dummyUserContributions.filter(contribution => {
+  const filteredContributions: UserContribution[] = dummyUserContributions.filter(contribution => {
     const contributionDate = parseISO(contribution.date);
     return (
       getMonth(contributionDate).toString() === filterMonth &&
       getYear(contributionDate).toString() === filterYear
     );
-  });
+  }).sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()); // Sort by date ascending
 
   const totalContributed = filteredContributions.reduce((sum, c) => sum + c.amount, 0);
   const totalExpected = filteredContributions.reduce((sum, c) => sum + c.expected, 0);
@@ -63,7 +90,7 @@ const MyContributions: React.FC = () => {
     }
     acc[dateKey].push(contribution);
     return acc;
-  }, {} as Record<string, typeof dummyUserContributions>);
+  }, {} as Record<string, UserContribution[]>);
 
   const renderDay = (day: Date) => {
     const dateKey = format(day, "yyyy-MM-dd");
@@ -181,6 +208,46 @@ const MyContributions: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Detailed Contributions Table */}
+      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl mt-6">
+        <CardHeader>
+          <CardTitle>Detailed Contributions for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredContributions.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Contributed</TableHead>
+                  <TableHead className="text-right">Expected</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredContributions.map((contribution) => {
+                  const status = getContributionStatus(contribution.amount, contribution.expected);
+                  return (
+                    <TableRow key={contribution.id}>
+                      <TableCell className="font-medium">{contribution.projectName}</TableCell>
+                      <TableCell>{format(parseISO(contribution.date), "MMM dd, yyyy")}</TableCell>
+                      <TableCell className="text-right">${contribution.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${contribution.expected.toFixed(2)}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={status.variant}>{status.text}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-muted-foreground text-center mt-4">No contributions found for the selected period.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
