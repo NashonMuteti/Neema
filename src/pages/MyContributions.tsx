@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input"; // Import Input for search
 import { Search } from "lucide-react"; // Import Search icon
 import { Label } from "@/components/ui/label"; // Import Label for filters
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 // Dummy data for the logged-in user's contributions
 // In a real app, this would be fetched from a backend for the current user
@@ -72,6 +73,7 @@ const getContributionStatus = (amount: number, expected: number): { text: string
 };
 
 const MyContributions: React.FC = () => {
+  const { currentUserId } = useAuth(); // Get currentUserId from AuthContext
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
@@ -80,7 +82,7 @@ const MyContributions: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState(""); // Search query for All Contributions tab
 
   // For demonstration, assume logged-in user is "m1" (Alice Johnson)
-  const loggedInMemberId = "m1"; 
+  // const loggedInMemberId = "m1"; // This is now replaced by currentUserId from context
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -137,12 +139,12 @@ const MyContributions: React.FC = () => {
                             contribution.projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             contribution.memberEmail.toLowerCase().includes(searchQuery.toLowerCase());
       
-      // Filter by logged-in user's ID
-      const matchesLoggedInUser = contribution.memberId === loggedInMemberId;
+      // Filter by logged-in user's ID from context
+      const matchesLoggedInUser = currentUserId && contribution.memberId === currentUserId;
 
       return matchesDate && matchesSearch && matchesLoggedInUser;
     }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()); // Sort by date descending
-  }, [filterMonth, filterYear, searchQuery, loggedInMemberId]);
+  }, [filterMonth, filterYear, searchQuery, currentUserId]);
 
   return (
     <div className="space-y-6">
