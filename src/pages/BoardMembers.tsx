@@ -10,10 +10,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddEditBoardMemberDialog, { BoardMember } from "@/components/board-members/AddEditBoardMemberDialog";
 import { showSuccess, showError } from "@/utils/toast";
-import { PlusCircle, Edit, Trash2, UserCog, User as UserIcon } from "lucide-react"; // Added UserIcon
+import { PlusCircle, Edit, Trash2, UserCog, User as UserIcon, Search } from "lucide-react"; // Added Search icon
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input"; // Import Input component
 
 // Placeholder for a privileged user check
 const isAdmin = true; // This should come from user context/authentication
@@ -39,6 +39,17 @@ const BoardMembers = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [editingMember, setEditingMember] = React.useState<BoardMember | undefined>(undefined);
   const [deletingMemberId, setDeletingMemberId] = React.useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = React.useState(""); // New state for search query
+
+  const filteredBoardMembers = boardMembers.filter(member => {
+    const query = searchQuery.toLowerCase();
+    return (
+      member.name.toLowerCase().includes(query) ||
+      member.role.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query) ||
+      member.phone.toLowerCase().includes(query)
+    );
+  });
 
   const handleAddMember = (newMemberData: Omit<BoardMember, 'id'>) => {
     const newMember: BoardMember = {
@@ -84,18 +95,30 @@ const BoardMembers = () => {
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-xl font-semibold">Board Member List</CardTitle>
-          {isAdmin && (
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Board Member
-            </Button>
-          )}
+          <div className="flex items-center gap-4">
+            <div className="relative flex items-center">
+              <Input
+                type="text"
+                placeholder="Search board members..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8" // Add padding for the icon
+              />
+              <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+            </div>
+            {isAdmin && (
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Board Member
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          {boardMembers.length > 0 ? (
+          {filteredBoardMembers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[60px]">Image</TableHead> {/* New TableHead */}
+                  <TableHead className="w-[60px]">Image</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Email</TableHead>
@@ -106,7 +129,7 @@ const BoardMembers = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {boardMembers.map((member) => (
+                {filteredBoardMembers.map((member) => (
                   <TableRow key={member.id}>
                     <TableCell>
                       {member.imageUrl ? (
