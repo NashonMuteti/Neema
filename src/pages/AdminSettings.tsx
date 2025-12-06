@@ -8,6 +8,7 @@ import ReportsTemplateCustomization from "@/components/admin/ReportsTemplateCust
 import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmin"; // Placeholder for admin user settings
 import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings"; // Import the new component
 import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization"; // Import MemberFieldCustomization
+import UserGroupsSettings from "@/components/admin/UserGroupsSettings"; // Import the new UserGroupsSettings component
 
 const AdminSettings = () => {
   return (
@@ -18,12 +19,13 @@ const AdminSettings = () => {
       </p>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-6"> {/* Increased grid columns to 6 */}
+        <TabsList className="grid w-full grid-cols-7"> {/* Increased grid columns to 7 */}
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="app-customization">App Customization</TabsTrigger>
-          <TabsTrigger value="member-fields">Member Fields</TabsTrigger> {/* New tab trigger */}
+          <TabsTrigger value="member-fields">Member Fields</TabsTrigger>
           <TabsTrigger value="user-profiles">User Management</TabsTrigger>
+          <TabsTrigger value="user-groups">User Groups</TabsTrigger> {/* New tab trigger */}
           <TabsTrigger value="reports-templates">Reports Templates</TabsTrigger>
         </TabsList>
         <TabsContent value="general">
@@ -35,11 +37,14 @@ const AdminSettings = () => {
         <TabsContent value="app-customization">
           <AppCustomization />
         </TabsContent>
-        <TabsContent value="member-fields"> {/* New tab content */}
+        <TabsContent value="member-fields">
           <MemberFieldCustomization />
         </TabsContent>
         <TabsContent value="user-profiles">
           <UserProfileSettingsAdmin />
+        </TabsContent>
+        <TabsContent value="user-groups"> {/* New tab content */}
+          <UserGroupsSettings />
         </TabsContent>
         <TabsContent value="reports-templates">
           <ReportsTemplateCustomization />
