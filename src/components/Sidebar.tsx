@@ -23,7 +23,7 @@ interface NavHeading {
 
 type SidebarItem = NavItem | NavHeading;
 
-const navItems: SidebarItem[] = [
+export const navItems: SidebarItem[] = [ // Added export here
   {
     name: "Dashboard",
     href: "/",
