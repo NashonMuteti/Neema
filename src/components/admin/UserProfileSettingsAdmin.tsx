@@ -27,29 +27,24 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { showSuccess } from "@/utils/toast";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: "Admin" | "Member";
-  status: "Active" | "Inactive" | "Suspended";
-  imageUrl?: string;
-}
+import { useAuth } from "@/context/AuthContext";
+import AddEditUserDialog, { User } from "./AddEditUserDialog"; // Import the new dialog and User interface
 
 const dummyUsers: User[] = [
-  { id: "m1", name: "Alice Johnson", email: "alice@example.com", role: "Admin", status: "Active", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice" },
-  { id: "m2", name: "Bob Williams", email: "bob@example.com", role: "Member", status: "Active", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob" },
-  { id: "m3", name: "Charlie Brown", email: "charlie@example.com", role: "Member", status: "Inactive", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie" },
-  { id: "m4", name: "David Green", email: "david@example.com", role: "Member", status: "Suspended", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David" },
+  { id: "m1", name: "Alice Johnson", email: "alice@example.com", role: "Admin", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice" },
+  { id: "m2", name: "Bob Williams", email: "bob@example.com", role: "Member", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob" },
+  { id: "m3", name: "Charlie Brown", email: "charlie@example.com", role: "Member", status: "Inactive", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie" },
+  { id: "m4", name: "David Green", email: "david@example.com", role: "Member", status: "Suspended", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David" },
 ];
 
 const UserProfileSettingsAdmin = () => {
-  const { isAdmin } = useAuth(); // Use the auth context
+  const { isAdmin } = useAuth();
   const [users, setUsers] = React.useState<User[]>(dummyUsers);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [deletingUserId, setDeletingUserId] = React.useState<string | undefined>(undefined);
+
+  const [isAddEditUserDialogOpen, setIsAddEditUserDialogOpen] = React.useState(false);
+  const [editingUser, setEditingUser] = React.useState<User | undefined>(undefined);
 
   const filteredUsers = users.filter(user => {
     const query = searchQuery.toLowerCase();
@@ -74,10 +69,32 @@ const UserProfileSettingsAdmin = () => {
     }
   };
 
-  const handleEditUser = (userId: string) => {
-    showSuccess(`Editing user ${userId} (placeholder).`);
-    console.log("Edit user:", userId);
-    // In a real app, this would open an edit dialog
+  const handleAddUser = () => {
+    setEditingUser(undefined); // Clear any previous editing data
+    setIsAddEditUserDialogOpen(true);
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setIsAddEditUserDialogOpen(true);
+  };
+
+  const handleSaveUser = (userData: Omit<User, 'id'> & { id?: string; defaultPassword?: string }) => {
+    if (userData.id) {
+      // Editing existing user
+      setUsers(prev => prev.map(u => u.id === userData.id ? { ...u, ...userData, id: u.id } : u));
+    } else {
+      // Adding new user
+      const newUser: User = {
+        ...userData,
+        id: `u${users.length + 1}`, // Simple ID generation
+        enableLogin: userData.enableLogin, // Ensure enableLogin is passed
+        status: userData.status, // Ensure status is passed
+        role: userData.role, // Ensure role is passed
+        imageUrl: userData.imageUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${userData.name}`,
+      };
+      setUsers(prev => [...prev, newUser]);
+    }
   };
 
   const handleDeleteUser = () => {
@@ -108,7 +125,7 @@ const UserProfileSettingsAdmin = () => {
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
           </div>
           {isAdmin && (
-            <Button onClick={() => showSuccess("Add User functionality (placeholder).")}>
+            <Button onClick={handleAddUser}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add User
             </Button>
           )}
@@ -127,6 +144,7 @@ const UserProfileSettingsAdmin = () => {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">Login</TableHead>
                 {isAdmin && <TableHead className="text-center">Actions</TableHead>}
                 <TableHead className="text-center">Contributions</TableHead>
               </TableRow>
@@ -151,10 +169,13 @@ const UserProfileSettingsAdmin = () => {
                       {user.status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-center">
+                    {user.enableLogin ? "Enabled" : "Disabled"}
+                  </TableCell>
                   {isAdmin && (
                     <TableCell className="text-center">
                       <div className="flex justify-center space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEditUser(user.id)}>
+                        <Button variant="outline" size="sm" onClick={() => handleEditUser(user)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(user.id)}>
@@ -178,6 +199,13 @@ const UserProfileSettingsAdmin = () => {
           <p className="text-muted-foreground text-center mt-4">No users found matching your search.</p>
         )}
       </CardContent>
+      {/* Add/Edit User Dialog */}
+      <AddEditUserDialog
+        isOpen={isAddEditUserDialogOpen}
+        setIsOpen={setIsAddEditUserDialogOpen}
+        initialData={editingUser}
+        onSave={handleSaveUser}
+      />
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingUserId} onOpenChange={(open) => !open && setDeletingUserId(undefined)}>
         <AlertDialogContent>
