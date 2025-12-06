@@ -10,9 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddEditBoardMemberDialog, { BoardMember } from "@/components/board-members/AddEditBoardMemberDialog";
 import { showSuccess, showError } from "@/utils/toast";
-import { PlusCircle, Edit, Trash2, UserCog, User as UserIcon } from "lucide-react"; 
+import { PlusCircle, Edit, Trash2, UserCog, User as UserIcon } from "lucide-react"; // Added UserIcon
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,7 +95,7 @@ const BoardMembers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[60px]">Image</TableHead>
+                  <TableHead className="w-[60px]">Image</TableHead> {/* New TableHead */}
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Email</TableHead>
