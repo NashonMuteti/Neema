@@ -17,10 +17,12 @@ import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSelector } from "./LanguageSelector";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { useBranding } from "@/context/BrandingContext";
+import { useViewingMember } from "@/context/ViewingMemberContext"; // New import
 
 const Header = () => {
   const { isAdmin, toggleAdmin, currentUser } = useAuth(); // Use isAdmin, toggleAdmin, and currentUser from AuthContext
   const { brandLogoUrl, tagline } = useBranding();
+  const { viewingMemberName } = useViewingMember(); // Use the viewing member name
 
   // Use currentUser from context, fallback to dummy if not available
   const user = currentUser || {
@@ -35,6 +37,9 @@ const Header = () => {
         <Link to="/" className="text-xl font-bold text-foreground flex items-center">
           <img src={brandLogoUrl} alt="Logo" className="h-8 w-auto mr-2" />
           Group Finance
+          {viewingMemberName && (
+            <span className="ml-2 text-base font-normal text-muted-foreground"> - {viewingMemberName}</span>
+          )}
         </Link>
       </div>
       <div className="flex items-center space-x-4">

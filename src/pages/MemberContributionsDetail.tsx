@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Search, ArrowLeft } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useViewingMember } from "@/context/ViewingMemberContext"; // New import
 
 // Dummy data for all members' contributions (imported from Reports/MemberContributions for consistency)
 import { allMembersContributions } from "@/pages/Reports/MemberContributions";
@@ -62,6 +63,7 @@ const getContributionStatus = (amount: number, expected: number): { text: string
 
 const MemberContributionsDetail: React.FC = () => {
   const { memberId } = useParams<{ memberId: string }>();
+  const { setViewingMemberName } = useViewingMember(); // Use the setter
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
@@ -80,6 +82,14 @@ const MemberContributionsDetail: React.FC = () => {
 
   const memberContributions = allMembersContributions.filter(c => c.memberId === memberId);
   const memberName = memberContributions.length > 0 ? memberContributions[0].memberName : "Unknown Member";
+
+  // Effect to update the global header with the member's name
+  React.useEffect(() => {
+    setViewingMemberName(memberName);
+    return () => {
+      setViewingMemberName(null); // Clear the name when component unmounts
+    };
+  }, [memberName, setViewingMemberName]);
 
   // --- Logic for "Contributions Overview" tab (Calendar & Summary) ---
   const filteredOverviewContributions: MemberContribution[] = memberContributions.filter(contribution => {
