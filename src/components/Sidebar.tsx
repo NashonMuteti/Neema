@@ -3,7 +3,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays } from "lucide-react"; // Added CalendarDays icon
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote } from "lucide-react"; // Added Banknote icon
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible
 
 // Placeholder for a privileged user check
@@ -82,6 +82,12 @@ const navItems = [
         privileged: false,
       },
       {
+        name: "Table Banking Summary", // New report item
+        href: "/reports/table-banking-summary",
+        icon: Banknote, // Using Banknote icon
+        privileged: false,
+      },
+      {
         name: "User Activity Report",
         href: "/reports/user-activity",
         icon: Activity,
@@ -121,6 +127,17 @@ const Sidebar = () => {
   const location = useLocation();
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
+
+  // Open reports collapsible if any child route is active
+  React.useEffect(() => {
+    const isChildOfReports = navItems.some(item =>
+      item.type === "heading" && item.name === "Reports" && item.children?.some(child => location.pathname.startsWith(child.href))
+    );
+    if (isChildOfReports) {
+      setIsReportsOpen(true);
+    }
+  }, [location.pathname]);
+
 
   return (
     <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">

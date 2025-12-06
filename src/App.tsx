@@ -25,7 +25,8 @@ import Expenditure from "./pages/Expenditure";
 import BoardMembers from "./pages/BoardMembers";
 import MyContributions from "./pages/MyContributions";
 import MemberContributionsDetail from "./pages/MemberContributionsDetail";
-import ProjectFinancialsDetail from "./pages/ProjectFinancialsDetail"; // Import the new ProjectFinancialsDetail page
+import ProjectFinancialsDetail from "./pages/ProjectFinancialsDetail";
+import TableBankingSummary from "./pages/TableBankingSummary"; // Import the new TableBankingSummary page
 
 const queryClient = new QueryClient();
 
@@ -39,7 +40,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/projects" element={<Projects />} />
-            <Route path="/projects/:projectId/financials" element={<ProjectFinancialsDetail />} /> {/* New route for Project Financials Detail */}
+            <Route path="/projects/:projectId/financials" element={<ProjectFinancialsDetail />} />
             <Route path="/petty-cash" element={<PettyCash />} />
             <Route path="/pledges" element={<Pledges />} />
             <Route path="/income" element={<Income />} />
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/reports/pledges" element={<PledgeReport />} />
             <Route path="/reports/user-activity" element={<UserActivityReport />} />
             <Route path="/reports/deleted-projects" element={<DeletedProjectsReport />} />
+            <Route path="/reports/table-banking-summary" element={<TableBankingSummary />} /> {/* New route for Table Banking Summary */}
             <Route path="/initialize-balances" element={<InitializeBalances />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
