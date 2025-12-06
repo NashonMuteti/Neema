@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useBranding } from "@/context/BrandingContext"; // Import useBranding
 
 interface Member {
   id: string;
@@ -40,6 +41,7 @@ interface Member {
 
 const Members = () => {
   const { isAdmin } = useAuth(); // Use the auth context
+  const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
   const [members, setMembers] = React.useState<Member[]>([
     { id: "m1", name: "Alice Johnson", email: "alice@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice", status: "Active" },
     { id: "m2", name: "Bob Williams", email: "bob@example.com", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob", status: "Inactive" },
@@ -92,9 +94,10 @@ const Members = () => {
     showSuccess("Member status updated!");
   };
 
-  // Removed brandLogoPath and tagline from reportOptions as they are now global placeholders
   const reportOptions = {
     reportName: "Member List Report",
+    brandLogoUrl: brandLogoUrl, // Pass dynamic logo URL
+    tagline: tagline,           // Pass dynamic tagline
   };
 
   const handlePrintPdf = () => {

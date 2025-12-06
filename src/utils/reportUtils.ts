@@ -13,14 +13,9 @@ interface Member {
 
 interface ReportOptions {
   reportName: string;
-  // In a real app, brandLogoPath and tagline would be passed here or fetched from a global state/context
-  // For this example, we'll use placeholders and assume they are globally available.
+  brandLogoUrl?: string; // Now dynamic
+  tagline?: string;     // Now dynamic
 }
-
-// Placeholder for global branding settings (in a real app, these would be fetched from a context/backend)
-// For now, we'll use static placeholders as direct context access isn't feasible in a pure utility function
-const REPORT_BRAND_LOGO_PATH = "/placeholder.svg"; // This would ideally come from BrandingContext
-const REPORT_TAGLINE = "Your cinematic tagline here."; // This would ideally come from BrandingContext
 
 export const exportMembersToPdf = (members: Member[], options: ReportOptions) => {
   const doc = new jsPDF();
@@ -28,9 +23,9 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
   // Add Header
   doc.setFontSize(18);
   doc.text(options.reportName, 14, 22);
-  if (REPORT_BRAND_LOGO_PATH) {
+  if (options.brandLogoUrl) {
     const img = new Image();
-    img.src = REPORT_BRAND_LOGO_PATH;
+    img.src = options.brandLogoUrl;
     // Ensure the image is loaded before adding it to the PDF
     img.onload = () => {
       doc.addImage(img, "PNG", 170, 10, 20, 20); // Adjust position and size as needed
@@ -80,7 +75,7 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(10);
-      doc.text(REPORT_TAGLINE, 14, doc.internal.pageSize.height - 10);
+      doc.text(options.tagline || "", 14, doc.internal.pageSize.height - 10); // Use dynamic tagline
       doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
     }
 
@@ -100,9 +95,9 @@ export const exportMembersToExcel = (members: Member[], options: ReportOptions) 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, options.reportName);
 
-  // Add header and footer to a separate sheet or as metadata if needed for more complex reports
+  // For Excel, adding a tagline or logo directly to the sheet is more complex.
   // For simplicity, we'll just add a header row to the main sheet for now.
-  // More advanced Excel customization would involve direct cell manipulation.
+  // More advanced Excel customization would involve direct cell manipulation or using a template.
 
   XLSX.writeFile(wb, `${options.reportName.replace(/\s/g, "_")}.xlsx`);
 };
