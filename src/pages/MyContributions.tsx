@@ -42,7 +42,7 @@ const dummyUserContributions = [
 
 // Dummy data for all members' contributions (imported from Reports/MemberContributions for consistency)
 // In a real app, this would be fetched from a central backend source
-import { default as allMembersContributionsData } from "@/pages/Reports/MemberContributions";
+import { allMembersContributions } from "@/pages/Reports/MemberContributions"; // Corrected import to named export
 
 interface UserContribution {
   id: string;
@@ -127,7 +127,7 @@ const MyContributions: React.FC = () => {
 
   // --- Logic for "All Contributions" tab ---
   const filteredAllContributions: AllContribution[] = React.useMemo(() => {
-    return allMembersContributionsData.default.filter(contribution => { // Access default export
+    return allMembersContributions.filter(contribution => { // Used named export directly
       const contributionDate = parseISO(contribution.date);
       const matchesDate = getMonth(contributionDate).toString() === filterMonth && getYear(contributionDate).toString() === filterYear;
       const matchesSearch = contribution.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
