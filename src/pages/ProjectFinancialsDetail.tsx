@@ -42,15 +42,6 @@ const allProjectCollections = [
   { id: "col5", projectId: "proj1", memberId: "m1", amount: 50, date: "2024-08-05", paymentMethod: "cash" },
 ];
 
-// Dummy data for project pledges
-const allProjectPledges = [
-  { id: "p1", projectId: "proj1", memberId: "m1", amount: 500, dueDate: "2024-07-15", status: "Active" },
-  { id: "p2", projectId: "proj2", memberId: "m2", amount: 250, dueDate: "2024-05-01", status: "Overdue" },
-  { id: "p3", projectId: "proj1", memberId: "m3", amount: 750, dueDate: "2024-08-10", status: "Active" },
-  { id: "p4", projectId: "proj3", memberId: "m1", amount: 100, dueDate: "2024-04-20", status: "Paid" },
-  { id: "p5", projectId: "proj5", memberId: "m2", amount: 150, dueDate: "2024-07-25", status: "Active" },
-];
-
 interface Pledge {
   id: string;
   memberId: string;
@@ -59,6 +50,15 @@ interface Pledge {
   dueDate: string; // ISO string
   status: "Active" | "Paid" | "Overdue";
 }
+
+// Dummy data for project pledges - explicitly typed
+const allProjectPledges: Pledge[] = [
+  { id: "p1", projectId: "proj1", memberId: "m1", amount: 500, dueDate: "2024-07-15", status: "Active" },
+  { id: "p2", projectId: "proj2", memberId: "m2", amount: 250, dueDate: "2024-05-01", status: "Overdue" },
+  { id: "p3", projectId: "proj1", memberId: "m3", amount: 750, dueDate: "2024-08-10", status: "Active" },
+  { id: "p4", projectId: "proj3", memberId: "m1", amount: 100, dueDate: "2024-04-20", status: "Paid" },
+  { id: "p5", projectId: "proj5", memberId: "m2", amount: 150, dueDate: "2024-07-25", status: "Active" },
+];
 
 const getPledgeStatus = (pledge: Pledge): Pledge['status'] => {
   if (pledge.status === "Paid") return "Paid";

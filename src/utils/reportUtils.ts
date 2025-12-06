@@ -20,25 +20,6 @@ interface ReportOptions {
 export const exportMembersToPdf = (members: Member[], options: ReportOptions) => {
   const doc = new jsPDF();
 
-  // Add Header
-  doc.setFontSize(18);
-  doc.text(options.reportName, 14, 22);
-  if (options.brandLogoUrl) {
-    const img = new Image();
-    img.src = options.brandLogoUrl;
-    // Ensure the image is loaded before adding it to the PDF
-    img.onload = () => {
-      doc.addImage(img, "PNG", 170, 10, 20, 20); // Adjust position and size as needed
-      addTableAndFooter();
-    };
-    img.onerror = () => {
-      console.error("Failed to load brand logo for PDF report.");
-      addTableAndFooter(); // Proceed without logo if it fails to load
-    };
-  } else {
-    addTableAndFooter();
-  }
-
   const addTableAndFooter = () => {
     // Prepare table data
     const tableColumn = ["Name", "Email", "Login Enabled", "Status"];
@@ -81,6 +62,25 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
 
     doc.save(`${options.reportName.replace(/\s/g, "_")}.pdf`);
   };
+
+  // Add Header
+  doc.setFontSize(18);
+  doc.text(options.reportName, 14, 22);
+  if (options.brandLogoUrl) {
+    const img = new Image();
+    img.src = options.brandLogoUrl;
+    // Ensure the image is loaded before adding it to the PDF
+    img.onload = () => {
+      doc.addImage(img, "PNG", 170, 10, 20, 20); // Adjust position and size as needed
+      addTableAndFooter();
+    };
+    img.onerror = () => {
+      console.error("Failed to load brand logo for PDF report.");
+      addTableAndFooter(); // Proceed without logo if it fails to load
+    };
+  } else {
+    addTableAndFooter();
+  }
 };
 
 export const exportMembersToExcel = (members: Member[], options: ReportOptions) => {

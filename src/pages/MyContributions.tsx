@@ -45,7 +45,9 @@ interface UserContribution {
   expected: number; // Expected contribution
 }
 
-const getContributionStatus = (amount: number, expected: number) => {
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline"; // Define allowed badge variants
+
+const getContributionStatus = (amount: number, expected: number): { text: string; variant: BadgeVariant } => {
   if (amount >= expected) {
     return { text: "Met", variant: "default" };
   } else if (amount > 0) {
