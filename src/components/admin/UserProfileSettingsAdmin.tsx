@@ -27,31 +27,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { showSuccess } from "@/utils/toast";
-import { useAuth } from "@/context/AuthContext";
-import AddEditUserDialog from "./AddEditUserDialog"; // Import the new dialog
-import { useUserRoles } from "@/context/UserRolesContext"; // Import useUserRoles
+import { useAuth, User } from "@/context/AuthContext"; // Import useAuth and the centralized User interface
+import AddEditUserDialog from "./AddEditUserDialog";
+import { useUserRoles } from "@/context/UserRolesContext";
 
-// Define User interface here to be consistent and allow custom roles
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string; // Changed to string to support custom roles
-  status: "Active" | "Inactive" | "Suspended";
-  enableLogin: boolean;
-  imageUrl?: string;
-}
-
+// Dummy users now conform to the centralized User interface
 const dummyUsers: User[] = [
-  { id: "m1", name: "Alice Johnson", email: "alice@example.com", role: "Admin", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice" },
-  { id: "m2", name: "Bob Williams", email: "bob@example.com", role: "Project Manager", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob" },
-  { id: "m3", name: "Charlie Brown", email: "charlie@example.com", role: "Contributor", status: "Inactive", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie" },
-  { id: "m4", name: "David Green", email: "david@example.com", role: "Contributor", status: "Suspended", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David" },
+  { id: "u1", name: "Alice Johnson", email: "alice@example.com", role: "Admin", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice" },
+  { id: "u2", name: "Bob Williams", email: "bob@example.com", role: "Project Manager", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob" },
+  { id: "u3", name: "Charlie Brown", email: "charlie@example.com", role: "Contributor", status: "Inactive", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie" },
+  { id: "u4", name: "David Green", email: "david@example.com", role: "Contributor", status: "Suspended", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David" },
 ];
 
 const UserProfileSettingsAdmin = () => {
   const { isAdmin } = useAuth();
-  const { userRoles } = useUserRoles(); // Get userRoles from context
+  const { userRoles } = useUserRoles();
   const [users, setUsers] = React.useState<User[]>(dummyUsers);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [deletingUserId, setDeletingUserId] = React.useState<string | undefined>(undefined);
@@ -83,7 +73,7 @@ const UserProfileSettingsAdmin = () => {
   };
 
   const handleAddUser = () => {
-    setEditingUser(undefined); // Clear any previous editing data
+    setEditingUser(undefined);
     setIsAddEditUserDialogOpen(true);
   };
 
@@ -101,9 +91,9 @@ const UserProfileSettingsAdmin = () => {
       const newUser: User = {
         ...userData,
         id: `u${users.length + 1}`, // Simple ID generation
-        enableLogin: userData.enableLogin, // Ensure enableLogin is passed
-        status: userData.status, // Ensure status is passed
-        role: userData.role, // Ensure role is passed
+        enableLogin: userData.enableLogin,
+        status: userData.status,
+        role: userData.role,
         imageUrl: userData.imageUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${userData.name}`,
       };
       setUsers(prev => [...prev, newUser]);

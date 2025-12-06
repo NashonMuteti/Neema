@@ -23,18 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Image as ImageIcon, Save, Upload } from "lucide-react";
-import { UserRole as UserRoleType } from './AddEditUserRoleDialog'; // Import UserRoleType
-
-// Define User interface here to be consistent and allow custom roles
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string; // Changed to string to support custom roles
-  status: "Active" | "Inactive" | "Suspended";
-  enableLogin: boolean;
-  imageUrl?: string;
-}
+import { UserRole as UserRoleType } from './AddEditUserRoleDialog';
+import { User } from '@/context/AuthContext'; // Import the centralized User interface
 
 interface AddEditUserDialogProps {
   isOpen: boolean;
@@ -76,7 +66,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         URL.revokeObjectURL(previewUrl);
       }
     };
-  }, [isOpen, initialData, previewUrl, availableRoles]); // Added availableRoles to dependencies
+  }, [isOpen, initialData, previewUrl, availableRoles]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

@@ -15,18 +15,18 @@ import {
 import { LogOut, Settings, User, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSelector } from "./LanguageSelector";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { useBranding } from "@/context/BrandingContext";
 
 const Header = () => {
-  const { isAdmin, toggleAdmin } = useAuth(); // Use isAdmin and toggleAdmin from AuthContext
+  const { isAdmin, toggleAdmin, currentUser } = useAuth(); // Use isAdmin, toggleAdmin, and currentUser from AuthContext
   const { brandLogoUrl, tagline } = useBranding();
 
-  // Placeholder for user data, will be replaced with actual user context from Supabase
-  const user = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    initials: "JD",
+  // Use currentUser from context, fallback to dummy if not available
+  const user = currentUser || {
+    name: "Guest User",
+    email: "guest@example.com",
+    initials: "GU",
   };
 
   return (
@@ -74,7 +74,7 @@ const Header = () => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarFallback>{user.initials}</AvatarFallback>
+                <AvatarFallback>{user.name.charAt(0).toUpperCase() + user.name.split(' ')[1].charAt(0).toUpperCase()}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
