@@ -3,7 +3,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote } from "lucide-react";
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote, ShoppingCart, Package, Scale } from "lucide-react"; // Added ShoppingCart, Package, Scale icons
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
@@ -60,6 +60,31 @@ export const navItems: SidebarItem[] = [ // Added export here
     href: "/expenditure",
     icon: TrendingDown,
     requiredRoles: ["Admin", "Project Manager"],
+  },
+  {
+    name: "Sales Management", // New Heading
+    type: "heading",
+    requiredRoles: ["Admin", "Project Manager"], // Accessible to Admin and Project Manager
+    children: [
+      {
+        name: "Stocks",
+        href: "/sales/stocks",
+        icon: Package,
+        requiredRoles: ["Admin", "Project Manager"],
+      },
+      {
+        name: "Daily Sales",
+        href: "/sales/daily",
+        icon: ShoppingCart,
+        requiredRoles: ["Admin", "Project Manager"],
+      },
+      {
+        name: "Debts",
+        href: "/sales/debts",
+        icon: Scale,
+        requiredRoles: ["Admin", "Project Manager"],
+      },
+    ],
   },
   {
     name: "Members",
@@ -148,6 +173,7 @@ const Sidebar = () => {
   const { userRoles } = useAuth(); // Use userRoles from AuthContext
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
+  const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false); // New state for Sales Management
 
   // Helper to check if user has any of the required roles
   const hasRequiredRole = (requiredRoles?: string[]) => {
@@ -155,7 +181,7 @@ const Sidebar = () => {
     return requiredRoles.some(role => userRoles.includes(role));
   };
 
-  // Open reports/actions collapsible if any child route is active and user has access
+  // Open reports/actions/sales management collapsible if any child route is active and user has access
   React.useEffect(() => {
     const isChildOfReports = navItems.some(item =>
       (item as NavHeading).type === "heading" && item.name === "Reports" && (item as NavHeading).children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
@@ -174,6 +200,15 @@ const Sidebar = () => {
     } else {
       setIsActionsOpen(false); // Close if no child is active
     }
+
+    const isChildOfSalesManagement = navItems.some(item =>
+      (item as NavHeading).type === "heading" && item.name === "Sales Management" && (item as NavHeading).children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
+    );
+    if (isChildOfSalesManagement) {
+      setIsSalesManagementOpen(true);
+    } else {
+      setIsSalesManagementOpen(false); // Close if no child is active
+    }
   }, [location.pathname, userRoles]);
 
 
@@ -187,8 +222,23 @@ const Sidebar = () => {
 
           if (item.type === "heading") {
             const headingItem = item as NavHeading; // Type assertion
-            const isOpen = headingItem.name === "Reports" ? isReportsOpen : isActionsOpen;
-            const setIsOpen = headingItem.name === "Reports" ? setIsReportsOpen : setIsActionsOpen;
+            let isOpen = false;
+            let setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+
+            if (headingItem.name === "Reports") {
+              isOpen = isReportsOpen;
+              setIsOpen = setIsReportsOpen;
+            } else if (headingItem.name === "Actions") {
+              isOpen = isActionsOpen;
+              setIsOpen = setIsActionsOpen;
+            } else if (headingItem.name === "Sales Management") { // Handle new heading
+              isOpen = isSalesManagementOpen;
+              setIsOpen = setIsSalesManagementOpen;
+            } else {
+              // Default for other headings if any are added later
+              isOpen = false;
+              setIsOpen = () => {}; // No-op setter
+            }
 
             // Filter children based on user roles
             const visibleChildren = headingItem.children.filter(child => hasRequiredRole(child.requiredRoles));
@@ -210,7 +260,7 @@ const Sidebar = () => {
                       to={child.href}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                        location.pathname === child.href && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                        location.pathname.startsWith(child.href) && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
                       )}
                     >
                       <child.icon className="h-5 w-5" />
