@@ -12,6 +12,7 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   requiredRoles?: string[]; // Roles required to see this item
+  type?: "item"; // Explicitly define type for NavItem
 }
 
 interface NavHeading {
@@ -157,7 +158,7 @@ const Sidebar = () => {
   // Open reports/actions collapsible if any child route is active and user has access
   React.useEffect(() => {
     const isChildOfReports = navItems.some(item =>
-      item.type === "heading" && item.name === "Reports" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
+      (item as NavHeading).type === "heading" && item.name === "Reports" && (item as NavHeading).children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
     );
     if (isChildOfReports) {
       setIsReportsOpen(true);
@@ -166,7 +167,7 @@ const Sidebar = () => {
     }
 
     const isChildOfActions = navItems.some(item =>
-      item.type === "heading" && item.name === "Actions" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
+      (item as NavHeading).type === "heading" && item.name === "Actions" && (item as NavHeading).children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
     );
     if (isChildOfActions) {
       setIsActionsOpen(true);
@@ -185,20 +186,21 @@ const Sidebar = () => {
           }
 
           if (item.type === "heading") {
-            const isOpen = item.name === "Reports" ? isReportsOpen : isActionsOpen;
-            const setIsOpen = item.name === "Reports" ? setIsReportsOpen : setIsActionsOpen;
+            const headingItem = item as NavHeading; // Type assertion
+            const isOpen = headingItem.name === "Reports" ? isReportsOpen : isActionsOpen;
+            const setIsOpen = headingItem.name === "Reports" ? setIsReportsOpen : setIsActionsOpen;
 
             // Filter children based on user roles
-            const visibleChildren = item.children.filter(child => hasRequiredRole(child.requiredRoles));
+            const visibleChildren = headingItem.children.filter(child => hasRequiredRole(child.requiredRoles));
 
             if (visibleChildren.length === 0) {
               return null; // Hide heading if no children are visible
             }
 
             return (
-              <Collapsible key={item.name} open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
+              <Collapsible key={headingItem.name} open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
                 <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors duration-200 ease-in-out">
-                  {item.name}
+                  {headingItem.name}
                   <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isOpen && "rotate-180")} />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-1 pl-4">
@@ -219,17 +221,18 @@ const Sidebar = () => {
               </Collapsible>
             );
           } else {
+            const navItem = item as NavItem; // Type assertion
             return (
               <Link
-                key={item.name}
-                to={item.href}
+                key={navItem.name}
+                to={navItem.href}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                  location.pathname === item.href && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                  location.pathname === navItem.href && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
                 )}
               >
-                <item.icon className="h-5 w-5" />
-                {item.name}
+                <navItem.icon className="h-5 w-5" />
+                {navItem.name}
               </Link>
             );
           }

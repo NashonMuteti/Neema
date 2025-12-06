@@ -120,11 +120,12 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               {navItems.map((item) => {
                 if (item.type === "heading") {
+                  const headingItem = item as NavHeading; // Type assertion
                   return (
-                    <div key={item.name} className="col-span-full">
-                      <h4 className="font-medium text-sm mt-4 mb-2">{item.name}</h4>
+                    <div key={headingItem.name} className="col-span-full">
+                      <h4 className="font-medium text-sm mt-4 mb-2">{headingItem.name}</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pl-4">
-                        {item.children.map((child) => (
+                        {headingItem.children.map((child) => (
                           <div key={child.name} className="flex items-center space-x-2">
                             <Checkbox
                               id={`privilege-${child.name}`}
@@ -140,15 +141,16 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
                     </div>
                   );
                 } else {
+                  const navItem = item as NavItem; // Type assertion
                   return (
-                    <div key={item.name} className="flex items-center space-x-2">
+                    <div key={navItem.name} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`privilege-${item.name}`}
-                        checked={selectedMenuPrivileges.includes(item.name)}
-                        onCheckedChange={(checked) => handlePrivilegeChange(item.name, checked as boolean)}
+                        id={`privilege-${navItem.name}`}
+                        checked={selectedMenuPrivileges.includes(navItem.name)}
+                        onCheckedChange={(checked) => handlePrivilegeChange(navItem.name, checked as boolean)}
                       />
-                      <Label htmlFor={`privilege-${item.name}`} className="text-sm font-normal cursor-pointer">
-                        {item.name}
+                      <Label htmlFor={`privilege-${navItem.name}`} className="text-sm font-normal cursor-pointer">
+                        {navItem.name}
                       </Label>
                     </div>
                   );

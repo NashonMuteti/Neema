@@ -218,7 +218,7 @@ const UserProfileSettingsAdmin = () => {
         setIsOpen={setIsAddEditUserDialogOpen}
         initialData={editingUser}
         onSave={handleSaveUser}
-        availableRoles={userRoles} {/* Pass available roles */}
+        availableRoles={userRoles}
       />
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingUserId} onOpenChange={(open) => !open && setDeletingUserId(undefined)}>
