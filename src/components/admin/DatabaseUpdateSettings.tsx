@@ -5,8 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw, Database, Upload, Download } from "lucide-react"; // Added Upload and Download icons
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 const DatabaseUpdateSettings = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageDatabaseMaintenance = currentUserPrivileges.includes("Manage Database Maintenance");
+
   const handleCheckAndUpdateDatabase = async () => {
     const toastId = showLoading("Checking and updating database fields...");
 
@@ -87,13 +96,13 @@ const DatabaseUpdateSettings = () => {
           Perform critical database operations to ensure system stability and data recovery.
         </p>
         <div className="flex flex-wrap gap-3">
-          <Button onClick={handleCheckAndUpdateDatabase} variant="outline">
+          <Button onClick={handleCheckAndUpdateDatabase} variant="outline" disabled={!canManageDatabaseMaintenance}>
             <Database className="mr-2 h-4 w-4" /> Check & Update Fields
           </Button>
-          <Button onClick={handleBackupDatabase} variant="secondary">
+          <Button onClick={handleBackupDatabase} variant="secondary" disabled={!canManageDatabaseMaintenance}>
             <Download className="mr-2 h-4 w-4" /> Backup Database
           </Button>
-          <Button onClick={handleRestoreDatabase} variant="destructive">
+          <Button onClick={handleRestoreDatabase} variant="destructive" disabled={!canManageDatabaseMaintenance}>
             <Upload className="mr-2 h-4 w-4" /> Restore Database
           </Button>
         </div>

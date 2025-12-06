@@ -27,9 +27,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 const BoardMembers = () => {
-  const { isAdmin } = useAuth(); // Use the auth context
+  const { currentUser } = useAuth(); // Use the auth context
+  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageBoardMembers = currentUserPrivileges.includes("Manage Board Members");
+
   const [boardMembers, setBoardMembers] = React.useState<BoardMember[]>([
     { id: "bm1", name: "Jane Doe", role: "Chairperson", email: "jane.doe@example.com", phone: "555-123-4567", address: "123 Main St, Anytown", notes: "Oversees strategic direction.", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Jane" },
     { id: "bm2", name: "Richard Roe", role: "Treasurer", email: "richard.roe@example.com", phone: "555-987-6543", notes: "Manages financial oversight.", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Richard" },
@@ -106,7 +113,7 @@ const BoardMembers = () => {
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
-            {isAdmin && (
+            {canManageBoardMembers && (
               <Button onClick={() => setIsAddDialogOpen(true)}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Board Member
               </Button>
@@ -125,7 +132,7 @@ const BoardMembers = () => {
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead>Notes</TableHead>
-                  {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+                  {canManageBoardMembers && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -146,7 +153,7 @@ const BoardMembers = () => {
                     <TableCell>{member.phone}</TableCell>
                     <TableCell>{member.address || "-"}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{member.notes || "-"}</TableCell>
-                    {isAdmin && (
+                    {canManageBoardMembers && (
                       <TableCell className="text-center">
                         <div className="flex justify-center space-x-2">
                           <Button variant="outline" size="sm" onClick={() => openEditDialog(member)}>

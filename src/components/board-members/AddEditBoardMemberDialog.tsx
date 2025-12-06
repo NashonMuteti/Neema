@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { showSuccess, showError } from "@/utils/toast";
 import { PlusCircle, Save, Image as ImageIcon } from "lucide-react"; // Added ImageIcon
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 export interface BoardMember {
   id: string;
@@ -40,6 +42,13 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
   isOpen,
   setIsOpen,
 }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageBoardMembers = currentUserPrivileges.includes("Manage Board Members");
+
   const [name, setName] = React.useState(initialData?.name || "");
   const [role, setRole] = React.useState(initialData?.role || "");
   const [email, setEmail] = React.useState(initialData?.email || "");
@@ -139,6 +148,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
+                disabled={!canManageBoardMembers}
               />
             </div>
           </div>
@@ -151,6 +161,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
+              disabled={!canManageBoardMembers}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -162,6 +173,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="col-span-3"
+              disabled={!canManageBoardMembers}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -174,6 +186,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="col-span-3"
+              disabled={!canManageBoardMembers}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -186,6 +199,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="col-span-3"
+              disabled={!canManageBoardMembers}
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -198,6 +212,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               onChange={(e) => setAddress(e.target.value)}
               className="col-span-3"
               placeholder="Optional address details"
+              disabled={!canManageBoardMembers}
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -210,11 +225,12 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               onChange={(e) => setNotes(e.target.value)}
               className="col-span-3"
               placeholder="Any additional notes"
+              disabled={!canManageBoardMembers}
             />
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} disabled={!canManageBoardMembers}>
             <Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add Member"}
           </Button>
         </div>

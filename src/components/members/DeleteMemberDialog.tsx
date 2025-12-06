@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { showError, showSuccess } from "@/utils/toast"; // Assuming toast utility
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface Member {
   id: string;
@@ -26,6 +28,13 @@ interface DeleteMemberDialogProps {
 }
 
 const DeleteMemberDialog: React.FC<DeleteMemberDialogProps> = ({ member, onDeleteMember }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageMembers = currentUserPrivileges.includes("Manage Members");
+
   const handleDelete = () => {
     onDeleteMember(member.id);
     showSuccess(`${member.name} deleted successfully.`);
@@ -34,7 +43,7 @@ const DeleteMemberDialog: React.FC<DeleteMemberDialogProps> = ({ member, onDelet
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="sm">Delete</Button>
+        <Button variant="destructive" size="sm" disabled={!canManageMembers}>Delete</Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

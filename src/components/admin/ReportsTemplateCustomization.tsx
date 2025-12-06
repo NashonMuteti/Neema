@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { showSuccess } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 const availableReportFields = [
   { value: "name-email", label: "Name, Email" },
@@ -29,6 +31,13 @@ const availableExportFormats = [
 ];
 
 const ReportsTemplateCustomization = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageReportsTemplates = currentUserPrivileges.includes("Manage Reports Templates");
+
   const [selectedPledgeReportFields, setSelectedPledgeReportFields] = React.useState("name-email-status");
   const [defaultExportFormat, setDefaultExportFormat] = React.useState("pdf");
 
@@ -50,7 +59,7 @@ const ReportsTemplateCustomization = () => {
         <div className="mt-4 space-y-4">
           <div className="grid w-full max-w-sm items-center gap-1.5">
             <Label htmlFor="pledge-report-fields">Pledge Report Fields</Label>
-            <Select value={selectedPledgeReportFields} onValueChange={setSelectedPledgeReportFields}>
+            <Select value={selectedPledgeReportFields} onValueChange={setSelectedPledgeReportFields} disabled={!canManageReportsTemplates}>
               <SelectTrigger id="pledge-report-fields">
                 <SelectValue placeholder="Select fields" />
               </SelectTrigger>
@@ -68,7 +77,7 @@ const ReportsTemplateCustomization = () => {
           </div>
           <div className="grid w-full max-w-sm items-center gap-1.5">
             <Label htmlFor="export-format">Default Export Format</Label>
-            <Select value={defaultExportFormat} onValueChange={setDefaultExportFormat}>
+            <Select value={defaultExportFormat} onValueChange={setDefaultExportFormat} disabled={!canManageReportsTemplates}>
               <SelectTrigger id="export-format">
                 <SelectValue placeholder="Select format" />
               </SelectTrigger>
@@ -84,7 +93,7 @@ const ReportsTemplateCustomization = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleSaveReportSettings}>
+          <Button onClick={handleSaveReportSettings} disabled={!canManageReportsTemplates}>
             <Save className="mr-2 h-4 w-4" /> Save Report Settings
           </Button>
         </div>

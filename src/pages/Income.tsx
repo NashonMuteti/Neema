@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 // Dummy financial accounts (should ideally come from a backend/admin setup)
 const financialAccounts = [
@@ -48,7 +49,13 @@ interface IncomeTransaction {
 }
 
 const Income = () => {
-  const { isAdmin } = useAuth(); // Use the auth context
+  const { currentUser } = useAuth(); // Use the auth context
+  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageIncome = currentUserPrivileges.includes("Manage Income");
+
   // Form State
   const [incomeDate, setIncomeDate] = React.useState<Date | undefined>(new Date());
   const [incomeAmount, setIncomeAmount] = React.useState("");
@@ -154,6 +161,7 @@ const Income = () => {
                       "w-full justify-start text-left font-normal",
                       !incomeDate && "text-muted-foreground"
                     )}
+                    disabled={!canManageIncome}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {incomeDate ? format(incomeDate, "PPP") : <span>Pick a date</span>}
@@ -179,12 +187,13 @@ const Income = () => {
                 placeholder="0.00"
                 value={incomeAmount}
                 onChange={(e) => setIncomeAmount(e.target.value)}
+                disabled={!canManageIncome}
               />
             </div>
 
             <div className="grid gap-1.5">
               <Label htmlFor="income-account">Received Into Account</Label>
-              <Select value={incomeAccount} onValueChange={setIncomeAccount}>
+              <Select value={incomeAccount} onValueChange={setIncomeAccount} disabled={!canManageIncome}>
                 <SelectTrigger id="income-account">
                   <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
@@ -208,10 +217,11 @@ const Income = () => {
                 placeholder="e.g., Grant from Film Fund, Donation from Sponsor"
                 value={incomeSource}
                 onChange={(e) => setIncomeSource(e.target.value)}
+                disabled={!canManageIncome}
               />
             </div>
 
-            <Button onClick={handlePostIncome} className="w-full">
+            <Button onClick={handlePostIncome} className="w-full" disabled={!canManageIncome}>
               Post Income
             </Button>
           </CardContent>
@@ -275,7 +285,7 @@ const Income = () => {
                     <TableHead>Source</TableHead>
                     <TableHead>Account</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
-                    {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+                    {canManageIncome && <TableHead className="text-center">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -285,7 +295,7 @@ const Income = () => {
                       <TableCell>{tx.source}</TableCell>
                       <TableCell>{financialAccounts.find(acc => acc.id === tx.accountId)?.name}</TableCell>
                       <TableCell className="text-right">${tx.amount.toFixed(2)}</TableCell>
-                      {isAdmin && (
+                      {canManageIncome && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
                             <Button variant="ghost" size="icon" onClick={() => handleEditTransaction(tx.id)}>

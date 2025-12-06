@@ -26,6 +26,7 @@ import {
 import { showSuccess, showError } from "@/utils/toast";
 import AddEditUserRoleDialog, { UserRole } from "./AddEditUserRoleDialog";
 import { useUserRoles } from "@/context/UserRolesContext"; // Import useUserRoles
+import { useAuth } from "@/context/AuthContext"; // New import
 
 // Dummy data for users (reusing from UserProfileSettingsAdmin)
 interface User {
@@ -43,7 +44,13 @@ const dummyUsers: User[] = [
 ];
 
 const UserRolesSettings = () => {
+  const { currentUser } = useAuth(); // Use the auth context
   const { userRoles, addRole, updateRole, deleteRole } = useUserRoles(); // Use context
+
+  const currentUserRoleDefinition = userRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageUserRoles = currentUserPrivileges.includes("Manage User Roles");
+
   const [isAddEditRoleDialogOpen, setIsAddEditRoleDialogOpen] = React.useState(false);
   const [editingRole, setEditingRole] = React.useState<UserRole | undefined>(undefined);
   const [deletingRoleId, setDeletingRoleId] = React.useState<string | undefined>(undefined);
@@ -97,9 +104,11 @@ const UserRolesSettings = () => {
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
-            <Button onClick={() => { setEditingRole(undefined); setIsAddEditRoleDialogOpen(true); }}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Role
-            </Button>
+            {canManageUserRoles && (
+              <Button onClick={() => { setEditingRole(undefined); setIsAddEditRoleDialogOpen(true); }}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Role
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -113,7 +122,7 @@ const UserRolesSettings = () => {
                   <TableHead>Role Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-center">Members</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                  {canManageUserRoles && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -122,16 +131,18 @@ const UserRolesSettings = () => {
                     <TableCell className="font-medium">{role.name}</TableCell>
                     <TableCell className="max-w-[300px] truncate">{role.description}</TableCell>
                     <TableCell className="text-center">{role.memberUserIds.length}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => openEditDialog(role)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(role.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {canManageUserRoles && (
+                      <TableCell className="text-center">
+                        <div className="flex justify-center space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => openEditDialog(role)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(role.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { showSuccess, showError } from "@/utils/toast";
 import { Save } from "lucide-react";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 const availableCurrencies = [
   { value: "USD", label: "US Dollar ($)" },
@@ -27,6 +29,13 @@ const availableCurrencies = [
 ];
 
 const SystemCurrencySettings = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageSystemCurrency = currentUserPrivileges.includes("Manage System Currency");
+
   // In a real app, this would be fetched from a backend setting
   const [selectedCurrency, setSelectedCurrency] = React.useState("USD");
 
@@ -47,7 +56,7 @@ const SystemCurrencySettings = () => {
         </p>
         <div className="grid w-full max-w-sm items-center gap-1.5">
           <Label htmlFor="system-currency">Default Currency</Label>
-          <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
+          <Select value={selectedCurrency} onValueChange={setSelectedCurrency} disabled={!canManageSystemCurrency}>
             <SelectTrigger id="system-currency">
               <SelectValue placeholder="Select a currency" />
             </SelectTrigger>
@@ -63,7 +72,7 @@ const SystemCurrencySettings = () => {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleSaveCurrency}>
+        <Button onClick={handleSaveCurrency} disabled={!canManageSystemCurrency}>
           <Save className="mr-2 h-4 w-4" /> Save Currency Setting
         </Button>
       </CardContent>

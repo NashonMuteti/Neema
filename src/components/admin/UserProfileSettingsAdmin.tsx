@@ -40,8 +40,13 @@ const dummyUsers: User[] = [
 ];
 
 const UserProfileSettingsAdmin = () => {
-  const { isAdmin } = useAuth();
-  const { userRoles } = useUserRoles();
+  const { currentUser } = useAuth(); // Use the auth context
+  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
+
   const [users, setUsers] = React.useState<User[]>(dummyUsers);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [deletingUserId, setDeletingUserId] = React.useState<string | undefined>(undefined);
@@ -127,7 +132,7 @@ const UserProfileSettingsAdmin = () => {
             />
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
           </div>
-          {isAdmin && (
+          {canManageUserProfiles && (
             <Button onClick={handleAddUser}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add User
             </Button>
@@ -148,7 +153,7 @@ const UserProfileSettingsAdmin = () => {
                 <TableHead>Role</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-center">Login</TableHead>
-                {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+                {canManageUserProfiles && <TableHead className="text-center">Actions</TableHead>}
                 <TableHead className="text-center">Contributions</TableHead>
               </TableRow>
             </TableHeader>
@@ -175,7 +180,7 @@ const UserProfileSettingsAdmin = () => {
                   <TableCell className="text-center">
                     {user.enableLogin ? "Enabled" : "Disabled"}
                   </TableCell>
-                  {isAdmin && (
+                  {canManageUserProfiles && (
                     <TableCell className="text-center">
                       <div className="flex justify-center space-x-2">
                         <Button variant="outline" size="sm" onClick={() => handleEditUser(user)}>
@@ -208,7 +213,7 @@ const UserProfileSettingsAdmin = () => {
         setIsOpen={setIsAddEditUserDialogOpen}
         initialData={editingUser}
         onSave={handleSaveUser}
-        availableRoles={userRoles}
+        availableRoles={definedRoles} // Pass defined roles
       />
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingUserId} onOpenChange={(open) => !open && setDeletingUserId(undefined)}>

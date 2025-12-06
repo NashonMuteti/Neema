@@ -25,6 +25,8 @@ import {
 import { Image as ImageIcon, Save, Upload } from "lucide-react";
 import { UserRole as UserRoleType } from './AddEditUserRoleDialog';
 import { User } from '@/context/AuthContext'; // Import the centralized User interface
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface AddEditUserDialogProps {
   isOpen: boolean;
@@ -41,6 +43,13 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   onSave,
   availableRoles,
 }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
+
   const [name, setName] = React.useState(initialData?.name || "");
   const [email, setEmail] = React.useState(initialData?.email || "");
   const [role, setRole] = React.useState<string>(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : "")); // Initialize with first available role or empty
@@ -145,6 +154,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
+                disabled={!canManageUserProfiles}
               />
             </div>
           </div>
@@ -157,6 +167,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
+              disabled={!canManageUserProfiles}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -169,13 +180,14 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="col-span-3"
+              disabled={!canManageUserProfiles}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="role" className="text-right">
               Role
             </Label>
-            <Select value={role} onValueChange={(value: string) => setRole(value)}>
+            <Select value={role} onValueChange={(value: string) => setRole(value)} disabled={!canManageUserProfiles}>
               <SelectTrigger id="role" className="col-span-3">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
@@ -195,7 +207,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             <Label htmlFor="status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)}>
+            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageUserProfiles}>
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -218,6 +230,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               checked={enableLogin}
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)}
               className="col-span-3"
+              disabled={!canManageUserProfiles}
             />
           </div>
           {enableLogin && (
@@ -232,12 +245,13 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
                 onChange={(e) => setDefaultPassword(e.target.value)}
                 placeholder={initialData ? "Leave blank to keep current" : "Enter default password"}
                 className="col-span-3"
+                disabled={!canManageUserProfiles}
               />
             </div>
           )}
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} disabled={!canManageUserProfiles}>
             <Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add User"}
           </Button>
         </div>

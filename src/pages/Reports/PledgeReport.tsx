@@ -26,6 +26,7 @@ import { Search, Edit, Trash2, CheckCircle } from "lucide-react";
 import { format, getMonth, getYear, isBefore, startOfDay } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 // Dummy data for members and projects (should come from backend in a real app)
 const dummyMembers = [
@@ -59,7 +60,13 @@ const initialPledges: Pledge[] = [
 ];
 
 const PledgeReport = () => {
-  const { isAdmin } = useAuth();
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+
   const [pledges, setPledges] = React.useState<Pledge[]>(initialPledges);
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
@@ -218,7 +225,7 @@ const PledgeReport = () => {
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead className="text-center">Status</TableHead>
-                  {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+                  {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -237,7 +244,7 @@ const PledgeReport = () => {
                           {status}
                         </Badge>
                       </TableCell>
-                      {isAdmin && (
+                      {canManagePledges && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
                             {status !== "Paid" && (

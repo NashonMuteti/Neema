@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface Member {
   id: string;
@@ -41,6 +43,13 @@ interface EditMemberDialogProps {
 }
 
 const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMember }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageMembers = currentUserPrivileges.includes("Manage Members");
+
   const [name, setName] = React.useState(member.name);
   const [email, setEmail] = React.useState(member.email);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // New state for uploaded file
@@ -103,7 +112,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">Edit</Button>
+        <Button variant="outline" size="sm" disabled={!canManageMembers}>Edit</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -122,6 +131,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
+              disabled={!canManageMembers}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -134,6 +144,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="col-span-3"
+              disabled={!canManageMembers}
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
@@ -152,6 +163,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
+                disabled={!canManageMembers}
               />
             </div>
           </div>
@@ -164,6 +176,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               checked={enableLogin}
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)}
               className="col-span-3"
+              disabled={!canManageMembers}
             />
           </div>
           {enableLogin && (
@@ -178,6 +191,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
                 onChange={(e) => setDefaultPassword(e.target.value)}
                 placeholder="Leave blank to keep current password"
                 className="col-span-3"
+                disabled={!canManageMembers}
               />
             </div>
           )}
@@ -185,7 +199,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
             <Label htmlFor="status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)}>
+            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageMembers}>
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -201,7 +215,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit}>Save Changes</Button>
+          <Button onClick={handleSubmit} disabled={!canManageMembers}>Save Changes</Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Note: Image storage and serving, along with backend authentication for login, require backend integration (e.g., Supabase).

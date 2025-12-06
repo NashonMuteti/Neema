@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 // Dummy data for members and projects (should come from backend in a real app)
 const dummyMembers = [
@@ -55,7 +56,13 @@ interface Pledge {
 }
 
 const Pledges = () => {
-  const { isAdmin } = useAuth(); // Use the auth context
+  const { currentUser } = useAuth(); // Use the auth context
+  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+
   // Form State
   const [newPledgeMemberId, setNewPledgeMemberId] = React.useState<string | undefined>(undefined);
   const [newPledgeProjectId, setNewPledgeProjectId] = React.useState<string | undefined>(undefined);
@@ -193,7 +200,7 @@ const Pledges = () => {
           <CardContent className="space-y-4">
             <div className="grid gap-1.5">
               <Label htmlFor="pledge-member">Member</Label>
-              <Select value={newPledgeMemberId} onValueChange={setNewPledgeMemberId}>
+              <Select value={newPledgeMemberId} onValueChange={setNewPledgeMemberId} disabled={!canManagePledges}>
                 <SelectTrigger id="pledge-member">
                   <SelectValue placeholder="Select a member" />
                 </SelectTrigger>
@@ -212,7 +219,7 @@ const Pledges = () => {
 
             <div className="grid gap-1.5">
               <Label htmlFor="pledge-project">Project</Label>
-              <Select value={newPledgeProjectId} onValueChange={setNewPledgeProjectId}>
+              <Select value={newPledgeProjectId} onValueChange={setNewPledgeProjectId} disabled={!canManagePledges}>
                 <SelectTrigger id="pledge-project">
                   <SelectValue placeholder="Select a project" />
                 </SelectTrigger>
@@ -238,6 +245,7 @@ const Pledges = () => {
                 placeholder="0.00"
                 value={newPledgeAmount}
                 onChange={(e) => setNewPledgeAmount(e.target.value)}
+                disabled={!canManagePledges}
               />
             </div>
 
@@ -251,6 +259,7 @@ const Pledges = () => {
                       "w-full justify-start text-left font-normal",
                       !newPledgeDueDate && "text-muted-foreground"
                     )}
+                    disabled={!canManagePledges}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {newPledgeDueDate ? format(newPledgeDueDate, "PPP") : <span>Pick a date</span>}
@@ -267,7 +276,7 @@ const Pledges = () => {
               </Popover>
             </div>
 
-            <Button onClick={handleRecordPledge} className="w-full">
+            <Button onClick={handleRecordPledge} className="w-full" disabled={!canManagePledges}>
               Record Pledge
             </Button>
           </CardContent>
@@ -349,7 +358,7 @@ const Pledges = () => {
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead className="text-center">Status</TableHead>
-                    {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+                    {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -368,7 +377,7 @@ const Pledges = () => {
                             {status}
                           </Badge>
                         </TableCell>
-                        {isAdmin && (
+                        {canManagePledges && (
                           <TableCell className="text-center">
                             <div className="flex justify-center space-x-2">
                               {status !== "Paid" && (

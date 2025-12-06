@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PlusCircle, XCircle } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface CustomField {
   id: string;
@@ -15,6 +17,13 @@ interface CustomField {
 }
 
 const MemberFieldCustomization = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageMemberFields = currentUserPrivileges.includes("Manage Member Fields");
+
   const [customFields, setCustomFields] = React.useState<CustomField[]>([
     { id: "f1", name: "Phone Number", type: "text" },
     { id: "f2", name: "Role", type: "text" },
@@ -61,9 +70,11 @@ const MemberFieldCustomization = () => {
           {customFields.map((field) => (
             <div key={field.id} className="flex items-center justify-between gap-2">
               <Label className="flex-1">{field.name} ({field.type})</Label>
-              <Button variant="ghost" size="icon" onClick={() => handleRemoveField(field.id)}>
-                <XCircle className="h-4 w-4 text-destructive" />
-              </Button>
+              {canManageMemberFields && (
+                <Button variant="ghost" size="icon" onClick={() => handleRemoveField(field.id)}>
+                  <XCircle className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
             </div>
           ))}
 
@@ -73,12 +84,17 @@ const MemberFieldCustomization = () => {
               value={newFieldName}
               onChange={(e) => setNewFieldName(e.target.value)}
               className="flex-1"
+              disabled={!canManageMemberFields}
             />
-            <Button onClick={handleAddField} size="icon">
-              <PlusCircle className="h-4 w-4" />
-            </Button>
+            {canManageMemberFields && (
+              <Button onClick={handleAddField} size="icon">
+                <PlusCircle className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          <Button onClick={handleSaveFields} className="mt-4">Save Field Configuration</Button>
+          {canManageMemberFields && (
+            <Button onClick={handleSaveFields} className="mt-4">Save Field Configuration</Button>
+          )}
         </div>
       </CardContent>
     </Card>

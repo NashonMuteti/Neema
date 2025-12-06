@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon, Upload, Download } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface MemberContribution {
   id: string;
@@ -39,6 +41,13 @@ const dummyMembers = [
 ];
 
 const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projectName, onSaveCollections }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageProjects = currentUserPrivileges.includes("Manage Projects"); // Assuming 'Manage Projects' covers collections
+
   const [isOpen, setIsOpen] = React.useState(false);
   const [date, setDate] = React.useState<Date | undefined>(new Date());
   const [contributions, setContributions] = React.useState<Record<string, string>>({});
@@ -155,13 +164,14 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projec
                   onChange={(e) => handleContributionChange(member.id, e.target.value)}
                   className="col-span-1 sm:col-span-3"
                   placeholder="Amount"
+                  disabled={!canManageProjects} // Disable input if no privilege
                 />
               </div>
             ))}
           </div>
 
           <h3 className="text-lg font-semibold mt-4">Payment Method</h3>
-          <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="flex flex-wrap gap-4"> {/* Responsive radio group */}
+          <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="flex flex-wrap gap-4" disabled={!canManageProjects}> {/* Responsive radio group */}
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="cash" id="r1" />
               <Label htmlFor="r1">Cash</Label>
@@ -177,7 +187,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({ projectId, projec
           </RadioGroup>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handlePost}>Post Collections</Button>
+          <Button onClick={handlePost} disabled={!canManageProjects}>Post Collections</Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Note: Excel upload/download and actual payment processing require backend integration.

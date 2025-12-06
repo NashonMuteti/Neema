@@ -22,7 +22,8 @@ import { format } from "date-fns";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook
-import { Input } from "@/components/ui/input"; // Import Input for search bar
+import { Input } from "@/components/ui/input"; // Import Input for search
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface Project {
   id: string;
@@ -35,7 +36,14 @@ interface Project {
 }
 
 const Projects = () => {
-  const { isAdmin } = useAuth(); // Use the auth context
+  const { currentUser } = useAuth(); // Use the auth context
+  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+
+  // Determine if the current user has the "Manage Projects" privilege
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+
   // In a real application, this would come from your member management system
   // For now, we'll use a dummy value.
   const activeMembersCount = 5;
@@ -171,7 +179,7 @@ const Projects = () => {
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
           </div>
         </div>
-        {isAdmin && (
+        {canManageProjects && (
           <NewProjectDialog onAddProject={handleAddProject} />
         )}
       </div>
@@ -223,7 +231,7 @@ const Projects = () => {
                     </p>
                     <span className="font-medium text-blue-600">${totalPledges.toFixed(2)}</span>
                   </div>
-                  {isAdmin && (
+                  {canManageProjects && (
                     <div className="flex flex-wrap gap-2 mt-4">
                       <Link to={`/projects/${project.id}/financials`}>
                         <Button variant="outline" size="sm">

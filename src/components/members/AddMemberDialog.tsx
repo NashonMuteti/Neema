@@ -15,12 +15,21 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast";
 import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface AddMemberDialogProps {
   onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string; status: "Active" | "Inactive" | "Suspended" }) => void;
 }
 
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageMembers = currentUserPrivileges.includes("Manage Members");
+
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // State for the uploaded file
@@ -88,7 +97,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button>Add Member</Button>
+        <Button disabled={!canManageMembers}>Add Member</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -107,6 +116,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
+              disabled={!canManageMembers}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -119,6 +129,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="col-span-3"
+              disabled={!canManageMembers}
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
@@ -137,6 +148,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
+                disabled={!canManageMembers}
               />
             </div>
           </div>
@@ -149,6 +161,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               checked={enableLogin}
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)}
               className="col-span-3"
+              disabled={!canManageMembers}
             />
           </div>
           {enableLogin && (
@@ -162,12 +175,13 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
                 value={defaultPassword}
                 onChange={(e) => setDefaultPassword(e.target.value)}
                 className="col-span-3"
+                disabled={!canManageMembers}
               />
             </div>
           )}
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!name || !email || (enableLogin && !defaultPassword)}>
+          <Button onClick={handleSubmit} disabled={!name || !email || (enableLogin && !defaultPassword) || !canManageMembers}>
             <Upload className="mr-2 h-4 w-4" /> Save Member
           </Button>
         </div>

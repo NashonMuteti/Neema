@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 // Dummy financial accounts (should ideally come from a backend/admin setup)
 const financialAccounts = [
@@ -48,7 +49,13 @@ interface ExpenditureTransaction {
 }
 
 const Expenditure = () => {
-  const { isAdmin } = useAuth(); // Use the auth context
+  const { currentUser } = useAuth(); // Use the auth context
+  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageExpenditure = currentUserPrivileges.includes("Manage Expenditure");
+
   // Form State
   const [expenditureDate, setExpenditureDate] = React.useState<Date | undefined>(new Date());
   const [expenditureAmount, setExpenditureAmount] = React.useState("");
@@ -154,6 +161,7 @@ const Expenditure = () => {
                       "w-full justify-start text-left font-normal",
                       !expenditureDate && "text-muted-foreground"
                     )}
+                    disabled={!canManageExpenditure}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {expenditureDate ? format(expenditureDate, "PPP") : <span>Pick a date</span>}
@@ -179,12 +187,13 @@ const Expenditure = () => {
                 placeholder="0.00"
                 value={expenditureAmount}
                 onChange={(e) => setExpenditureAmount(e.target.value)}
+                disabled={!canManageExpenditure}
               />
             </div>
 
             <div className="grid gap-1.5">
               <Label htmlFor="expenditure-account">Debited From Account</Label>
-              <Select value={expenditureAccount} onValueChange={setExpenditureAccount}>
+              <Select value={expenditureAccount} onValueChange={setExpenditureAccount} disabled={!canManageExpenditure}>
                 <SelectTrigger id="expenditure-account">
                   <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
@@ -208,10 +217,11 @@ const Expenditure = () => {
                 placeholder="e.g., Equipment rental, Travel expenses, Office supplies"
                 value={expenditurePurpose}
                 onChange={(e) => setExpenditurePurpose(e.target.value)}
+                disabled={!canManageExpenditure}
               />
             </div>
 
-            <Button onClick={handlePostExpenditure} className="w-full">
+            <Button onClick={handlePostExpenditure} className="w-full" disabled={!canManageExpenditure}>
               Post Expenditure
             </Button>
           </CardContent>
@@ -275,7 +285,7 @@ const Expenditure = () => {
                     <TableHead>Purpose</TableHead>
                     <TableHead>Account</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
-                    {isAdmin && <TableHead className="text-center">Actions</TableHead>}
+                    {canManageExpenditure && <TableHead className="text-center">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -285,7 +295,7 @@ const Expenditure = () => {
                       <TableCell>{tx.purpose}</TableCell>
                       <TableCell>{financialAccounts.find(acc => acc.id === tx.accountId)?.name}</TableCell>
                       <TableCell className="text-right">${tx.amount.toFixed(2)}</TableCell>
-                      {isAdmin && (
+                      {canManageExpenditure && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
                             <Button variant="ghost" size="icon" onClick={() => handleEditTransaction(tx.id)}>

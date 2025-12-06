@@ -17,8 +17,17 @@ import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { useTheme } from "next-themes"; // Import useTheme
 import { showSuccess } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 const AppCustomization = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageAppCustomization = currentUserPrivileges.includes("Manage App Customization");
+
   const { theme, setTheme } = useTheme(); // Get current theme and setter
   const [defaultTheme, setDefaultTheme] = React.useState<string>(theme || "system"); // State for the default theme setting
 
@@ -48,7 +57,7 @@ const AppCustomization = () => {
           </p>
           <div className="grid w-full max-w-sm items-center gap-1.5">
             <Label htmlFor="default-theme">Default Application Theme</Label>
-            <Select value={defaultTheme} onValueChange={setDefaultTheme}>
+            <Select value={defaultTheme} onValueChange={setDefaultTheme} disabled={!canManageAppCustomization}>
               <SelectTrigger id="default-theme">
                 <SelectValue placeholder="Select default theme" />
               </SelectTrigger>
@@ -69,7 +78,7 @@ const AppCustomization = () => {
               This sets the default theme for users who haven't chosen one.
             </p>
           </div>
-          <Button onClick={handleSaveDefaultTheme}>
+          <Button onClick={handleSaveDefaultTheme} disabled={!canManageAppCustomization}>
             <Save className="mr-2 h-4 w-4" /> Save Default Theme
           </Button>
         </CardContent>

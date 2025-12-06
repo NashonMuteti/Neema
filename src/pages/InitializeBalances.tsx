@@ -4,8 +4,17 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import InitializeBalancesDialog from "@/components/admin/InitializeBalancesDialog"; // Import the new dialog
 import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 const InitializeBalances = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances");
+
   const handleInitialize = (balances: Record<string, number>) => {
     // In a real application, this would trigger a backend process
     // to reset or set default values for all account balances.
@@ -31,7 +40,11 @@ const InitializeBalances = () => {
             <span className="font-bold">Warning:</span> This is a critical operation and cannot be easily undone.
             Ensure you have backed up any necessary data before proceeding.
           </p>
-          <InitializeBalancesDialog onInitialize={handleInitialize} /> {/* Use the new dialog */}
+          {canInitializeBalances ? (
+            <InitializeBalancesDialog onInitialize={handleInitialize} />
+          ) : (
+            <p className="text-muted-foreground">You do not have permission to initialize balances.</p>
+          )}
         </CardContent>
       </Card>
     </div>

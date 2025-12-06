@@ -8,8 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Save, Image as ImageIcon, Upload } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useBranding } from "@/context/BrandingContext"; // Import useBranding
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 const BrandSettings = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManageAppCustomization = currentUserPrivileges.includes("Manage App Customization");
+
   const { brandLogoUrl, tagline, setBrandLogoUrl, setTagline } = useBranding(); // Use the branding context
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(brandLogoUrl);
@@ -83,6 +92,7 @@ const BrandSettings = () => {
               accept="image/*"
               onChange={handleFileChange}
               className="flex-1"
+              disabled={!canManageAppCustomization}
             />
           </div>
           <p className="text-sm text-muted-foreground">Upload a new logo image.</p>
@@ -96,11 +106,12 @@ const BrandSettings = () => {
             value={localTagline}
             onChange={(e) => setLocalTagline(e.target.value)}
             placeholder="Your cinematic tagline here."
+            disabled={!canManageAppCustomization}
           />
           <p className="text-sm text-muted-foreground">This tagline appears in reports and footers.</p>
         </div>
 
-        <Button onClick={handleSaveBranding}>
+        <Button onClick={handleSaveBranding} disabled={!canManageAppCustomization}>
           <Save className="mr-2 h-4 w-4" /> Save Brand Settings
         </Button>
       </CardContent>

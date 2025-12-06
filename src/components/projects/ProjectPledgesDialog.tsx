@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/table";
 import { Printer, Download } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface Pledge {
   id: string;
@@ -41,6 +43,13 @@ const dummyPledges: Pledge[] = [
 ];
 
 const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({ projectId, projectName }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+
   const [isOpen, setIsOpen] = React.useState(false);
   const [pledges, setPledges] = React.useState<Pledge[]>(dummyPledges); // Filter by projectId in real app
 
@@ -100,7 +109,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({ projectId, 
                 <TableHead>Member</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-center">Action</TableHead>
+                {canManagePledges && <TableHead className="text-center">Action</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -109,16 +118,18 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({ projectId, 
                   <TableCell className="font-medium">{pledge.member}</TableCell>
                   <TableCell className="text-right">${pledge.amount.toFixed(2)}</TableCell>
                   <TableCell className="text-center">{pledge.status}</TableCell>
-                  <TableCell className="text-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePayPledge(pledge.id, pledge.member, pledge.amount)}
-                      disabled={pledge.status === "Paid"}
-                    >
-                      Pay
-                    </Button>
-                  </TableCell>
+                  {canManagePledges && (
+                    <TableCell className="text-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePayPledge(pledge.id, pledge.member, pledge.amount)}
+                        disabled={pledge.status === "Paid"}
+                      >
+                        Pay
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

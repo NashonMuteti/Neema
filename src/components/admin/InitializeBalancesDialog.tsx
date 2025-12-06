@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
 interface Account {
   id: string;
@@ -32,6 +34,13 @@ const dummyAccounts: Account[] = [
 ];
 
 const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onInitialize }) => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances");
+
   const [isOpen, setIsOpen] = React.useState(false);
   const [newBalances, setNewBalances] = React.useState<Record<string, string>>({});
 
@@ -73,7 +82,7 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="destructive">Initialize All Balances</Button>
+        <Button variant="destructive" disabled={!canInitializeBalances}>Initialize All Balances</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -99,12 +108,13 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
                 onChange={(e) => handleBalanceChange(account.id, e.target.value)}
                 className="col-span-2"
                 placeholder="0.00"
+                disabled={!canInitializeBalances}
               />
             </div>
           ))}
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit}>Confirm Initialization</Button>
+          <Button onClick={handleSubmit} disabled={!canInitializeBalances}>Confirm Initialization</Button>
         </div>
         <p className="text-sm text-destructive-foreground bg-destructive/10 p-3 rounded-md border border-destructive mt-2">
           <span className="font-bold">Warning:</span> This action will overwrite existing balances.
