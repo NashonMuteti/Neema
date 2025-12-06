@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, DollarSign, Handshake } from "lucide-react";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook
 
 // Dummy data for projects (to get project name)
 const dummyProjects = [
@@ -86,6 +87,8 @@ const ProjectFinancialsDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const project = dummyProjects.find(p => p.id === projectId);
 
+  const { totalCollections, totalPledges } = useProjectFinancials(projectId || ""); // Use the hook
+
   if (!project) {
     return (
       <div className="space-y-6 text-center">
@@ -105,9 +108,6 @@ const ProjectFinancialsDetail: React.FC = () => {
   const projectCollections = allProjectCollections.filter(c => c.projectId === projectId);
   const projectPledges = allProjectPledges.filter(p => p.projectId === projectId);
 
-  const totalCollections = projectCollections.reduce((sum, c) => sum + c.amount, 0);
-  const totalPledges = projectPledges.reduce((sum, p) => sum + p.amount, 0);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -121,6 +121,34 @@ const ProjectFinancialsDetail: React.FC = () => {
       <p className="text-lg text-muted-foreground">
         Overview of all collections and pledges related to this project.
       </p>
+
+      {/* Financial Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalCollections.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">
+              All recorded contributions for this project.
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Pledged</CardTitle>
+            <Handshake className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalPledges.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">
+              Total outstanding and paid pledges.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Collections Section */}
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
