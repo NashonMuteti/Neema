@@ -37,9 +37,10 @@ import {
   isWithinInterval,
   parseISO,
 } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ChevronDown } from "lucide-react"; // Added ChevronDown icon
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button"; // Added Button import
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible components
 
 interface FinancialAccount {
   id: string;
@@ -86,6 +87,7 @@ const TableBankingSummary: React.FC = () => {
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const [selectedMonth, setSelectedMonth] = React.useState<string>(currentMonth.toString());
   const [selectedYear, setSelectedYear] = React.useState<string>(currentYear.toString());
+  const [openCollapsibles, setOpenCollapsibles] = React.useState<Record<string, boolean>>({}); // State for open collapsibles
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -158,6 +160,13 @@ const TableBankingSummary: React.FC = () => {
       default:
         return "";
     }
+  };
+
+  const toggleCollapsible = (accountId: string) => {
+    setOpenCollapsibles(prev => ({
+      ...prev,
+      [accountId]: !prev[accountId],
+    }));
   };
 
   return (
@@ -279,21 +288,65 @@ const TableBankingSummary: React.FC = () => {
                 <TableRow>
                   <TableHead>Financial Account</TableHead>
                   <TableHead className="text-right">Total Contributions</TableHead>
+                  <TableHead className="w-[40px]"></TableHead> {/* For the chevron icon */}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {financialAccounts.map((account) => {
                   const total = groupedContributions[account.id] || 0;
+                  const accountCollections = filteredCollections.filter(c => c.accountId === account.id);
+                  const isOpen = openCollapsibles[account.id];
+
                   return (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium">{account.name}</TableCell>
-                      <TableCell className="text-right">${total.toFixed(2)}</TableCell>
-                    </TableRow>
+                    <React.Fragment key={account.id}>
+                      <TableRow className="hover:bg-muted/50">
+                        <TableCell className="font-medium">{account.name}</TableCell>
+                        <TableCell className="text-right">${total.toFixed(2)}</TableCell>
+                        <TableCell>
+                          {accountCollections.length > 0 && (
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => toggleCollapsible(account.id)}>
+                                <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isOpen && "rotate-180")} />
+                                <span className="sr-only">Toggle details</span>
+                              </Button>
+                            </CollapsibleTrigger>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                      {accountCollections.length > 0 && (
+                        <TableRow>
+                          <TableCell colSpan={3} className="p-0">
+                            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                              <div className="py-2 pl-8 pr-4 bg-muted/30">
+                                <h4 className="text-sm font-semibold mb-2">Individual Contributions:</h4>
+                                <Table className="w-full text-sm">
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="w-[120px]">Date</TableHead>
+                                      <TableHead className="text-right">Amount</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {accountCollections.map(collection => (
+                                      <TableRow key={collection.id}>
+                                        <TableCell>{format(parseISO(collection.date), "MMM dd, yyyy")}</TableCell>
+                                        <TableCell className="text-right">${collection.amount.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </CollapsibleContent>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   );
                 })}
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                   <TableCell>Grand Total</TableCell>
                   <TableCell className="text-right">${grandTotal.toFixed(2)}</TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
