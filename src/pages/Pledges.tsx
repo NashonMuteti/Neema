@@ -18,7 +18,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { format, getMonth, getYear, isBefore, startOfDay } from "date-fns";
-import { CalendarIcon, Edit, Trash2, CheckCircle } from "lucide-react";
+import { CalendarIcon, Edit, Trash2, CheckCircle, Search } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import {
   Table,
@@ -77,6 +77,7 @@ const Pledges = () => {
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Paid" | "Overdue">("All");
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
+  const [searchQuery, setSearchQuery] = React.useState(""); // New: Search query state
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -105,7 +106,11 @@ const Pledges = () => {
     const pledgeYear = getYear(pledge.dueDate);
     const matchesDate = pledgeMonth.toString() === filterMonth && pledgeYear.toString() === filterYear;
 
-    return matchesStatus && matchesDate;
+    const memberName = dummyMembers.find(m => m.id === pledge.memberId)?.name.toLowerCase() || "";
+    const projectName = dummyProjects.find(p => p.id === pledge.projectId)?.name.toLowerCase() || "";
+    const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || projectName.includes(searchQuery.toLowerCase());
+
+    return matchesStatus && matchesDate && matchesSearch;
   }).sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime()); // Sort by due date descending
 
   const handleRecordPledge = () => {
@@ -322,6 +327,17 @@ const Pledges = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {/* New: Search Input */}
+              <div className="relative flex items-center flex-1 min-w-[180px]">
+                <Input
+                  type="text"
+                  placeholder="Search member/project..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8"
+                />
+                <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
 
             {filteredPledges.length > 0 ? (
@@ -339,10 +355,12 @@ const Pledges = () => {
                 <TableBody>
                   {filteredPledges.map((pledge) => {
                     const status = getPledgeStatus(pledge);
+                    const memberName = dummyMembers.find(m => m.id === pledge.memberId)?.name;
+                    const projectName = dummyProjects.find(p => p.id === pledge.projectId)?.name;
                     return (
                       <TableRow key={pledge.id}>
-                        <TableCell className="font-medium">{dummyMembers.find(m => m.id === pledge.memberId)?.name}</TableCell>
-                        <TableCell>{dummyProjects.find(p => p.id === pledge.projectId)?.name}</TableCell>
+                        <TableCell className="font-medium">{memberName}</TableCell>
+                        <TableCell>{projectName}</TableCell>
                         <TableCell className="text-right">${pledge.amount.toFixed(2)}</TableCell>
                         <TableCell>{format(pledge.dueDate, "MMM dd, yyyy")}</TableCell>
                         <TableCell className="text-center">
@@ -373,7 +391,7 @@ const Pledges = () => {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground">No pledges found for the selected period and status.</p>
+              <p className="text-muted-foreground">No pledges found for the selected period or matching your search.</p>
             )}
           </CardContent>
         </Card>
