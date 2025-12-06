@@ -17,10 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon, CalendarIcon, DollarSign } from "lucide-react";
+import { Image as ImageIcon, CalendarIcon, DollarSign, Handshake } from "lucide-react"; // Added Handshake icon
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook
 
 interface Project {
   id: string;
@@ -165,6 +166,8 @@ const Projects = () => {
         {filteredProjects.length > 0 ? (
           filteredProjects.map((project) => {
             const expectedAmount = (project.memberContributionAmount || 0) * activeMembersCount;
+            const { totalCollections, totalPledges } = useProjectFinancials(project.id); // Use the hook
+
             return (
               <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">
                 <CardHeader>
@@ -195,6 +198,18 @@ const Projects = () => {
                   <p className="text-sm">
                     Expected Total (from {activeMembersCount} members): <span className="font-medium">${expectedAmount.toFixed(2)}</span>
                   </p>
+                  <div className="flex items-center justify-between text-sm">
+                    <p className="flex items-center gap-1">
+                      <DollarSign className="h-4 w-4 text-green-600" /> Collected:
+                    </p>
+                    <span className="font-medium text-green-600">${totalCollections.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <p className="flex items-center gap-1">
+                      <Handshake className="h-4 w-4 text-blue-600" /> Pledged:
+                    </p>
+                    <span className="font-medium text-blue-600">${totalPledges.toFixed(2)}</span>
+                  </div>
                   {isAdmin && (
                     <div className="flex flex-wrap gap-2 mt-4">
                       <Link to={`/projects/${project.id}/financials`}>
