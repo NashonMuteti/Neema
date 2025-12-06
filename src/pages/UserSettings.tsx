@@ -5,7 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch"; // Assuming Switch component is available
+import { Switch } from "@/components/ui/switch";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { showSuccess } from "@/utils/toast";
+
+// Define the schema for form validation
+const userSettingsSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email address"),
+  receiveNotifications: z.boolean(),
+});
+
+type UserSettingsFormValues = z.infer<typeof userSettingsSchema>;
 
 const UserSettings = () => {
   // Placeholder for user data, will be replaced with actual user context
@@ -16,14 +29,24 @@ const UserSettings = () => {
     themePreference: "system",
   };
 
-  const [userName, setUserName] = React.useState(currentUser.name);
-  const [userEmail, setUserEmail] = React.useState(currentUser.email);
-  const [notifications, setNotifications] = React.useState(currentUser.receiveNotifications);
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = useForm<UserSettingsFormValues>({
+    resolver: zodResolver(userSettingsSchema),
+    defaultValues: {
+      name: currentUser.name,
+      email: currentUser.email,
+      receiveNotifications: currentUser.receiveNotifications,
+    },
+  });
 
-  const handleSaveSettings = () => {
+  const onSubmit = (data: UserSettingsFormValues) => {
     // In a real app, this would send updated settings to the backend
-    console.log("Saving user settings:", { userName, userEmail, notifications });
-    // showSuccess("Settings saved successfully!"); // Assuming a toast utility
+    console.log("Saving user settings:", data);
+    showSuccess("Settings saved successfully!");
   };
 
   return (
@@ -33,41 +56,55 @@ const UserSettings = () => {
         Manage your personal account information and preferences.
       </p>
 
-      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid w-full max-w-sm items-center gap-1.5">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} />
-          </div>
-          <div className="grid w-full max-w-sm items-center gap-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} disabled />
-            <p className="text-sm text-muted-foreground">Email cannot be changed here.</p>
-          </div>
-          <Button onClick={handleSaveSettings}>Save Changes</Button>
-        </CardContent>
-      </Card>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+          <CardHeader>
+            <CardTitle>Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid w-full max-w-sm items-center gap-1.5">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" type="text" {...register("name")} />
+              {errors.name && (
+                <p className="text-sm text-destructive">{errors.name.message}</p>
+              )}
+            </div>
+            <div className="grid w-full max-w-sm items-center gap-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" {...register("email")} disabled />
+              <p className="text-sm text-muted-foreground">Email cannot be changed here.</p>
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email.message}</p>
+              )}
+            </div>
+            <Button type="submit">Save Changes</Button>
+          </CardContent>
+        </Card>
 
-      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
-          <CardTitle>Preferences</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between w-full max-w-sm">
-            <Label htmlFor="notifications">Receive Email Notifications</Label>
-            <Switch
-              id="notifications"
-              checked={notifications}
-              onCheckedChange={setNotifications}
-            />
-          </div>
-          {/* Theme preference is handled by the ThemeToggle in the header */}
-          <Button onClick={handleSaveSettings}>Save Preferences</Button>
-        </CardContent>
-      </Card>
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+          <CardHeader>
+            <CardTitle>Preferences</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between w-full max-w-sm">
+              <Label htmlFor="notifications">Receive Email Notifications</Label>
+              <Controller
+                name="receiveNotifications"
+                control={control}
+                render={({ field }) => (
+                  <Switch
+                    id="notifications"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+            {/* Theme preference is handled by the ThemeToggle in the header */}
+            <Button type="submit">Save Preferences</Button>
+          </CardContent>
+        </Card>
+      </form>
     </div>
   );
 };
