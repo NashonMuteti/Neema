@@ -79,6 +79,9 @@ const MyContributions: React.FC = () => {
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState(""); // Search query for All Contributions tab
 
+  // For demonstration, assume logged-in user is "m1" (Alice Johnson)
+  const loggedInMemberId = "m1"; 
+
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
     label: format(new Date(0, i), "MMMM"),
@@ -125,17 +128,21 @@ const MyContributions: React.FC = () => {
     );
   };
 
-  // --- Logic for "All Contributions" tab ---
-  const filteredAllContributions: AllContribution[] = React.useMemo(() => {
-    return allMembersContributions.filter(contribution => { // Used named export directly
+  // --- Logic for "My Detailed Contributions" tab ---
+  const filteredMyDetailedContributions: AllContribution[] = React.useMemo(() => {
+    return allMembersContributions.filter(contribution => {
       const contributionDate = parseISO(contribution.date);
       const matchesDate = getMonth(contributionDate).toString() === filterMonth && getYear(contributionDate).toString() === filterYear;
       const matchesSearch = contribution.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             contribution.projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             contribution.memberEmail.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesDate && matchesSearch;
+      
+      // Filter by logged-in user's ID
+      const matchesLoggedInUser = contribution.memberId === loggedInMemberId;
+
+      return matchesDate && matchesSearch && matchesLoggedInUser;
     }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()); // Sort by date descending
-  }, [filterMonth, filterYear, searchQuery]);
+  }, [filterMonth, filterYear, searchQuery, loggedInMemberId]);
 
   return (
     <div className="space-y-6">
@@ -147,7 +154,7 @@ const MyContributions: React.FC = () => {
       <Tabs defaultValue="my-contributions" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="my-contributions">My Contributions</TabsTrigger>
-          <TabsTrigger value="all-contributions">All Contributions</TabsTrigger>
+          <TabsTrigger value="my-detailed-contributions">My Detailed Contributions</TabsTrigger>
         </TabsList>
 
         {/* My Contributions Tab Content */}
@@ -288,11 +295,11 @@ const MyContributions: React.FC = () => {
           </Card>
         </TabsContent>
 
-        {/* All Contributions Tab Content */}
-        <TabsContent value="all-contributions" className="space-y-6 mt-6">
+        {/* My Detailed Contributions Tab Content */}
+        <TabsContent value="my-detailed-contributions" className="space-y-6 mt-6">
           <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
             <CardHeader>
-              <CardTitle>All Contributions Overview for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
+              <CardTitle>My Detailed Contributions Overview for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
@@ -336,7 +343,7 @@ const MyContributions: React.FC = () => {
                   <div className="relative flex items-center">
                     <Input
                       type="text"
-                      placeholder="Search member/project..."
+                      placeholder="Search project..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-8"
@@ -346,11 +353,10 @@ const MyContributions: React.FC = () => {
                 </div>
               </div>
 
-              {filteredAllContributions.length > 0 ? (
+              {filteredMyDetailedContributions.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Member</TableHead>
                       <TableHead>Project</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead className="text-right">Contributed</TableHead>
@@ -359,12 +365,11 @@ const MyContributions: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAllContributions.map((contribution) => {
+                    {filteredMyDetailedContributions.map((contribution) => {
                       const status = getContributionStatus(contribution.amount, contribution.expected);
                       return (
                         <TableRow key={contribution.id}>
-                          <TableCell className="font-medium">{contribution.memberName}</TableCell>
-                          <TableCell>{contribution.projectName}</TableCell>
+                          <TableCell className="font-medium">{contribution.projectName}</TableCell>
                           <TableCell>{format(parseISO(contribution.date), "MMM dd, yyyy")}</TableCell>
                           <TableCell className="text-right">${contribution.amount.toFixed(2)}</TableCell>
                           <TableCell className="text-right">${contribution.expected.toFixed(2)}</TableCell>
