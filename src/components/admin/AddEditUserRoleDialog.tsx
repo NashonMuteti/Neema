@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast";
 import { Save } from "lucide-react";
-import { navItems, NavItem, NavHeading } from "@/components/Sidebar"; // Import NavItem and NavHeading
+import { navItems, NavItem, NavHeading, PrivilegeItem } from "@/components/Sidebar"; // Import NavItem, NavHeading, and PrivilegeItem
 
 export interface UserRole {
   id: string;
@@ -80,7 +80,7 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"> {/* Increased width and added scroll */}
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{initialData ? "Edit User Role" : "Add New User Role"}</DialogTitle>
           <DialogDescription>
@@ -115,12 +115,12 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
           <div className="col-span-full mt-4">
             <h3 className="text-lg font-semibold mb-2">Menu Privileges</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Select the menu items this role should have access to.
+              Select the menu items and specific privileges this role should have access to.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               {navItems.map((item) => {
                 if (item.type === "heading") {
-                  const headingItem = item as NavHeading; // Type assertion
+                  const headingItem = item as NavHeading;
                   return (
                     <div key={headingItem.name} className="col-span-full">
                       <h4 className="font-medium text-sm mt-4 mb-2">{headingItem.name}</h4>
@@ -141,16 +141,16 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
                     </div>
                   );
                 } else {
-                  const navItem = item as NavItem; // Type assertion
+                  const currentItem = item as (NavItem | PrivilegeItem); // Handle both NavItem and PrivilegeItem
                   return (
-                    <div key={navItem.name} className="flex items-center space-x-2">
+                    <div key={currentItem.name} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`privilege-${navItem.name}`}
-                        checked={selectedMenuPrivileges.includes(navItem.name)}
-                        onCheckedChange={(checked) => handlePrivilegeChange(navItem.name, checked as boolean)}
+                        id={`privilege-${currentItem.name}`}
+                        checked={selectedMenuPrivileges.includes(currentItem.name)}
+                        onCheckedChange={(checked) => handlePrivilegeChange(currentItem.name, checked as boolean)}
                       />
-                      <Label htmlFor={`privilege-${navItem.name}`} className="text-sm font-normal cursor-pointer">
-                        {navItem.name}
+                      <Label htmlFor={`privilege-${currentItem.name}`} className="text-sm font-normal cursor-pointer">
+                        {currentItem.name}
                       </Label>
                     </div>
                   );

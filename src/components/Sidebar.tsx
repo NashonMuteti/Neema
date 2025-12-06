@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote, ShoppingCart, Package, Scale } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext";
-import { useUserRoles } from "@/context/UserRolesContext"; // Added missing import
+import { useUserRoles } from "@/context/UserRolesContext";
 
 export interface NavItem {
   name: string;
@@ -23,7 +23,13 @@ export interface NavHeading {
   children: NavItem[];
 }
 
-type SidebarItem = NavItem | NavHeading;
+export interface PrivilegeItem { // New interface for privilege-only items
+  name: string;
+  type: "privilege";
+  requiredRoles?: string[]; // Who can assign this privilege (optional, for future use)
+}
+
+type SidebarItem = NavItem | NavHeading | PrivilegeItem; // Union type for all sidebar items
 
 export const navItems: SidebarItem[] = [
   {
@@ -167,12 +173,17 @@ export const navItems: SidebarItem[] = [
     icon: Settings,
     requiredRoles: ["Admin"],
   },
+  {
+    name: "Manage Members", // This is the privilege item
+    type: "privilege",
+    requiredRoles: ["Admin"], // Only Admin can assign this privilege
+  },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
   const { currentUser } = useAuth();
-  const { userRoles: definedRoles } = useUserRoles(); // Use the hook
+  const { userRoles: definedRoles } = useUserRoles();
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
   const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false);
@@ -187,7 +198,7 @@ const Sidebar = () => {
 
   React.useEffect(() => {
     const isChildOfReports = navItems.some(item =>
-      (item as NavHeading).type === "heading" && item.name === "Reports" && (item as NavHeading).children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
+      (item.type === "heading" && item.name === "Reports" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles)))
     );
     if (isChildOfReports) {
       setIsReportsOpen(true);
@@ -196,7 +207,7 @@ const Sidebar = () => {
     }
 
     const isChildOfActions = navItems.some(item =>
-      (item as NavHeading).type === "heading" && item.name === "Actions" && (item as NavHeading).children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
+      (item.type === "heading" && item.name === "Actions" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles)))
     );
     if (isChildOfActions) {
       setIsActionsOpen(true);
@@ -205,7 +216,7 @@ const Sidebar = () => {
     }
 
     const isChildOfSalesManagement = navItems.some(item =>
-      (item as NavHeading).type === "heading" && item.name === "Sales Management" && (item as NavHeading).children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
+      (item.type === "heading" && item.name === "Sales Management" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles)))
     );
     if (isChildOfSalesManagement) {
       setIsSalesManagementOpen(true);
@@ -219,6 +230,10 @@ const Sidebar = () => {
     <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">
       <nav className="flex-1 space-y-2">
         {navItems.map((item) => {
+          if (item.type === "privilege") { // Do not render privilege-only items as links
+            return null;
+          }
+
           if (!hasRequiredRole(item.requiredRoles)) {
             return null;
           }
