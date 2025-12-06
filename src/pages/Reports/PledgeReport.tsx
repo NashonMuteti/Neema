@@ -52,7 +52,7 @@ const PledgeReport = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Pledge Report</h1>
+      <h1 className="text-3xl font-bold text-foreground">Pledge Report</h1>
       <p className="text-lg text-muted-foreground">
         View active pledges from members across all projects and process payments.
       </p>

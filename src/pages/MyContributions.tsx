@@ -82,7 +82,7 @@ const MyContributions: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">My Contributions</h1>
+      <h1 className="text-3xl font-bold text-foreground">My Contributions</h1>
       <p className="text-lg text-muted-foreground">
         View your personal contributions to all open projects.
       </p>

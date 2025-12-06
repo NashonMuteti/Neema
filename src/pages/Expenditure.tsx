@@ -128,7 +128,7 @@ const Expenditure = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Expenditure</h1>
+      <h1 className="text-3xl font-bold text-foreground">Expenditure</h1>
       <p className="text-lg text-muted-foreground">
         Record and manage all financial outflows.
       </p>

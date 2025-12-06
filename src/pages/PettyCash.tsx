@@ -5,7 +5,7 @@ import React from "react";
 const PettyCash = () => {
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Petty Cash Expenditures</h1>
+      <h1 className="text-3xl font-bold text-foreground">Petty Cash Expenditures</h1>
       <p className="text-lg text-muted-foreground">
         Track and manage all petty cash expenses.
       </p>

@@ -87,7 +87,7 @@ const MemberContributionsDetail: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">{memberName}'s Contributions</h1>
+      <h1 className="text-3xl font-bold text-foreground">{memberName}'s Contributions</h1>
       <p className="text-lg text-muted-foreground">
         Detailed view of {memberName}'s contributions to projects.
       </p>

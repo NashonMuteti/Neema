@@ -21,7 +21,7 @@ const dummyUserActivity = [
 const UserActivityReport = () => {
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">User Activity Report</h1>
+      <h1 className="text-3xl font-bold text-foreground">User Activity Report</h1>
       <p className="text-lg text-muted-foreground">
         Track and review all user actions within the application.
       </p>

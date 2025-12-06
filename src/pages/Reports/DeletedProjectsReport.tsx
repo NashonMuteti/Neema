@@ -37,7 +37,7 @@ const DeletedProjectsReport = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Deleted Projects Report</h1>
+      <h1 className="text-3xl font-bold text-foreground">Deleted Projects Report</h1>
       <p className="text-lg text-muted-foreground">
         View and manage projects that have been marked as deleted.
       </p>

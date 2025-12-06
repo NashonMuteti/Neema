@@ -5,7 +5,7 @@ import React from "react";
 const PettyCashReport = () => {
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Petty Cash Expenditures Report</h1>
+      <h1 className="text-3xl font-bold text-foreground">Petty Cash Expenditures Report</h1>
       <p className="text-lg text-muted-foreground">
         Generate reports on all petty cash transactions and spending patterns.
       </p>

@@ -5,7 +5,7 @@ import React from "react";
 const Pledges = () => {
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Manage Pledges</h1>
+      <h1 className="text-3xl font-bold text-foreground">Manage Pledges</h1>
       <p className="text-lg text-muted-foreground">
         Record and track financial commitments (pledges) from members for various projects.
       </p>

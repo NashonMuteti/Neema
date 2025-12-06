@@ -124,7 +124,7 @@ const Members = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Members</h1>
+      <h1 className="text-3xl font-bold text-foreground">Members</h1>
       <p className="text-lg text-muted-foreground">
         View and manage all members of your organization.
       </p>

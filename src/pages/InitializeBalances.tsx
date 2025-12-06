@@ -17,7 +17,7 @@ const InitializeBalances = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Initialize Account Balances</h1>
+      <h1 className="text-3xl font-bold text-foreground">Initialize Account Balances</h1>
       <p className="text-lg text-muted-foreground">
         Use this feature to reset or set default values for all financial accounts in the system.
         This action is typically performed when starting fresh or during major financial resets.

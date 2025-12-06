@@ -138,7 +138,7 @@ const Projects = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Project Accounts</h1>
+      <h1 className="text-3xl font-bold text-foreground">Project Accounts</h1>
       <p className="text-lg text-muted-foreground">
         Manage your project-specific financial contributions and reports here.
       </p>

@@ -5,7 +5,7 @@ import React from "react";
 const MemberContributions = () => {
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary-foreground">Member Contributions per Project</h1>
+      <h1 className="text-3xl font-bold text-foreground">Member Contributions per Project</h1>
       <p className="text-lg text-muted-foreground">
         View detailed reports on member contributions across various projects.
       </p>

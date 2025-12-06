@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, User, Shield } from "lucide-react"; // Added Shield icon for Admin
 import { ThemeToggle } from "./ThemeToggle";
-import { GroupSelector } from "./GroupSelector";
 import { LanguageSelector } from "./LanguageSelector"; // Import LanguageSelector
 
 const Header = () => {
@@ -35,7 +34,6 @@ const Header = () => {
         </Link>
       </div>
       <div className="flex items-center space-x-4">
-        <GroupSelector />
         <LanguageSelector /> {/* Integrated LanguageSelector */}
         <ThemeToggle />
         {user.isAdmin && ( // Only show Admin menu if user is admin
