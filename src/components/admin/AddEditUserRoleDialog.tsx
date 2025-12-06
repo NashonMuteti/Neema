@@ -12,10 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
+import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast";
 import { Save } from "lucide-react";
-import { navItems } from "@/components/Sidebar"; // Import navItems from Sidebar
+import { navItems, NavItem, NavHeading } from "@/components/Sidebar"; // Import NavItem and NavHeading
 
 export interface UserRole {
   id: string;
