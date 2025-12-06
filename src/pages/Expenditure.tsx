@@ -18,7 +18,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { format, getMonth, getYear } from "date-fns";
-import { CalendarIcon, Edit, Trash2 } from "lucide-react";
+import { CalendarIcon, Edit, Trash2, Search } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -69,6 +69,7 @@ const Expenditure = () => {
   const currentMonth = getMonth(new Date()); // 0-indexed
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
+  const [searchQuery, setSearchQuery] = React.useState(""); // New: Search query state
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -79,11 +80,15 @@ const Expenditure = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const filteredTransactions = transactions.filter(tx => {
-    const txMonth = getMonth(tx.date);
-    const txYear = getYear(tx.date);
-    return txMonth.toString() === filterMonth && txYear.toString() === filterYear;
-  }).sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+  const filteredTransactions = React.useMemo(() => {
+    return transactions.filter(tx => {
+      const txMonth = getMonth(tx.date);
+      const txYear = getYear(tx.date);
+      const matchesDate = txMonth.toString() === filterMonth && txYear.toString() === filterYear;
+      const matchesSearch = tx.purpose.toLowerCase().includes(searchQuery.toLowerCase()); // New: Filter by search query
+      return matchesDate && matchesSearch;
+    }).sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+  }, [transactions, filterMonth, filterYear, searchQuery]); // Added searchQuery to dependencies
 
   const handlePostExpenditure = () => {
     if (!expenditureDate || !expenditureAmount || !expenditureAccount || !expenditurePurpose) {
@@ -249,6 +254,17 @@ const Expenditure = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {/* New: Search Input */}
+              <div className="relative flex items-center flex-1 min-w-[180px]">
+                <Input
+                  type="text"
+                  placeholder="Search purpose..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8"
+                />
+                <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
 
             {filteredTransactions.length > 0 ? (
@@ -286,7 +302,7 @@ const Expenditure = () => {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground">No expenditure transactions found for the selected period.</p>
+              <p className="text-muted-foreground">No expenditure transactions found for the selected period or matching your search.</p>
             )}
           </CardContent>
         </Card>
