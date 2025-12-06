@@ -3,28 +3,29 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote, ShoppingCart, Package, Scale } from "lucide-react"; // Added ShoppingCart, Package, Scale icons
+import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote, ShoppingCart, Package, Scale } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext"; // Added missing import
 
-export interface NavItem { // Exported NavItem
+export interface NavItem {
   name: string;
   href: string;
   icon: React.ElementType;
-  requiredRoles?: string[]; // Roles required to see this item
-  type?: "item"; // Explicitly define type for NavItem
+  requiredRoles?: string[];
+  type?: "item";
 }
 
-export interface NavHeading { // Exported NavHeading
+export interface NavHeading {
   name: string;
   type: "heading";
-  requiredRoles?: string[]; // Roles required to see this heading
+  requiredRoles?: string[];
   children: NavItem[];
 }
 
 type SidebarItem = NavItem | NavHeading;
 
-export const navItems: SidebarItem[] = [ // Added export here
+export const navItems: SidebarItem[] = [
   {
     name: "Dashboard",
     href: "/",
@@ -62,9 +63,9 @@ export const navItems: SidebarItem[] = [ // Added export here
     requiredRoles: ["Admin", "Project Manager"],
   },
   {
-    name: "Sales Management", // New Heading
+    name: "Sales Management",
     type: "heading",
-    requiredRoles: ["Admin", "Project Manager"], // Accessible to Admin and Project Manager
+    requiredRoles: ["Admin", "Project Manager"],
     children: [
       {
         name: "Stocks",
@@ -90,13 +91,13 @@ export const navItems: SidebarItem[] = [ // Added export here
     name: "Members",
     href: "/members",
     icon: Users,
-    requiredRoles: ["Admin", "Project Manager", "Manage Members"], // Added "Manage Members"
+    requiredRoles: ["Admin", "Project Manager", "Manage Members"],
   },
   {
     name: "Board Members",
     href: "/board-members",
     icon: UserCog,
-    requiredRoles: ["Admin"], // Only Admin can see this
+    requiredRoles: ["Admin"],
   },
   {
     name: "Reports",
@@ -131,26 +132,26 @@ export const navItems: SidebarItem[] = [ // Added export here
         name: "User Activity Report",
         href: "/reports/user-activity",
         icon: Activity,
-        requiredRoles: ["Admin"], // Only Admin can see this
+        requiredRoles: ["Admin"],
       },
       {
         name: "Deleted Projects Report",
         href: "/reports/deleted-projects",
         icon: FolderX,
-        requiredRoles: ["Admin"], // Only Admin can see this
+        requiredRoles: ["Admin"],
       },
     ],
   },
   {
     name: "Actions",
     type: "heading",
-    requiredRoles: ["Admin"], // Only Admin can see this heading
+    requiredRoles: ["Admin"],
     children: [
       {
         name: "Initialize Balances",
         href: "/initialize-balances",
         icon: RefreshCcw,
-        requiredRoles: ["Admin"], // Only Admin can see this
+        requiredRoles: ["Admin"],
       },
     ],
   },
@@ -164,30 +165,26 @@ export const navItems: SidebarItem[] = [ // Added export here
     name: "Admin Settings",
     href: "/admin/settings",
     icon: Settings,
-    requiredRoles: ["Admin"], // Only Admin can see this
+    requiredRoles: ["Admin"],
   },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
-  const { currentUser } = useAuth(); // Use currentUser from AuthContext
-  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles(); // Use the hook
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
-  const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false); // New state for Sales Management
+  const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false);
 
-  // Get the current user's role definition to check privileges
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
 
-  // Helper to check if user has any of the required roles or specific privileges
   const hasRequiredRole = (requiredRoles?: string[]) => {
-    if (!requiredRoles || requiredRoles.length === 0) return true; // No roles required, so accessible
-    // Check if the user's current role name is in requiredRoles OR if any of the user's privileges are in requiredRoles
+    if (!requiredRoles || requiredRoles.length === 0) return true;
     return requiredRoles.some(role => currentUser?.role === role || currentUserPrivileges.includes(role));
   };
 
-  // Open reports/actions/sales management collapsible if any child route is active and user has access
   React.useEffect(() => {
     const isChildOfReports = navItems.some(item =>
       (item as NavHeading).type === "heading" && item.name === "Reports" && (item as NavHeading).children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles))
@@ -195,7 +192,7 @@ const Sidebar = () => {
     if (isChildOfReports) {
       setIsReportsOpen(true);
     } else {
-      setIsReportsOpen(false); // Close if no child is active
+      setIsReportsOpen(false);
     }
 
     const isChildOfActions = navItems.some(item =>
@@ -204,7 +201,7 @@ const Sidebar = () => {
     if (isChildOfActions) {
       setIsActionsOpen(true);
     } else {
-      setIsActionsOpen(false); // Close if no child is active
+      setIsActionsOpen(false);
     }
 
     const isChildOfSalesManagement = navItems.some(item =>
@@ -213,7 +210,7 @@ const Sidebar = () => {
     if (isChildOfSalesManagement) {
       setIsSalesManagementOpen(true);
     } else {
-      setIsSalesManagementOpen(false); // Close if no child is active
+      setIsSalesManagementOpen(false);
     }
   }, [location.pathname, currentUser, currentUserPrivileges, definedRoles]);
 
@@ -223,11 +220,11 @@ const Sidebar = () => {
       <nav className="flex-1 space-y-2">
         {navItems.map((item) => {
           if (!hasRequiredRole(item.requiredRoles)) {
-            return null; // Hide item if user doesn't have required roles
+            return null;
           }
 
           if (item.type === "heading") {
-            const headingItem = item as NavHeading; // Type assertion
+            const headingItem = item as NavHeading;
             let isOpen = false;
             let setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -237,20 +234,18 @@ const Sidebar = () => {
             } else if (headingItem.name === "Actions") {
               isOpen = isActionsOpen;
               setIsOpen = setIsActionsOpen;
-            } else if (headingItem.name === "Sales Management") { // Handle new heading
+            } else if (headingItem.name === "Sales Management") {
               isOpen = isSalesManagementOpen;
               setIsOpen = setIsSalesManagementOpen;
             } else {
-              // Default for other headings if any are added later
               isOpen = false;
-              setIsOpen = () => {}; // No-op setter
+              setIsOpen = () => {};
             }
 
-            // Filter children based on user roles
             const visibleChildren = headingItem.children.filter(child => hasRequiredRole(child.requiredRoles));
 
             if (visibleChildren.length === 0) {
-              return null; // Hide heading if no children are visible
+              return null;
             }
 
             return (
@@ -277,7 +272,7 @@ const Sidebar = () => {
               </Collapsible>
             );
           } else {
-            const navItem = item as NavItem; // Type assertion
+            const navItem = item as NavItem;
             return (
               <Link
                 key={navItem.name}
