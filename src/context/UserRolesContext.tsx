@@ -14,9 +14,56 @@ const UserRolesContext = createContext<UserRolesContextType | undefined>(undefin
 
 export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [userRoles, setUserRoles] = useState<UserRoleType[]>([
-    { id: "r1", name: "Admin", description: "Full access to all features and settings.", memberUserIds: ["u1"], menuPrivileges: ["Dashboard", "Project Accounts", "Petty Cash", "Pledges", "Income", "Expenditure", "Members", "Board Members", "Reports", "Member Contributions", "Petty Cash Report", "Pledge Report", "Table Banking Summary", "User Activity Report", "Deleted Projects Report", "Actions", "Initialize Balances", "My Contributions", "Admin Settings", "Manage Members"] },
-    { id: "r2", name: "Project Manager", description: "Can create and manage projects, view reports.", memberUserIds: ["u2"], menuPrivileges: ["Dashboard", "Project Accounts", "Petty Cash", "Pledges", "Income", "Expenditure", "Members", "Reports", "Member Contributions", "Petty Cash Report", "Pledge Report", "Table Banking Summary", "My Contributions"] },
-    { id: "r3", name: "Contributor", description: "Can record contributions and view personal reports.", memberUserIds: ["u3", "u4"], menuPrivileges: ["Dashboard", "My Contributions"] },
+    {
+      id: "r1",
+      name: "Admin",
+      description: "Full access to all features and settings.",
+      memberUserIds: ["u1"],
+      menuPrivileges: [
+        "View Dashboard",
+        "View Project Accounts", "Manage Projects",
+        "View Petty Cash", "Manage Petty Cash",
+        "View Pledges", "Manage Pledges",
+        "View Income", "Manage Income",
+        "View Expenditure", "Manage Expenditure",
+        "View Sales Management", "View Stocks", "Manage Stocks", "View Daily Sales", "Manage Daily Sales", "View Debts", "Manage Debts",
+        "View Members", "Manage Members",
+        "View Board Members", "Manage Board Members",
+        "View Reports", "View Member Contributions Report", "View Petty Cash Report", "View Pledge Report", "View Table Banking Summary", "View User Activity Report", "View Deleted Projects Report", "Manage Reports Templates",
+        "Perform Admin Actions", "Initialize Balances",
+        "View My Contributions",
+        "Access Admin Settings", "Manage User Profiles", "Manage User Roles", "Manage App Customization", "Manage System Currency", "Manage Member Fields", "Manage Database Maintenance",
+      ]
+    },
+    {
+      id: "r2",
+      name: "Project Manager",
+      description: "Can create and manage projects, view reports.",
+      memberUserIds: ["u2"],
+      menuPrivileges: [
+        "View Dashboard",
+        "View Project Accounts", "Manage Projects",
+        "View Petty Cash", "Manage Petty Cash",
+        "View Pledges", "Manage Pledges",
+        "View Income", "Manage Income",
+        "View Expenditure", "Manage Expenditure",
+        "View Sales Management", "View Stocks", "View Daily Sales", "View Debts",
+        "View Members",
+        "View Reports", "View Member Contributions Report", "View Petty Cash Report", "View Pledge Report", "View Table Banking Summary",
+        "View My Contributions",
+      ]
+    },
+    {
+      id: "r3",
+      name: "Contributor",
+      description: "Can record contributions and view personal reports.",
+      memberUserIds: ["u3", "u4"],
+      menuPrivileges: [
+        "View Dashboard",
+        "View My Contributions",
+        "View Members", // Can view members list
+      ]
+    },
   ]);
 
   const addRole = (role: Omit<UserRoleType, 'id'>) => {

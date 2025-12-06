@@ -78,6 +78,40 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
     setIsOpen(false);
   };
 
+  // Flatten all possible privilege names from navItems for display in the dialog
+  const allPrivilegeNames = React.useMemo(() => {
+    const privileges: string[] = [];
+    navItems.forEach(item => {
+      if (item.type === "privilege") {
+        privileges.push(item.name);
+      } else if (item.type === "item") {
+        if (item.requiredPrivileges) {
+          privileges.push(...item.requiredPrivileges);
+        } else {
+          // If an item has no requiredPrivileges, its name itself can be a privilege
+          privileges.push(item.name);
+        }
+      } else if (item.type === "heading") {
+        if (item.requiredPrivileges) {
+          privileges.push(...item.requiredPrivileges);
+        } else {
+          // If a heading has no requiredPrivileges, its name itself can be a privilege
+          privileges.push(item.name);
+        }
+        item.children.forEach(child => {
+          if (child.requiredPrivileges) {
+            privileges.push(...child.requiredPrivileges);
+          } else {
+            privileges.push(child.name);
+          }
+        });
+      }
+    });
+    // Ensure uniqueness and sort for consistent display
+    return Array.from(new Set(privileges)).sort();
+  }, []);
+
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -115,47 +149,21 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
           <div className="col-span-full mt-4">
             <h3 className="text-lg font-semibold mb-2">Menu Privileges</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Select the menu items and specific privileges this role should have access to.
+              Select the specific privileges this role should have.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-              {navItems.map((item) => {
-                if (item.type === "heading") {
-                  const headingItem = item as NavHeading;
-                  return (
-                    <div key={headingItem.name} className="col-span-full">
-                      <h4 className="font-medium text-sm mt-4 mb-2">{headingItem.name}</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pl-4">
-                        {headingItem.children.map((child) => (
-                          <div key={child.name} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`privilege-${child.name}`}
-                              checked={selectedMenuPrivileges.includes(child.name)}
-                              onCheckedChange={(checked) => handlePrivilegeChange(child.name, checked as boolean)}
-                            />
-                            <Label htmlFor={`privilege-${child.name}`} className="text-sm font-normal cursor-pointer">
-                              {child.name}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                } else {
-                  const currentItem = item as (NavItem | PrivilegeItem); // Handle both NavItem and PrivilegeItem
-                  return (
-                    <div key={currentItem.name} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`privilege-${currentItem.name}`}
-                        checked={selectedMenuPrivileges.includes(currentItem.name)}
-                        onCheckedChange={(checked) => handlePrivilegeChange(currentItem.name, checked as boolean)}
-                      />
-                      <Label htmlFor={`privilege-${currentItem.name}`} className="text-sm font-normal cursor-pointer">
-                        {currentItem.name}
-                      </Label>
-                    </div>
-                  );
-                }
-              })}
+              {allPrivilegeNames.map((privilegeName) => (
+                <div key={privilegeName} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`privilege-${privilegeName}`}
+                    checked={selectedMenuPrivileges.includes(privilegeName)}
+                    onCheckedChange={(checked) => handlePrivilegeChange(privilegeName, checked as boolean)}
+                  />
+                  <Label htmlFor={`privilege-${privilegeName}`} className="text-sm font-normal cursor-pointer">
+                    {privilegeName}
+                  </Label>
+                </div>
+              ))}
             </div>
           </div>
         </div>

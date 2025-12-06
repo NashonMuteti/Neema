@@ -12,84 +12,85 @@ export interface NavItem {
   name: string;
   href: string;
   icon: React.ElementType;
-  requiredRoles?: string[];
+  requiredPrivileges?: string[]; // Changed from requiredRoles
   type?: "item";
 }
 
 export interface NavHeading {
   name: string;
   type: "heading";
-  requiredRoles?: string[];
+  requiredPrivileges?: string[]; // Changed from requiredRoles
   children: NavItem[];
 }
 
-export interface PrivilegeItem { // New interface for privilege-only items
+export interface PrivilegeItem {
   name: string;
   type: "privilege";
-  requiredRoles?: string[]; // Who can assign this privilege (optional, for future use)
+  // requiredPrivileges here would define who can *assign* this privilege, not who can *access* it.
+  // For now, we'll keep it simple and assume 'Admin' can assign all privileges.
 }
 
-type SidebarItem = NavItem | NavHeading | PrivilegeItem; // Union type for all sidebar items
+type SidebarItem = NavItem | NavHeading | PrivilegeItem;
 
 export const navItems: SidebarItem[] = [
   {
     name: "Dashboard",
     href: "/",
     icon: Home,
-    requiredRoles: ["Admin", "Project Manager", "Contributor"],
+    requiredPrivileges: ["View Dashboard"],
   },
   {
     name: "Project Accounts",
     href: "/projects",
     icon: DollarSign,
-    requiredRoles: ["Admin", "Project Manager"],
+    requiredPrivileges: ["View Project Accounts"],
   },
   {
     name: "Petty Cash",
     href: "/petty-cash",
     icon: Wallet,
-    requiredRoles: ["Admin", "Project Manager"],
+    requiredPrivileges: ["View Petty Cash"],
   },
   {
     name: "Pledges",
     href: "/pledges",
     icon: Handshake,
-    requiredRoles: ["Admin", "Project Manager"],
+    requiredPrivileges: ["View Pledges"],
   },
   {
     name: "Income",
     href: "/income",
     icon: TrendingUp,
-    requiredRoles: ["Admin", "Project Manager"],
+    requiredPrivileges: ["View Income"],
   },
   {
     name: "Expenditure",
     href: "/expenditure",
     icon: TrendingDown,
-    requiredRoles: ["Admin", "Project Manager"],
+    requiredPrivileges: ["View Expenditure"],
   },
   {
     name: "Sales Management",
     type: "heading",
-    requiredRoles: ["Admin", "Project Manager"],
+    requiredPrivileges: ["View Sales Management"],
     children: [
       {
         name: "Stocks",
         href: "/sales/stocks",
         icon: Package,
-        requiredRoles: ["Admin", "Project Manager"],
+        requiredPrivileges: ["View Stocks"],
       },
       {
         name: "Daily Sales",
         href: "/sales/daily",
         icon: ShoppingCart,
-        requiredRoles: ["Admin", "Project Manager"],
+        requiredPrivileges: ["View Daily Sales"],
       },
       {
         name: "Debts",
         href: "/sales/debts",
         icon: Scale,
-        requiredRoles: ["Admin", "Project Manager"],
+        requiredPrivileges: ["View Debts"],
       },
     ],
   },
@@ -97,67 +98,67 @@ export const navItems: SidebarItem[] = [
     name: "Members",
     href: "/members",
     icon: Users,
-    requiredRoles: ["Admin", "Project Manager", "Contributor"], // Allow more roles to view the page
+    requiredPrivileges: ["View Members"], // Allow more roles to view the page
   },
   {
     name: "Board Members",
     href: "/board-members",
     icon: UserCog,
-    requiredRoles: ["Admin"],
+    requiredPrivileges: ["View Board Members"],
   },
   {
     name: "Reports",
     type: "heading",
-    requiredRoles: ["Admin", "Project Manager", "Contributor"],
+    requiredPrivileges: ["View Reports"],
     children: [
       {
-        name: "Member Contributions",
+        name: "Member Contributions Report", // Renamed for clarity
         href: "/reports/member-contributions",
         icon: BarChart2,
-        requiredRoles: ["Admin", "Project Manager"],
+        requiredPrivileges: ["View Member Contributions Report"],
       },
       {
         name: "Petty Cash Report",
         href: "/reports/petty-cash",
         icon: FileText,
-        requiredRoles: ["Admin", "Project Manager"],
+        requiredPrivileges: ["View Petty Cash Report"],
       },
       {
         name: "Pledge Report",
         href: "/reports/pledges",
         icon: FileText,
-        requiredRoles: ["Admin", "Project Manager"],
+        requiredPrivileges: ["View Pledge Report"],
       },
       {
         name: "Table Banking Summary",
         href: "/reports/table-banking-summary",
         icon: Banknote,
-        requiredRoles: ["Admin", "Project Manager"],
+        requiredPrivileges: ["View Table Banking Summary"],
       },
       {
         name: "User Activity Report",
         href: "/reports/user-activity",
         icon: Activity,
-        requiredRoles: ["Admin"],
+        requiredPrivileges: ["View User Activity Report"],
       },
       {
         name: "Deleted Projects Report",
         href: "/reports/deleted-projects",
         icon: FolderX,
-        requiredRoles: ["Admin"],
+        requiredPrivileges: ["View Deleted Projects Report"],
       },
     ],
   },
   {
     name: "Actions",
     type: "heading",
-    requiredRoles: ["Admin"],
+    requiredPrivileges: ["Perform Admin Actions"],
     children: [
       {
         name: "Initialize Balances",
         href: "/initialize-balances",
         icon: RefreshCcw,
-        requiredRoles: ["Admin"],
+        requiredPrivileges: ["Initialize Balances"],
       },
     ],
   },
@@ -165,18 +166,81 @@ export const navItems: SidebarItem[] = [
     name: "My Contributions",
     href: "/my-contributions",
     icon: CalendarDays,
-    requiredRoles: ["Admin", "Project Manager", "Contributor"],
+    requiredPrivileges: ["View My Contributions"],
   },
   {
     name: "Admin Settings",
     href: "/admin/settings",
     icon: Settings,
-    requiredRoles: ["Admin"],
+    requiredPrivileges: ["Access Admin Settings"],
   },
   {
-    name: "Manage Members", // This is the privilege item
+    name: "Manage Members", // This is a privilege, not a navigation item
     type: "privilege",
-    requiredRoles: ["Admin"], // Only Admin can assign this privilege
+  },
+  {
+    name: "Manage Projects", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Pledges", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Income", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Expenditure", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Petty Cash", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Board Members", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage User Profiles", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage User Roles", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage App Customization", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage System Currency", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Member Fields", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Reports Templates", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Database Maintenance", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Stocks", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Daily Sales", // New privilege
+    type: "privilege",
+  },
+  {
+    name: "Manage Debts", // New privilege
+    type: "privilege",
   },
 ];
 
@@ -191,14 +255,15 @@ const Sidebar = () => {
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
 
-  const hasRequiredRole = (requiredRoles?: string[]) => {
-    if (!requiredRoles || requiredRoles.length === 0) return true;
-    return requiredRoles.some(role => currentUser?.role === role || currentUserPrivileges.includes(role));
+  // Function to check if the user has any of the required privileges
+  const hasAccess = (requiredPrivileges?: string[]) => {
+    if (!requiredPrivileges || requiredPrivileges.length === 0) return true; // No privileges required, so access is granted
+    return requiredPrivileges.some(privilege => currentUserPrivileges.includes(privilege));
   };
 
   React.useEffect(() => {
     const isChildOfReports = navItems.some(item =>
-      (item.type === "heading" && item.name === "Reports" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles)))
+      (item.type === "heading" && item.name === "Reports" && item.children?.some(child => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges)))
     );
     if (isChildOfReports) {
       setIsReportsOpen(true);
@@ -207,7 +272,7 @@ const Sidebar = () => {
     }
 
     const isChildOfActions = navItems.some(item =>
-      (item.type === "heading" && item.name === "Actions" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles)))
+      (item.type === "heading" && item.name === "Actions" && item.children?.some(child => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges)))
     );
     if (isChildOfActions) {
       setIsActionsOpen(true);
@@ -216,7 +281,7 @@ const Sidebar = () => {
     }
 
     const isChildOfSalesManagement = navItems.some(item =>
-      (item.type === "heading" && item.name === "Sales Management" && item.children?.some(child => location.pathname.startsWith(child.href) && hasRequiredRole(child.requiredRoles)))
+      (item.type === "heading" && item.name === "Sales Management" && item.children?.some(child => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges)))
     );
     if (isChildOfSalesManagement) {
       setIsSalesManagementOpen(true);
@@ -234,7 +299,7 @@ const Sidebar = () => {
             return null;
           }
 
-          if (!hasRequiredRole(item.requiredRoles)) {
+          if (!hasAccess(item.requiredPrivileges)) { // Use hasAccess
             return null;
           }
 
@@ -257,7 +322,7 @@ const Sidebar = () => {
               setIsOpen = () => {};
             }
 
-            const visibleChildren = headingItem.children.filter(child => hasRequiredRole(child.requiredRoles));
+            const visibleChildren = headingItem.children.filter(child => hasAccess(child.requiredPrivileges)); // Use hasAccess
 
             if (visibleChildren.length === 0) {
               return null;
