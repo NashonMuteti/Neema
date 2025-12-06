@@ -53,7 +53,7 @@ const SoonDueProjectsGraph: React.FC<SoonDueProjectsGraphProps> = ({ projects })
   const data = categorizeProjects(projects);
 
   return (
-    <Card className="transition-all duration-300 ease-in-out hover:shadow-xl col-span-full lg:col-span-2">
+    <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
         <CardTitle>Projects Due Soon</CardTitle>
       </CardHeader>

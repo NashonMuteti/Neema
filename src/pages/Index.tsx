@@ -60,14 +60,12 @@ const Index = () => {
         Welcome to your cinematic financial management hub.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Income and Expenditure Graph (full width) */}
-        <IncomeExpenditureGraph financialData={dummyFinancialData} availableYears={availableYears} />
-        
-        {/* Soon Due Projects Graph */}
+      {/* Main Financial Overview */}
+      <IncomeExpenditureGraph financialData={dummyFinancialData} availableYears={availableYears} />
+      
+      {/* Project-specific Graphs (side-by-side on larger screens) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <SoonDueProjectsGraph projects={dummyDashboardProjects} />
-        
-        {/* Contributions Progress Graph */}
         <ContributionsProgressGraph projectsData={dummyContributionsData} />
       </div>
     </div>

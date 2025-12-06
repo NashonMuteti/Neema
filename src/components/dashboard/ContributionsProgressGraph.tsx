@@ -27,7 +27,7 @@ const ContributionsProgressGraph: React.FC<ContributionsProgressGraphProps> = ({
   projectsData,
 }) => {
   return (
-    <Card className="transition-all duration-300 ease-in-out hover:shadow-xl col-span-full lg:col-span-2">
+    <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
         <CardTitle>Contribution Progress</CardTitle>
       </CardHeader>
