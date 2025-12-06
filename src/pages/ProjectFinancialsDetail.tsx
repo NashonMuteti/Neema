@@ -105,6 +105,9 @@ const ProjectFinancialsDetail: React.FC = () => {
   const projectCollections = allProjectCollections.filter(c => c.projectId === projectId);
   const projectPledges = allProjectPledges.filter(p => p.projectId === projectId);
 
+  const totalCollections = projectCollections.reduce((sum, c) => sum + c.amount, 0);
+  const totalPledges = projectPledges.reduce((sum, p) => sum + p.amount, 0);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -146,6 +149,11 @@ const ProjectFinancialsDetail: React.FC = () => {
                     <TableCell className="capitalize">{collection.paymentMethod.replace(/-/g, " ")}</TableCell>
                   </TableRow>
                 ))}
+                <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                  <TableCell colSpan={2}>Total Collections</TableCell>
+                  <TableCell className="text-right">${totalCollections.toFixed(2)}</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           ) : (
@@ -188,6 +196,11 @@ const ProjectFinancialsDetail: React.FC = () => {
                     </TableRow>
                   );
                 })}
+                <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                  <TableCell colSpan={1}>Total Pledges</TableCell>
+                  <TableCell className="text-right">${totalPledges.toFixed(2)}</TableCell>
+                  <TableCell colSpan={2}></TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           ) : (
