@@ -8,7 +8,8 @@ import ReportsTemplateCustomization from "@/components/admin/ReportsTemplateCust
 import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmin";
 import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings";
 import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization";
-import UserRolesSettings from "@/components/admin/UserRolesSettings"; // Import the renamed component
+import UserRolesSettings from "@/components/admin/UserRolesSettings";
+import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings"; // New import
 
 const AdminSettings = () => {
   return (
@@ -19,14 +20,15 @@ const AdminSettings = () => {
       </p>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8"> {/* Increased grid-cols to accommodate new tab */}
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="app-customization">App Customization</TabsTrigger>
           <TabsTrigger value="member-fields">Member Fields</TabsTrigger>
           <TabsTrigger value="user-profiles">User Management</TabsTrigger>
-          <TabsTrigger value="user-roles">User Roles</TabsTrigger> {/* Updated tab trigger */}
+          <TabsTrigger value="user-roles">User Roles</TabsTrigger>
           <TabsTrigger value="reports-templates">Reports Templates</TabsTrigger>
+          <TabsTrigger value="maintenance">Maintenance</TabsTrigger> {/* New tab trigger */}
         </TabsList>
         <TabsContent value="general">
           <SystemCurrencySettings />
@@ -43,11 +45,14 @@ const AdminSettings = () => {
         <TabsContent value="user-profiles">
           <UserProfileSettingsAdmin />
         </TabsContent>
-        <TabsContent value="user-roles"> {/* Updated tab content */}
+        <TabsContent value="user-roles">
           <UserRolesSettings />
         </TabsContent>
         <TabsContent value="reports-templates">
           <ReportsTemplateCustomization />
+        </TabsContent>
+        <TabsContent value="maintenance"> {/* New tab content */}
+          <DatabaseUpdateSettings />
         </TabsContent>
       </Tabs>
     </div>
