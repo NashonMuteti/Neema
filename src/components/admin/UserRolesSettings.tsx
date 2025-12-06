@@ -43,9 +43,9 @@ const dummyUsers: User[] = [
 
 const UserRolesSettings = () => {
   const [userRoles, setUserRoles] = React.useState<UserRole[]>([
-    { id: "r1", name: "Admin", description: "Full access to all features and settings.", memberUserIds: ["u1"] },
-    { id: "r2", name: "Project Manager", description: "Can create and manage projects, view reports.", memberUserIds: ["u2"] },
-    { id: "r3", name: "Contributor", description: "Can record contributions and view personal reports.", memberUserIds: ["u3", "u4"] },
+    { id: "r1", name: "Admin", description: "Full access to all features and settings.", memberUserIds: ["u1"], menuPrivileges: ["Dashboard", "Project Accounts", "Petty Cash", "Pledges", "Income", "Expenditure", "Members", "Board Members", "Reports", "Member Contributions", "Petty Cash Report", "Pledge Report", "Table Banking Summary", "User Activity Report", "Deleted Projects Report", "Actions", "Initialize Balances", "My Contributions", "Admin Settings"] },
+    { id: "r2", name: "Project Manager", description: "Can create and manage projects, view reports.", memberUserIds: ["u2"], menuPrivileges: ["Dashboard", "Project Accounts", "Petty Cash", "Pledges", "Income", "Expenditure", "Members", "Reports", "Member Contributions", "Petty Cash Report", "Pledge Report", "Table Banking Summary", "My Contributions"] },
+    { id: "r3", name: "Contributor", description: "Can record contributions and view personal reports.", memberUserIds: ["u3", "u4"], menuPrivileges: ["Dashboard", "My Contributions"] },
   ]);
   const [isAddEditRoleDialogOpen, setIsAddEditRoleDialogOpen] = React.useState(false);
   const [editingRole, setEditingRole] = React.useState<UserRole | undefined>(undefined);
@@ -67,6 +67,7 @@ const UserRolesSettings = () => {
         ...roleData,
         id: `r${userRoles.length + 1}`, // Simple ID generation
         memberUserIds: [], // New roles start with no members
+        menuPrivileges: roleData.menuPrivileges || [], // Ensure privileges are saved
       };
       setUserRoles(prev => [...prev, newRole]);
     }

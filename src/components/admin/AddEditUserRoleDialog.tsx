@@ -12,14 +12,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 import { showSuccess, showError } from "@/utils/toast";
 import { Save } from "lucide-react";
+import { navItems } from "@/components/Sidebar"; // Import navItems from Sidebar
 
 export interface UserRole {
   id: string;
   name: string;
   description: string;
   memberUserIds: string[]; // IDs of users belonging to this role
+  menuPrivileges: string[]; // New: Names of menu items this role has access to
 }
 
 interface AddEditUserRoleDialogProps {
@@ -37,13 +40,21 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
 }) => {
   const [name, setName] = React.useState(initialData?.name || "");
   const [description, setDescription] = React.useState(initialData?.description || "");
+  const [selectedMenuPrivileges, setSelectedMenuPrivileges] = React.useState<string[]>(initialData?.menuPrivileges || []);
 
   React.useEffect(() => {
     if (isOpen) {
       setName(initialData?.name || "");
       setDescription(initialData?.description || "");
+      setSelectedMenuPrivileges(initialData?.menuPrivileges || []);
     }
   }, [isOpen, initialData]);
+
+  const handlePrivilegeChange = (itemName: string, checked: boolean) => {
+    setSelectedMenuPrivileges((prev) =>
+      checked ? [...prev, itemName] : prev.filter((name) => name !== itemName)
+    );
+  };
 
   const handleSubmit = () => {
     if (!name.trim()) {
@@ -55,6 +66,7 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
       name: name.trim(),
       description: description.trim(),
       memberUserIds: initialData?.memberUserIds || [], // Preserve existing members or start empty
+      menuPrivileges: selectedMenuPrivileges, // Include selected privileges
     };
 
     if (initialData?.id) {
@@ -68,7 +80,7 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"> {/* Increased width and added scroll */}
         <DialogHeader>
           <DialogTitle>{initialData ? "Edit User Role" : "Add New User Role"}</DialogTitle>
           <DialogDescription>
@@ -98,6 +110,51 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
               className="col-span-3"
               placeholder="Briefly describe the purpose or permissions of this role."
             />
+          </div>
+
+          <div className="col-span-full mt-4">
+            <h3 className="text-lg font-semibold mb-2">Menu Privileges</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Select the menu items this role should have access to.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+              {navItems.map((item) => {
+                if (item.type === "heading") {
+                  return (
+                    <div key={item.name} className="col-span-full">
+                      <h4 className="font-medium text-sm mt-4 mb-2">{item.name}</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pl-4">
+                        {item.children.map((child) => (
+                          <div key={child.name} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`privilege-${child.name}`}
+                              checked={selectedMenuPrivileges.includes(child.name)}
+                              onCheckedChange={(checked) => handlePrivilegeChange(child.name, checked as boolean)}
+                            />
+                            <Label htmlFor={`privilege-${child.name}`} className="text-sm font-normal cursor-pointer">
+                              {child.name}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div key={item.name} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`privilege-${item.name}`}
+                        checked={selectedMenuPrivileges.includes(item.name)}
+                        onCheckedChange={(checked) => handlePrivilegeChange(item.name, checked as boolean)}
+                      />
+                      <Label htmlFor={`privilege-${item.name}`} className="text-sm font-normal cursor-pointer">
+                        {item.name}
+                      </Label>
+                    </div>
+                  );
+                }
+              })}
+            </div>
           </div>
         </div>
         <div className="flex justify-end">
