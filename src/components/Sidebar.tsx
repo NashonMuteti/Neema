@@ -108,12 +108,7 @@ const navItems = [
       },
     ],
   },
-  {
-    name: "My Settings",
-    href: "/settings",
-    icon: Settings,
-    privileged: false,
-  },
+  // Removed "My Settings" from here
   {
     name: "My Contributions", // New menu item for logged-in user's contributions
     href: "/my-contributions",
