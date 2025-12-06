@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import MemberFieldCustomization from "./MemberFieldCustomization"; // Import the new component
+// MemberFieldCustomization is no longer imported here as it's moved to its own tab
 
 const AppCustomization = () => {
   return (
@@ -30,7 +30,7 @@ const AppCustomization = () => {
           </div>
         </CardContent>
       </Card>
-      <MemberFieldCustomization /> {/* Integrate the new component here */}
+      {/* MemberFieldCustomization is now in its own tab */}
     </div>
   );
 };

@@ -7,6 +7,7 @@ import AppCustomization from "@/components/admin/AppCustomization";
 import ReportsTemplateCustomization from "@/components/admin/ReportsTemplateCustomization";
 import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmin"; // Placeholder for admin user settings
 import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings"; // Import the new component
+import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization"; // Import MemberFieldCustomization
 
 const AdminSettings = () => {
   return (
@@ -16,15 +17,16 @@ const AdminSettings = () => {
         Manage application-wide settings, security, customization, and user profiles.
       </p>
 
-      <Tabs defaultValue="general" className="w-full"> {/* Changed default value to 'general' */}
-        <TabsList className="grid w-full grid-cols-5"> {/* Increased grid columns */}
-          <TabsTrigger value="general">General</TabsTrigger> {/* New tab */}
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-6"> {/* Increased grid columns to 6 */}
+          <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="app-customization">App Customization</TabsTrigger>
+          <TabsTrigger value="member-fields">Member Fields</TabsTrigger> {/* New tab trigger */}
           <TabsTrigger value="user-profiles">User Management</TabsTrigger>
           <TabsTrigger value="reports-templates">Reports Templates</TabsTrigger>
         </TabsList>
-        <TabsContent value="general"> {/* New tab content */}
+        <TabsContent value="general">
           <SystemCurrencySettings />
         </TabsContent>
         <TabsContent value="security">
@@ -32,6 +34,9 @@ const AdminSettings = () => {
         </TabsContent>
         <TabsContent value="app-customization">
           <AppCustomization />
+        </TabsContent>
+        <TabsContent value="member-fields"> {/* New tab content */}
+          <MemberFieldCustomization />
         </TabsContent>
         <TabsContent value="user-profiles">
           <UserProfileSettingsAdmin />
