@@ -1,7 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { useSession } from './SessionContext'; // New import
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 // Centralized User interface
 export interface User {
@@ -12,98 +11,88 @@ export interface User {
   status: "Active" | "Inactive" | "Suspended";
   enableLogin: boolean;
   imageUrl?: string;
-  receiveNotifications?: boolean; // Added for UserSettings
 }
 
 interface AuthContextType {
   userRoles: string[];
   isAdmin: boolean;
   currentUserId: string | null;
-  currentUser: User | null;
+  currentUser: User | null; // Added currentUser
   setUserRoles: (roles: string[]) => void;
   toggleAdmin: () => void;
-  setCurrentUserId: (userId: string | null) => void; // Kept for potential external use, though internal logic will use Supabase
-  setCurrentUser: (user: User | null) => void;
+  setCurrentUserId: (userId: string | null) => void;
+  setCurrentUser: (user: User | null) => void; // Added setter for currentUser
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user: supabaseUser, loading: sessionLoading } = useSession(); // Get Supabase user from SessionContext
+  // For demonstration, start with 'Admin' role and a default user ID and user object.
+  // In a real app, these would come from authentication.
+  const [userRoles, setUserRoles] = useState<string[]>(['Admin']); 
+  const [currentUserId, setCurrentUserIdState] = useState<string | null>("u1"); // Renamed to avoid conflict
+  const [currentUser, setCurrentUserState] = useState<User | null>({ // Default to 'u1' for demonstration
+    id: "u1",
+    name: "Alice Johnson",
+    email: "alice@example.com",
+    role: "Admin",
+    status: "Active",
+    enableLogin: true,
+    imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice",
+  });
 
-  // Initial states for roles and admin status (can be fetched from a profiles table later)
-  const [userRoles, setUserRolesState] = useState<string[]>(['Contributor']); // Default to Contributor
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [currentUserState, setCurrentUserState] = useState<User | null>(null);
-
-  useEffect(() => {
-    if (!sessionLoading) {
-      if (supabaseUser) {
-        // Map Supabase user to our internal User interface
-        const mappedUser: User = {
-          id: supabaseUser.id,
-          name: supabaseUser.user_metadata.name || supabaseUser.email || 'User',
-          email: supabaseUser.email || '',
-          role: 'Contributor', // Default role, will be overridden if a profile exists
-          status: 'Active', // Default status
-          enableLogin: true, // Supabase user is logged in
-          imageUrl: supabaseUser.user_metadata.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${supabaseUser.user_metadata.name || supabaseUser.email}`,
-          receiveNotifications: true, // Default preference
-        };
-
-        // For demonstration, if the user is 'alice@example.com', make them an Admin
-        if (supabaseUser.email === 'alice@example.com') {
-          mappedUser.role = 'Admin';
-          setUserRolesState(['Admin']);
-          setIsAdmin(true);
-        } else if (supabaseUser.email === 'bob@example.com') {
-          mappedUser.role = 'Project Manager';
-          setUserRolesState(['Project Manager']);
-          setIsAdmin(false);
-        } else {
-          setUserRolesState(['Contributor']);
-          setIsAdmin(false);
-        }
-
-        setCurrentUserState(mappedUser);
-      } else {
-        setCurrentUserState(null);
-        setUserRolesState([]);
-        setIsAdmin(false);
-      }
-    }
-  }, [supabaseUser, sessionLoading]);
+  const isAdmin = userRoles.includes('Admin');
 
   const toggleAdmin = () => {
-    // This toggle is for demonstration purposes of UI changes based on admin status.
-    // In a real app, role changes would be managed via backend/database.
-    setIsAdmin(prev => !prev);
-    setUserRolesState(prev => prev.includes('Admin') ? prev.filter(role => role !== 'Admin') : [...prev, 'Admin']);
+    setUserRoles(prevRoles => {
+      if (prevRoles.includes('Admin')) {
+        return prevRoles.filter(role => role !== 'Admin');
+      } else {
+        return [...prevRoles, 'Admin'];
+      }
+    });
   };
 
+  // Custom setter for currentUserId that also updates currentUser
   const setCurrentUserId = (userId: string | null) => {
-    // This setter is less relevant now that user comes from Supabase session,
-    // but kept for compatibility if other parts of the app rely on it.
-    // It should ideally trigger a re-fetch of the user from Supabase or a profiles table.
-    console.warn("setCurrentUserId is deprecated. Use setCurrentUser with a full User object.");
+    setCurrentUserIdState(userId);
+    // In a real app, you would fetch the full user object here based on userId
+    // For now, we'll just set a dummy user if an ID is provided, or null if cleared.
+    if (userId === "u1") { // Example: if u1 is logged in
+      setCurrentUserState({
+        id: "u1",
+        name: "Alice Johnson",
+        email: "alice@example.com",
+        role: "Admin",
+        status: "Active",
+        enableLogin: true,
+        imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice",
+      });
+    } else if (userId === "u2") { // Example: if u2 is logged in
+      setCurrentUserState({
+        id: "u2",
+        name: "Bob Williams",
+        email: "bob@example.com",
+        role: "Project Manager",
+        status: "Active",
+        enableLogin: true,
+        imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob",
+      });
+    } else {
+      setCurrentUserState(null);
+    }
   };
 
-  const setUserRoles = (roles: string[]) => {
-    setUserRolesState(roles);
-    setIsAdmin(roles.includes('Admin'));
+  // Custom setter for currentUser
+  const setCurrentUser = (user: User | null) => {
+    setCurrentUserState(user);
+    setCurrentUserIdState(user ? user.id : null);
+    setUserRoles(user ? [user.role] : []); // Update roles based on the user's role
   };
+
 
   return (
-    <AuthContext.Provider value={{
-      userRoles: userRoles,
-      isAdmin: isAdmin,
-      currentUserId: currentUserState?.id || null,
-      currentUser: currentUserState,
-      setUserRoles,
-      toggleAdmin,
-      setCurrentUserId,
-      setCurrentUser: setCurrentUserState,
-    }}>
+    <AuthContext.Provider value={{ userRoles, isAdmin, currentUserId, currentUser, setUserRoles, toggleAdmin, setCurrentUserId, setCurrentUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -112,7 +101,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth must be used within an an AuthProvider');
   }
   return context;
 };
