@@ -15,20 +15,32 @@ import {
 import { LogOut, Settings, User, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSelector } from "./LanguageSelector";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
-import { useViewingMember } from "@/context/ViewingMemberContext"; // New import
+import { useViewingMember } from "@/context/ViewingMemberContext";
+import { supabase } from "@/integrations/supabase/client"; // New import for Supabase client
+import { showSuccess, showError } from "@/utils/toast"; // Import toast utilities
 
 const Header = () => {
-  const { isAdmin, toggleAdmin, currentUser } = useAuth(); // Use isAdmin, toggleAdmin, and currentUser from AuthContext
-  const { brandLogoUrl, tagline } = useBranding();
-  const { viewingMemberName } = useViewingMember(); // Use the viewing member name
+  const { isAdmin, toggleAdmin, currentUser } = useAuth();
+  const { brandLogoUrl } = useBranding();
+  const { viewingMemberName } = useViewingMember();
 
   // Use currentUser from context, fallback to dummy if not available
   const user = currentUser || {
     name: "Guest User",
     email: "guest@example.com",
     initials: "GU",
+  };
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      showError("Failed to log out: " + error.message);
+      console.error("Logout error:", error);
+    } else {
+      showSuccess("You have been logged out.");
+    }
   };
 
   return (
@@ -79,7 +91,7 @@ const Header = () => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarFallback>{user.name.charAt(0).toUpperCase() + user.name.split(' ')[1].charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarFallback>{user.name.charAt(0).toUpperCase() + (user.name.split(' ')[1]?.charAt(0).toUpperCase() || '')}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
@@ -106,7 +118,7 @@ const Header = () => {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}> {/* Updated logout handler */}
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
