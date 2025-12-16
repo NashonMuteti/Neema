@@ -16,6 +16,7 @@ import { Image as ImageIcon, Upload } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 
 interface UploadThumbnailDialogProps {
   projectId: string;
@@ -33,9 +34,15 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+  const { canManageProjects } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageProjects: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+    return { canManageProjects };
+  }, [currentUser, definedRoles]);
 
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -46,7 +53,12 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
       setSelectedFile(null);
       setPreviewUrl(currentThumbnailUrl || null);
     }
-  }, [isOpen, currentThumbnailUrl]);
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [isOpen, currentThumbnailUrl, previewUrl]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -100,7 +112,7 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
               </div>
             )}
             <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="thumbnail-upload">Select Image</Label>
+              <Label htmlFor="thumbnail-upload" className="text-center">Select Image</Label>
               <Input id="thumbnail-upload" type="file" accept="image/*" onChange={handleFileChange} disabled={!canManageProjects} />
             </div>
           </div>

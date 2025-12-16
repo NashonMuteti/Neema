@@ -22,14 +22,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon, Upload, CalendarIcon } from "lucide-react"; // Import CalendarIcon
+import { Image as ImageIcon, Upload, CalendarIcon } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
-import { Calendar } from "@/components/ui/calendar"; // Import Calendar
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Import Popover components
-import { cn } from "@/lib/utils"; // Import cn for styling
-import { format } from "date-fns"; // Import format for date display
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 
 interface Project {
   id: string;
@@ -38,7 +39,8 @@ interface Project {
   status: "Open" | "Closed" | "Deleted" | "Suspended";
   thumbnailUrl?: string;
   dueDate?: Date;
-  memberContributionAmount?: number; // New: Amount each member is expected to contribute
+  memberContributionAmount?: number;
+  user_id: string; // Add user_id to match Supabase table
 }
 
 interface EditProjectDialogProps {
@@ -50,9 +52,15 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+  const { canManageProjects } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageProjects: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+    return { canManageProjects };
+  }, [currentUser, definedRoles]);
 
   const [name, setName] = React.useState(project.name);
   const [description, setDescription] = React.useState(project.description);
@@ -62,7 +70,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   const [dueDate, setDueDate] = React.useState<Date | undefined>(project.dueDate ? new Date(project.dueDate) : undefined);
   const [memberContributionAmount, setMemberContributionAmount] = React.useState<string>(
     project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : ""
-  ); // New: Member contribution amount
+  );
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -93,9 +101,13 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name) {
       showError("Project Name is required.");
+      return;
+    }
+    if (!currentUser || project.user_id !== currentUser.id) {
+      showError("You do not have permission to edit this project.");
       return;
     }
 
@@ -108,21 +120,39 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
     let projectThumbnailUrl: string | undefined = project.thumbnailUrl;
     if (selectedFile && previewUrl) {
       projectThumbnailUrl = previewUrl;
+      // In a real app, you'd upload the file to Supabase Storage here
     } else if (!selectedFile && !project.thumbnailUrl) {
       projectThumbnailUrl = undefined;
     }
 
-    onEditProject({
-      ...project,
-      name,
-      description,
-      status,
-      thumbnailUrl: projectThumbnailUrl,
-      dueDate,
-      memberContributionAmount: memberContributionAmount === "" ? undefined : parsedContributionAmount,
-    });
-    showSuccess("Project updated successfully!");
-    setIsOpen(false);
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        name,
+        description,
+        status,
+        thumbnail_url: projectThumbnailUrl,
+        due_date: dueDate?.toISOString(),
+        member_contribution_amount: memberContributionAmount === "" ? null : parsedContributionAmount,
+      })
+      .eq('id', project.id);
+
+    if (error) {
+      console.error("Error updating project:", error);
+      showError("Failed to update project.");
+    } else {
+      onEditProject({
+        ...project,
+        name,
+        description,
+        status,
+        thumbnailUrl: projectThumbnailUrl,
+        dueDate,
+        memberContributionAmount: memberContributionAmount === "" ? undefined : parsedContributionAmount,
+      });
+      showSuccess("Project updated successfully!");
+      setIsOpen(false);
+    }
   };
 
   return (
@@ -190,7 +220,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               </PopoverContent>
             </Popover>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4"> {/* New: Member Contribution Amount */}
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="member-contribution" className="text-right">
               Member Contribution
             </Label>

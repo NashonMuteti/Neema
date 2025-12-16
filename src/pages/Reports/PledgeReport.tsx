@@ -63,9 +63,15 @@ const PledgeReport = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+  const { canManagePledges } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManagePledges: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+    return { canManagePledges };
+  }, [currentUser, definedRoles]);
 
   const [pledges, setPledges] = React.useState<Pledge[]>(initialPledges);
   const currentYear = getYear(new Date());

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Search, Edit, Trash2, User as UserIcon, Eye, PlusCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,45 +23,71 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { showSuccess } from "@/utils/toast";
-import { useAuth, User } from "@/context/AuthContext"; // Import useAuth and the centralized User interface
+import { showSuccess, showError } from "@/utils/toast";
+import { useAuth, User } from "@/context/AuthContext";
 import AddEditUserDialog from "./AddEditUserDialog";
 import { useUserRoles } from "@/context/UserRolesContext";
-
-// Dummy users now conform to the centralized User interface
-const dummyUsers: User[] = [
-  { id: "u1", name: "Alice Johnson", email: "alice@example.com", role: "Admin", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice" },
-  { id: "u2", name: "Bob Williams", email: "bob@example.com", role: "Project Manager", status: "Active", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob" },
-  { id: "u3", name: "Charlie Brown", email: "charlie@example.com", role: "Contributor", status: "Inactive", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie" },
-  { id: "u4", name: "David Green", email: "david@example.com", role: "Contributor", status: "Suspended", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David" },
-];
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 
 const UserProfileSettingsAdmin = () => {
-  const { currentUser } = useAuth(); // Use the auth context
-  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
+  const { canManageUserProfiles } = useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageUserProfiles: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
+    return { canManageUserProfiles };
+  }, [currentUser, definedRoles]);
 
-  const [users, setUsers] = React.useState<User[]>(dummyUsers);
+  const [users, setUsers] = React.useState<User[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [deletingUserId, setDeletingUserId] = React.useState<string | undefined>(undefined);
 
   const [isAddEditUserDialogOpen, setIsAddEditUserDialogOpen] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<User | undefined>(undefined);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const filteredUsers = users.filter(user => {
-    const query = searchQuery.toLowerCase();
-    return (
-      user.name.toLowerCase().includes(query) ||
-      user.email.toLowerCase().includes(query) ||
-      user.role.toLowerCase().includes(query) ||
-      user.status.toLowerCase().includes(query)
-    );
-  });
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    let query = supabase.from('profiles').select('*');
+
+    if (searchQuery) {
+      query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,status.ilike.%${searchQuery}%`);
+    }
+
+    const { data, error } = await query.order('name', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching users:", error);
+      setError("Failed to load users.");
+      showError("Failed to load users.");
+      setUsers([]);
+    } else {
+      setUsers(data.map(p => ({
+        id: p.id,
+        name: p.name || p.email || "Unknown",
+        email: p.email || "N/A",
+        role: p.role || "Contributor",
+        status: p.status as "Active" | "Inactive" | "Suspended",
+        enableLogin: p.enable_login ?? false,
+        imageUrl: p.image_url || undefined,
+      })));
+    }
+    setLoading(false);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const getStatusBadgeClasses = (status: User['status']) => {
     switch (status) {
@@ -87,35 +112,46 @@ const UserProfileSettingsAdmin = () => {
     setIsAddEditUserDialogOpen(true);
   };
 
-  const handleSaveUser = (userData: Omit<User, 'id'> & { id?: string; defaultPassword?: string }) => {
-    if (userData.id) {
-      // Editing existing user
-      setUsers(prev => prev.map(u => u.id === userData.id ? { ...u, ...userData, id: u.id } : u));
-    } else {
-      // Adding new user
-      const newUser: User = {
-        ...userData,
-        id: `u${users.length + 1}`, // Simple ID generation
-        enableLogin: userData.enableLogin,
-        status: userData.status,
-        role: userData.role,
-        imageUrl: userData.imageUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${userData.name}`,
-      };
-      setUsers(prev => [...prev, newUser]);
-    }
+  const handleSaveUser = () => {
+    fetchUsers(); // Re-fetch users after adding/editing
   };
 
-  const handleDeleteUser = () => {
+  const handleDeleteUser = async () => {
     if (deletingUserId) {
-      setUsers(prev => prev.filter(user => user.id !== deletingUserId));
-      showSuccess("User deleted successfully!");
-      setDeletingUserId(undefined);
+      const { error } = await supabase.rpc('delete_user_by_id', { user_id_to_delete: deletingUserId });
+
+      if (error) {
+        console.error("Error deleting user from Supabase Auth:", error);
+        showError(`Failed to delete user: ${error.message}`);
+      } else {
+        showSuccess("User deleted successfully!");
+        setDeletingUserId(undefined);
+        fetchUsers(); // Re-fetch to update the list
+      }
     }
   };
 
   const openDeleteDialog = (userId: string) => {
     setDeletingUserId(userId);
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">User Management</h1>
+        <p className="text-lg text-muted-foreground">Loading users...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">User Management</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
@@ -143,7 +179,7 @@ const UserProfileSettingsAdmin = () => {
         <p className="text-muted-foreground mb-4">
           As an administrator, you can view, edit, and manage other users' accounts, roles, and group permissions.
         </p>
-        {filteredUsers.length > 0 ? (
+        {users.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -158,7 +194,7 @@ const UserProfileSettingsAdmin = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     {user.imageUrl ? (
@@ -213,7 +249,7 @@ const UserProfileSettingsAdmin = () => {
         setIsOpen={setIsAddEditUserDialogOpen}
         initialData={editingUser}
         onSave={handleSaveUser}
-        availableRoles={definedRoles} // Pass defined roles
+        availableRoles={definedRoles}
       />
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingUserId} onOpenChange={(open) => !open && setDeletingUserId(undefined)}>

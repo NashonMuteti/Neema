@@ -5,12 +5,9 @@ import Header from "./Header";
 import Sidebar from "./Sidebar";
 import { MadeWithDyad } from "./made-with-dyad";
 import { useBranding } from "@/context/BrandingContext"; // Import useBranding
+import { Outlet } from "react-router-dom"; // Import Outlet
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
-
-const Layout: React.FC<LayoutProps> = ({ children }) => {
+const Layout: React.FC = () => { // Removed LayoutProps interface and children prop
   const { tagline } = useBranding(); // Use the branding context
 
   return (
@@ -19,7 +16,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex flex-col flex-1">
         <Header />
         <main className="flex-1 p-6 overflow-auto transition-all duration-300 ease-in-out">
-          {children}
+          <Outlet /> {/* Render nested routes here */}
         </main>
         <footer className="p-4 text-center text-sm text-muted-foreground border-t shadow-inner transition-all duration-300 ease-in-out">
           <p>{tagline}</p> {/* Use dynamic tagline */}

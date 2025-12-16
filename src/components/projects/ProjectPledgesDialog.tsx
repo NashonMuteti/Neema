@@ -18,126 +18,357 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Printer, Download } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Edit, CheckCircle, XCircle, PlusCircle } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { format, parseISO } from "date-fns";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { CalendarIcon } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
 
-interface Pledge {
+interface ProjectPledge {
   id: string;
-  member: string;
+  member_id: string;
+  member_name: string;
   amount: number;
+  due_date: Date;
   status: "Active" | "Paid" | "Overdue";
 }
 
 interface ProjectPledgesDialogProps {
   projectId: string;
   projectName: string;
+  onPledgesUpdated: () => void;
 }
 
-const dummyPledges: Pledge[] = [
-  { id: "p1", member: "Alice Johnson", amount: 500.00, status: "Active" },
-  { id: "p2", member: "Bob Williams", amount: 250.00, status: "Overdue" },
-  { id: "p3", member: "Charlie Brown", amount: 750.00, status: "Active" },
-  { id: "p4", member: "Alice Johnson", amount: 100.00, status: "Paid" },
-];
+interface Member {
+  id: string;
+  name: string;
+  email: string;
+}
 
-const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({ projectId, projectName }) => {
+const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
+  projectId,
+  projectName,
+  onPledgesUpdated,
+}) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+  const { canManagePledges } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManagePledges: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+    return { canManagePledges };
+  }, [currentUser, definedRoles]);
 
   const [isOpen, setIsOpen] = React.useState(false);
-  const [pledges, setPledges] = React.useState<Pledge[]>(dummyPledges); // Filter by projectId in real app
+  const [pledges, setPledges] = React.useState<ProjectPledge[]>([]);
+  const [loadingPledges, setLoadingPledges] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // New Pledge Form State
+  const [newPledgeAmount, setNewPledgeAmount] = React.useState("");
+  const [newPledgeMember, setNewPledgeMember] = React.useState<string | undefined>(undefined);
+  const [newPledgeDueDate, setNewPledgeDueDate] = React.useState<Date | undefined>(new Date());
+  const [members, setMembers] = React.useState<Member[]>([]);
+  const [loadingMembers, setLoadingMembers] = React.useState(true);
+
+  const fetchPledges = React.useCallback(async () => {
+    setLoadingPledges(true);
+    setError(null);
+    const { data, error } = await supabase
+      .from('project_pledges')
+      .select(`
+        id,
+        member_id,
+        amount,
+        due_date,
+        status,
+        profiles ( name )
+      `)
+      .eq('project_id', projectId)
+      .order('due_date', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching pledges:", error);
+      setError("Failed to load pledges.");
+      showError("Failed to load pledges.");
+      setPledges([]);
+    } else {
+      setPledges(data.map(p => ({
+        id: p.id,
+        member_id: p.member_id,
+        member_name: (p.profiles as { name: string })?.name || 'Unknown Member',
+        amount: p.amount,
+        due_date: parseISO(p.due_date),
+        status: p.status as "Active" | "Paid" | "Overdue",
+      })));
+    }
+    setLoadingPledges(false);
+  }, [projectId]);
+
+  const fetchMembers = React.useCallback(async () => {
+    setLoadingMembers(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching members:", error);
+      showError("Failed to load members for pledges.");
+    } else {
+      setMembers(data || []);
+      if (data && data.length > 0 && !newPledgeMember) {
+        setNewPledgeMember(data[0].id); // Default to first member
+      }
+    }
+    setLoadingMembers(false);
+  }, [newPledgeMember]);
 
   React.useEffect(() => {
     if (isOpen) {
-      // In a real app, fetch pledges for the specific projectId
-      setPledges(dummyPledges); // Reset dummy data for demonstration
+      fetchPledges();
+      fetchMembers();
     }
-  }, [isOpen, projectId]);
+  }, [isOpen, fetchPledges, fetchMembers]);
 
-  const handlePayPledge = (pledgeId: string, memberName: string, amount: number) => {
-    // In a real application, this would trigger a payment process
-    showSuccess(`Payment initiated for ${memberName}'s pledge of $${amount.toFixed(2)}.`);
-    console.log(`Initiating payment for pledge ID: ${pledgeId} for project ${projectName}`);
-    // Update pledge status to 'Paid' in state (and backend)
-    setPledges((prev) =>
-      prev.map((p) => (p.id === pledgeId ? { ...p, status: "Paid" } : p))
-    );
+  const getStatusBadgeClasses = (status: ProjectPledge['status']) => {
+    switch (status) {
+      case "Active":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+      case "Paid":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      case "Overdue":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+    }
   };
 
-  const handlePrint = () => {
-    showSuccess("Printing pledge report (placeholder).");
-    console.log("Printing pledges for project:", projectName);
-    // Actual implementation would involve generating a printable view
+  const handleUpdatePledgeStatus = async (pledgeId: string, newStatus: ProjectPledge['status']) => {
+    if (!canManagePledges) {
+      showError("You do not have permission to update pledge status.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('project_pledges')
+      .update({ status: newStatus })
+      .eq('id', pledgeId);
+
+    if (error) {
+      console.error("Error updating pledge status:", error);
+      showError("Failed to update pledge status.");
+    } else {
+      showSuccess("Pledge status updated successfully!");
+      fetchPledges();
+      onPledgesUpdated(); // Notify parent to refresh financials
+    }
   };
 
-  const handleDownload = () => {
-    showSuccess("Downloading pledge report (placeholder).");
-    console.log("Downloading pledges for project:", projectName);
-    // Actual implementation would involve generating and downloading a file (e.g., PDF, CSV)
+  const handleAddPledge = async () => {
+    if (!newPledgeAmount || !newPledgeMember || !newPledgeDueDate) {
+      showError("All new pledge fields are required.");
+      return;
+    }
+
+    const parsedAmount = parseFloat(newPledgeAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      showError("Please enter a valid positive amount for the pledge.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('project_pledges')
+      .insert({
+        project_id: projectId,
+        member_id: newPledgeMember,
+        amount: parsedAmount,
+        due_date: newPledgeDueDate.toISOString(),
+        status: "Active", // New pledges are active by default
+      });
+
+    if (error) {
+      console.error("Error adding new pledge:", error);
+      showError("Failed to add new pledge.");
+    } else {
+      showSuccess("New pledge added successfully!");
+      fetchPledges();
+      onPledgesUpdated(); // Notify parent to refresh financials
+      // Reset form
+      setNewPledgeAmount("");
+      setNewPledgeMember(members.length > 0 ? members[0].id : undefined);
+      setNewPledgeDueDate(new Date());
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">Pledges</Button>
+        <Button variant="outline" size="sm" disabled={!canManagePledges}>
+          <Edit className="mr-2 h-4 w-4" /> Manage Pledges
+        </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[800px]">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
-          <DialogTitle>Pledges for {projectName}</DialogTitle>
+          <DialogTitle>Manage Pledges for {projectName}</DialogTitle>
           <DialogDescription>
-            View and manage pledges related to this project.
+            View, add, and update the status of financial pledges for this project.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="flex justify-end space-x-2 mb-4">
-            <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="mr-2 h-4 w-4" /> Print
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="mr-2 h-4 w-4" /> Download
+        <div className="grid gap-6 py-4">
+          {/* Add New Pledge Section */}
+          <div className="border p-4 rounded-lg space-y-4">
+            <h3 className="text-lg font-semibold flex items-center">
+              <PlusCircle className="mr-2 h-5 w-5" /> Add New Pledge
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="new-pledge-member">Member</Label>
+                <Select value={newPledgeMember} onValueChange={setNewPledgeMember} disabled={!canManagePledges || loadingMembers}>
+                  <SelectTrigger id="new-pledge-member">
+                    <SelectValue placeholder="Select a member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Members</SelectLabel>
+                      {members.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.name} ({member.email})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                {loadingMembers && <p className="text-sm text-muted-foreground">Loading members...</p>}
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="new-pledge-amount">Amount</Label>
+                <Input
+                  id="new-pledge-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={newPledgeAmount}
+                  onChange={(e) => setNewPledgeAmount(e.target.value)}
+                  disabled={!canManagePledges}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="new-pledge-due-date">Due Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !newPledgeDueDate && "text-muted-foreground"
+                      )}
+                      disabled={!canManagePledges}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newPledgeDueDate ? format(newPledgeDueDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={newPledgeDueDate}
+                      onSelect={setNewPledgeDueDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            <Button onClick={handleAddPledge} className="w-full" disabled={!canManagePledges || !newPledgeAmount || !newPledgeMember || !newPledgeDueDate}>
+              Add Pledge
             </Button>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Member</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                {canManagePledges && <TableHead className="text-center">Action</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pledges.map((pledge) => (
-                <TableRow key={pledge.id}>
-                  <TableCell className="font-medium">{pledge.member}</TableCell>
-                  <TableCell className="text-right">${pledge.amount.toFixed(2)}</TableCell>
-                  <TableCell className="text-center">{pledge.status}</TableCell>
-                  {canManagePledges && (
-                    <TableCell className="text-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePayPledge(pledge.id, pledge.member, pledge.amount)}
-                        disabled={pledge.status === "Paid"}
-                      >
-                        Pay
-                      </Button>
-                    </TableCell>
-                  )}
+
+          {/* Existing Pledges Table */}
+          <h3 className="text-lg font-semibold">Existing Pledges</h3>
+          {loadingPledges ? (
+            <p className="text-muted-foreground">Loading pledges...</p>
+          ) : error ? (
+            <p className="text-destructive">{error}</p>
+          ) : pledges.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Member</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {pledges.map((pledge) => (
+                  <TableRow key={pledge.id}>
+                    <TableCell className="font-medium">{pledge.member_name}</TableCell>
+                    <TableCell>${pledge.amount.toFixed(2)}</TableCell>
+                    <TableCell>{format(pledge.due_date, "PPP")}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge className={getStatusBadgeClasses(pledge.status)}>
+                        {pledge.status}
+                      </Badge>
+                    </TableCell>
+                    {canManagePledges && (
+                      <TableCell className="text-center">
+                        <div className="flex justify-center space-x-2">
+                          {pledge.status !== "Paid" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdatePledgeStatus(pledge.id, "Paid")}
+                              title="Mark as Paid"
+                            >
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            </Button>
+                          )}
+                          {pledge.status !== "Overdue" && pledge.status !== "Paid" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdatePledgeStatus(pledge.id, "Overdue")}
+                              title="Mark as Overdue"
+                            >
+                              <XCircle className="h-4 w-4 text-red-600" />
+                            </Button>
+                          )}
+                          {/* Optionally add an "Edit" button for amount/due date */}
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-muted-foreground text-center mt-4">No pledges found for this project.</p>
+          )}
         </div>
-        <p className="text-sm text-muted-foreground mt-2">
-          Note: Payment processing, printing, and downloading require backend integration.
-        </p>
       </DialogContent>
     </Dialog>
   );

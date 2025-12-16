@@ -17,18 +17,25 @@ import { showSuccess, showError } from "@/utils/toast";
 import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { supabase } from "@/integrations/supabase/client"; // Import supabase client
 
 interface AddMemberDialogProps {
-  onAddMember: (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string; status: "Active" | "Inactive" | "Suspended" }) => void;
+  onAddMember: () => void; // Changed to trigger a re-fetch in parent
 }
 
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageMembers = currentUserPrivileges.includes("Manage Members");
+  const { canManageMembers } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageMembers: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageMembers = currentUserPrivileges.includes("Manage Members");
+    return { canManageMembers };
+  }, [currentUser, definedRoles]);
 
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -58,7 +65,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name || !email) {
       showError("Name and Email are required.");
       return;
@@ -75,14 +82,40 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       memberImageUrl = previewUrl || undefined;
     }
 
-    onAddMember({
-      name,
-      email,
-      enableLogin,
-      imageUrl: memberImageUrl,
-      defaultPassword: enableLogin ? defaultPassword : undefined,
-      status: "Active", // Default status for new members
+    // Create user in Supabase Auth
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: email,
+      password: defaultPassword || "default_secure_password", // Fallback password if not provided
+      options: {
+        data: {
+          full_name: name,
+          avatar_url: memberImageUrl,
+        },
+      },
     });
+
+    if (signUpError) {
+      console.error("Error signing up new member:", signUpError);
+      showError(`Failed to add new member: ${signUpError.message}`);
+      return;
+    }
+
+    if (signUpData.user) {
+      // The handle_new_user trigger should create the profile.
+      // We might need to explicitly update the role and enable_login if the trigger doesn't handle it.
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({ role: "Contributor", status: "Active", enable_login: enableLogin })
+        .eq('id', signUpData.user.id);
+
+      if (profileUpdateError) {
+        console.error("Error updating new member's profile with role/status:", profileUpdateError);
+        showError("Failed to set new member's role and status.");
+        return;
+      }
+    }
+
+    onAddMember(); // Trigger parent to re-fetch members
     showSuccess("Member added successfully!");
     setIsOpen(false);
     // Reset form states

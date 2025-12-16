@@ -24,31 +24,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
-import { useAuth } from "@/context/AuthContext"; // New import
+import { useAuth, User } from "@/context/AuthContext"; // New import, use centralized User interface
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-  enableLogin: boolean;
-  imageUrl?: string;
-  status: "Active" | "Inactive" | "Suspended"; // Added status property
-  // Add other member fields as needed
-}
+import { supabase } from "@/integrations/supabase/client"; // Import supabase client
 
 interface EditMemberDialogProps {
-  member: Member;
-  onEditMember: (memberData: Member) => void;
+  member: User; // Use the centralized User interface
+  onEditMember: () => void; // Changed to trigger a re-fetch in parent
 }
 
 const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMember }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageMembers = currentUserPrivileges.includes("Manage Members");
+  const { canManageMembers } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageMembers: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageMembers = currentUserPrivileges.includes("Manage Members");
+    return { canManageMembers };
+  }, [currentUser, definedRoles]);
 
   const [name, setName] = React.useState(member.name);
   const [email, setEmail] = React.useState(member.email);
@@ -88,7 +85,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name || !email) {
       showError("Name and Email are required.");
       return;
@@ -96,15 +93,48 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
 
     let memberImageUrl: string | undefined = member.imageUrl;
     if (selectedFile && previewUrl) {
-      // In a real app, this is where you'd upload the file to a storage service
-      // and get a permanent URL. For now, we use the preview URL.
       memberImageUrl = previewUrl;
+      // In a real app, you'd upload the file to Supabase Storage here
     } else if (!selectedFile && !member.imageUrl) {
-      // If no new file and no existing image, ensure imageUrl is undefined
       memberImageUrl = undefined;
     }
 
-    onEditMember({ ...member, name, email, enableLogin, imageUrl: memberImageUrl, status });
+    // Update Supabase auth user metadata (for name and avatar)
+    const { error: authUpdateError } = await supabase.auth.updateUser({
+      email: email, // Can update email if needed, but usually handled by Supabase Auth UI
+      data: { full_name: name, avatar_url: memberImageUrl },
+    });
+
+    if (authUpdateError) {
+      console.error("Error updating Supabase Auth user:", authUpdateError);
+      showError("Failed to update member authentication details.");
+      return;
+    }
+
+    // Update public.profiles table
+    const { error: profileUpdateError } = await supabase
+      .from('profiles')
+      .update({ name, email, enable_login: enableLogin, image_url: memberImageUrl, status })
+      .eq('id', member.id);
+
+    if (profileUpdateError) {
+      console.error("Error updating member profile:", profileUpdateError);
+      showError("Failed to update member profile details.");
+      return;
+    }
+
+    if (defaultPassword) {
+      const { error: passwordResetError } = await supabase.auth.updateUser({
+        password: defaultPassword,
+      });
+      if (passwordResetError) {
+        console.error("Error resetting password:", passwordResetError);
+        showError("Failed to reset member password.");
+        return;
+      }
+    }
+
+    onEditMember(); // Trigger parent to re-fetch members
     showSuccess("Member updated successfully!");
     setIsOpen(false);
   };

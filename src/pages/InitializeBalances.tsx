@@ -11,9 +11,15 @@ const InitializeBalances = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances");
+  const { canInitializeBalances } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canInitializeBalances: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances");
+    return { canInitializeBalances };
+  }, [currentUser, definedRoles]);
 
   const handleInitialize = (balances: Record<string, number>) => {
     // In a real application, this would trigger a backend process

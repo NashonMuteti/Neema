@@ -1,8 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { UserRole as UserRoleType } from '@/components/admin/AddEditUserRoleDialog'; // Import the UserRole interface
-import { allPrivilegeNames } from '@/lib/privileges'; // Import allPrivilegeNames
+import { UserRole as UserRoleType } from '@/components/admin/AddEditUserRoleDialog';
+import { allPrivilegeNames } from '@/lib/privileges';
+import { useAuth } from './AuthContext';
 
 interface UserRolesContextType {
   userRoles: UserRoleType[];
@@ -14,19 +15,28 @@ interface UserRolesContextType {
 const UserRolesContext = createContext<UserRolesContextType | undefined>(undefined);
 
 export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
+
   const [userRoles, setUserRoles] = useState<UserRoleType[]>([
+    {
+      id: "r0", // New ID for Super Admin
+      name: "Super Admin",
+      description: "Full access to all features and settings, including critical system configurations.",
+      memberUserIds: [], // Will be dynamically updated
+      menuPrivileges: allPrivilegeNames, // Super Admin role gets all privileges
+    },
     {
       id: "r1",
       name: "Admin",
       description: "Full access to all features and settings.",
-      memberUserIds: ["u1"],
-      menuPrivileges: allPrivilegeNames, // Admin role gets all privileges
+      memberUserIds: [], // Will be dynamically updated
+      menuPrivileges: [...allPrivilegeNames.filter(p => p !== "Manage Database Maintenance" && p !== "Initialize Balances"), "Manage Default Password"], // Admin role gets all privileges except critical maintenance, but includes default password
     },
     {
       id: "r2",
       name: "Project Manager",
       description: "Can create and manage projects, view reports.",
-      memberUserIds: ["u2"],
+      memberUserIds: [], // Will be dynamically updated
       menuPrivileges: [
         "View Dashboard",
         "View Project Accounts", "Manage Projects",
@@ -35,7 +45,8 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         "View Income", "Manage Income",
         "View Expenditure", "Manage Expenditure",
         "View Sales Management", "View Stocks", "View Daily Sales", "View Debts",
-        "View Members", "Export Member List PDF", "Export Member List Excel", // Added new export privileges
+        "View Members", "Export Member List PDF", "Export Member List Excel",
+        "View Board Members",
         "View Reports", "View Member Contributions Report", "View Petty Cash Report", "View Pledge Report", "View Table Banking Summary",
         "View My Contributions",
       ]
@@ -44,20 +55,40 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       id: "r3",
       name: "Contributor",
       description: "Can record contributions and view personal reports.",
-      memberUserIds: ["u3", "u4"],
+      memberUserIds: [], // Will be dynamically updated
       menuPrivileges: [
         "View Dashboard",
         "View My Contributions",
-        "View Members", // Can view members list
+        "View Members",
       ]
     },
   ]);
 
+  // Effect to dynamically assign the current user's ID to their corresponding role
+  React.useEffect(() => {
+    if (currentUser) {
+      setUserRoles(prevRoles => {
+        const updatedRoles = prevRoles.map(role => {
+          // Remove current user's ID from any role they might have been in previously
+          const filteredMemberUserIds = role.memberUserIds.filter(id => id !== currentUser.id);
+
+          // If this is the current user's role, add their ID
+          if (role.name === currentUser.role) {
+            return { ...role, memberUserIds: [...filteredMemberUserIds, currentUser.id] };
+          }
+          return { ...role, memberUserIds: filteredMemberUserIds };
+        });
+        return updatedRoles;
+      });
+    }
+  }, [currentUser]);
+
+
   const addRole = (role: Omit<UserRoleType, 'id'>) => {
     const newRole: UserRoleType = {
       ...role,
-      id: `r${userRoles.length + 1}`, // Simple ID generation
-      memberUserIds: [], // New roles start with no members
+      id: `r${userRoles.length + 1}`,
+      memberUserIds: [],
       menuPrivileges: role.menuPrivileges || [],
     };
     setUserRoles(prev => [...prev, newRole]);

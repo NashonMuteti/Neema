@@ -25,14 +25,15 @@ import {
 import { Image as ImageIcon, Save, Upload } from "lucide-react";
 import { UserRole as UserRoleType } from './AddEditUserRoleDialog';
 import { User } from '@/context/AuthContext'; // Import the centralized User interface
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AddEditUserDialogProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   initialData?: User; // For editing existing user
-  onSave: (userData: Omit<User, 'id'> & { id?: string; defaultPassword?: string }) => void;
+  onSave: () => void; // Changed to trigger a re-fetch in parent
   availableRoles: UserRoleType[]; // New prop: list of available roles
 }
 
@@ -43,12 +44,18 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   onSave,
   availableRoles,
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser: loggedInUser } = useAuth(); // Renamed to avoid conflict
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
+  const { canManageUserProfiles } = React.useMemo(() => {
+    if (!loggedInUser || !definedRoles) {
+      return { canManageUserProfiles: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === loggedInUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
+    return { canManageUserProfiles };
+  }, [loggedInUser, definedRoles]);
 
   const [name, setName] = React.useState(initialData?.name || "");
   const [email, setEmail] = React.useState(initialData?.email || "");
@@ -88,7 +95,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name || !email) {
       showError("Name and Email are required.");
       return;
@@ -105,25 +112,82 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     let userImageUrl: string | undefined = initialData?.imageUrl;
     if (selectedFile && previewUrl) {
       userImageUrl = previewUrl;
+      // In a real app, you'd upload the file to Supabase Storage here
+      // For now, we're using a blob URL for preview.
     } else if (!selectedFile && !initialData?.imageUrl) {
       userImageUrl = undefined;
     }
 
-    const userData: Omit<User, 'id'> & { id?: string; defaultPassword?: string } = {
-      name,
-      email,
-      role,
-      status,
-      enableLogin,
-      imageUrl: userImageUrl,
-      defaultPassword: enableLogin && defaultPassword ? defaultPassword : undefined,
-    };
-
     if (initialData?.id) {
-      userData.id = initialData.id;
+      // Editing existing user in Supabase Auth and profiles table
+      const { error: authUpdateError } = await supabase.auth.updateUser({
+        email: email,
+        data: { full_name: name, avatar_url: userImageUrl },
+      });
+
+      if (authUpdateError) {
+        console.error("Error updating Supabase Auth user:", authUpdateError);
+        showError("Failed to update user authentication details.");
+        return;
+      }
+
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({ name, email, role, status, enable_login: enableLogin, image_url: userImageUrl })
+        .eq('id', initialData.id);
+
+      if (profileUpdateError) {
+        console.error("Error updating user profile:", profileUpdateError);
+        showError("Failed to update user profile details.");
+        return;
+      }
+
+      if (defaultPassword) {
+        const { error: passwordResetError } = await supabase.auth.updateUser({
+          password: defaultPassword,
+        });
+        if (passwordResetError) {
+          console.error("Error resetting password:", passwordResetError);
+          showError("Failed to reset user password.");
+          return;
+        }
+      }
+
+    } else {
+      // Add new user to Supabase Auth and profiles table
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: defaultPassword || "default_secure_password", // Fallback password if not provided
+        options: {
+          data: {
+            full_name: name,
+            avatar_url: userImageUrl,
+          },
+        },
+      });
+
+      if (signUpError) {
+        console.error("Error signing up new user:", signUpError);
+        showError(`Failed to add new user: ${signUpError.message}`);
+        return;
+      }
+
+      if (signUpData.user) {
+        // Update the profile with the selected role and status
+        const { error: profileUpdateError } = await supabase
+          .from('profiles')
+          .update({ role, status, enable_login: enableLogin })
+          .eq('id', signUpData.user.id);
+
+        if (profileUpdateError) {
+          console.error("Error updating new user's profile with role/status:", profileUpdateError);
+          showError("Failed to set new user's role and status.");
+          return;
+        }
+      }
     }
 
-    onSave(userData);
+    onSave(); // Trigger the parent to re-fetch users
     showSuccess(`User ${initialData ? "updated" : "added"} successfully!`);
     setIsOpen(false);
   };

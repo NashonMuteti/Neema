@@ -12,9 +12,15 @@ const DatabaseUpdateSettings = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageDatabaseMaintenance = currentUserPrivileges.includes("Manage Database Maintenance");
+  const { canManageDatabaseMaintenance } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageDatabaseMaintenance: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageDatabaseMaintenance = currentUserPrivileges.includes("Manage Database Maintenance");
+    return { canManageDatabaseMaintenance };
+  }, [currentUser, definedRoles]);
 
   const handleCheckAndUpdateDatabase = async () => {
     const toastId = showLoading("Checking and updating database fields...");

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
@@ -29,47 +29,44 @@ import { Input } from "@/components/ui/input";
 import { Search, ArrowLeft } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { useViewingMember } from "@/context/ViewingMemberContext"; // New import
-
-// Dummy data for all members' contributions (imported from Reports/MemberContributions for consistency)
-import { allMembersContributions } from "@/pages/Reports/MemberContributions";
+import { useViewingMember } from "@/context/ViewingMemberContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MemberContribution {
   id: string;
-  projectId: string;
-  projectName: string;
-  date: string; // ISO string
-  amount: number; // Actual contributed
-  expected: number; // Expected contribution
-}
-
-interface AllContribution extends MemberContribution {
-  memberId: string;
-  memberName: string;
-  memberEmail: string;
+  type: 'income' | 'expenditure' | 'petty_cash';
+  sourceOrPurpose: string;
+  date: Date;
+  amount: number;
+  accountName: string;
 }
 
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
-const getContributionStatus = (amount: number, expected: number): { text: string; variant: BadgeVariant } => {
-  if (amount >= expected) {
-    return { text: "Met", variant: "default" };
-  } else if (amount > 0) {
-    return { text: "Partial", variant: "secondary" };
-  } else {
-    return { text: "Deficit", variant: "destructive" };
+const getContributionStatus = (type: MemberContribution['type']): { text: string; variant: BadgeVariant } => {
+  if (type === 'income') {
+    return { text: "Income", variant: "default" };
+  } else if (type === 'expenditure') {
+    return { text: "Expenditure", variant: "destructive" };
+  } else if (type === 'petty_cash') {
+    return { text: "Petty Cash", variant: "secondary" };
   }
+  return { text: "Unknown", variant: "outline" };
 };
 
 const MemberContributionsDetail: React.FC = () => {
   const { memberId } = useParams<{ memberId: string }>();
-  const { setViewingMemberName } = useViewingMember(); // Use the setter
+  const { setViewingMemberName } = useViewingMember();
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([]);
+  const [memberName, setMemberName] = useState("Unknown Member");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -80,32 +77,119 @@ const MemberContributionsDetail: React.FC = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const memberContributions = allMembersContributions.filter(c => c.memberId === memberId);
-  const memberName = memberContributions.length > 0 ? memberContributions[0].memberName : "Unknown Member";
+  const fetchMemberData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  // Effect to update the global header with the member's name
-  React.useEffect(() => {
-    setViewingMemberName(memberName);
+    if (!memberId) {
+      setError("Member ID is missing.");
+      setLoading(false);
+      return;
+    }
+
+    // Fetch member name
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('name, email')
+      .eq('id', memberId)
+      .single();
+
+    if (profileError) {
+      console.error("Error fetching member profile:", profileError);
+      setError("Failed to load member profile.");
+      setLoading(false);
+      return;
+    }
+
+    if (profileData) {
+      setMemberName(profileData.name || profileData.email || "Unknown Member");
+      setViewingMemberName(profileData.name || profileData.email || "Unknown Member");
+    } else {
+      setError("Member not found.");
+      setLoading(false);
+      return;
+    }
+
+    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
+    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
+
+    const { data: incomeData, error: incomeError } = await supabase
+      .from('income_transactions')
+      .select('id, date, amount, source, financial_accounts(name)')
+      .eq('user_id', memberId)
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString());
+
+    const { data: expenditureData, error: expenditureError } = await supabase
+      .from('expenditure_transactions')
+      .select('id, date, amount, purpose, financial_accounts(name)')
+      .eq('user_id', memberId)
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString());
+
+    const { data: pettyCashData, error: pettyCashError } = await supabase
+      .from('petty_cash_transactions')
+      .select('id, date, amount, purpose, financial_accounts(name)')
+      .eq('user_id', memberId)
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString());
+
+    if (incomeError || expenditureError || pettyCashError) {
+      console.error("Error fetching contributions:", incomeError || expenditureError || pettyCashError);
+      setError("Failed to load member's contributions.");
+      setMemberContributions([]);
+    } else {
+      const allContributions: MemberContribution[] = [];
+
+      incomeData?.forEach(tx => allContributions.push({
+        id: tx.id,
+        type: 'income',
+        sourceOrPurpose: tx.source,
+        date: parseISO(tx.date),
+        amount: tx.amount,
+        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+      }));
+
+      expenditureData?.forEach(tx => allContributions.push({
+        id: tx.id,
+        type: 'expenditure',
+        sourceOrPurpose: tx.purpose,
+        date: parseISO(tx.date),
+        amount: tx.amount,
+        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+      }));
+
+      pettyCashData?.forEach(tx => allContributions.push({
+        id: tx.id,
+        type: 'petty_cash',
+        sourceOrPurpose: tx.purpose,
+        date: parseISO(tx.date),
+        amount: tx.amount,
+        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+      }));
+
+      const filteredAndSorted = allContributions
+        .filter(c => c.sourceOrPurpose.toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+
+      setMemberContributions(filteredAndSorted);
+    }
+    setLoading(false);
+  }, [memberId, filterMonth, filterYear, searchQuery, setViewingMemberName]);
+
+  useEffect(() => {
+    fetchMemberData();
     return () => {
       setViewingMemberName(null); // Clear the name when component unmounts
     };
-  }, [memberName, setViewingMemberName]);
+  }, [fetchMemberData, setViewingMemberName]);
 
-  // --- Logic for "Contributions Overview" tab (Calendar & Summary) ---
-  const filteredOverviewContributions: MemberContribution[] = memberContributions.filter(contribution => {
-    const contributionDate = parseISO(contribution.date);
-    return (
-      getMonth(contributionDate).toString() === filterMonth &&
-      getYear(contributionDate).toString() === filterYear
-    );
-  }).sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()); // Sort by date ascending
+  const totalIncome = memberContributions.filter(c => c.type === 'income').reduce((sum, c) => sum + c.amount, 0);
+  const totalExpenditure = memberContributions.filter(c => c.type === 'expenditure' || c.type === 'petty_cash').reduce((sum, c) => sum + c.amount, 0);
+  const netBalance = totalIncome - totalExpenditure;
 
-  const totalOverviewContributed = filteredOverviewContributions.reduce((sum, c) => sum + c.amount, 0);
-  const totalOverviewExpected = filteredOverviewContributions.reduce((sum, c) => sum + c.expected, 0);
-  const overviewDeficit = totalOverviewExpected - totalOverviewContributed;
-
-  const overviewContributionsByDate = filteredOverviewContributions.reduce((acc, contribution) => {
-    const dateKey = format(parseISO(contribution.date), "yyyy-MM-dd");
+  const contributionsByDate = memberContributions.reduce((acc, contribution) => {
+    const dateKey = format(contribution.date, "yyyy-MM-dd");
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
@@ -115,7 +199,7 @@ const MemberContributionsDetail: React.FC = () => {
 
   const renderDay = (day: Date) => {
     const dateKey = format(day, "yyyy-MM-dd");
-    const dayContributions = overviewContributionsByDate[dateKey];
+    const dayContributions = contributionsByDate[dateKey];
     return (
       <div className="relative text-center">
         {day.getDate()}
@@ -128,16 +212,28 @@ const MemberContributionsDetail: React.FC = () => {
     );
   };
 
-  // --- Logic for "Detailed Contributions" tab (Table) ---
-  const filteredDetailedContributions: AllContribution[] = React.useMemo(() => {
-    return memberContributions.filter(contribution => {
-      const contributionDate = parseISO(contribution.date);
-      const matchesDate = getMonth(contributionDate).toString() === filterMonth && getYear(contributionDate).toString() === filterYear;
-      const matchesSearch = contribution.projectName.toLowerCase().includes(searchQuery.toLowerCase());
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Member Contributions</h1>
+        <p className="text-lg text-muted-foreground">Loading member contributions...</p>
+      </div>
+    );
+  }
 
-      return matchesDate && matchesSearch;
-    }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()); // Sort by date descending
-  }, [memberContributions, filterMonth, filterYear, searchQuery]);
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Member Contributions</h1>
+        <p className="text-lg text-destructive">{error}</p>
+        <Link to="/members">
+          <Button variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Members
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -150,13 +246,13 @@ const MemberContributionsDetail: React.FC = () => {
         <h1 className="text-3xl font-bold text-foreground">{memberName}'s Contributions</h1>
       </div>
       <p className="text-lg text-muted-foreground">
-        Detailed view of {memberName}'s contributions to projects.
+        Detailed view of {memberName}'s financial activities.
       </p>
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="overview">Contributions Overview</TabsTrigger>
-          <TabsTrigger value="detailed">Detailed Contributions</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="detailed">Detailed Transactions</TabsTrigger>
         </TabsList>
 
         {/* Contributions Overview Tab Content */}
@@ -165,7 +261,7 @@ const MemberContributionsDetail: React.FC = () => {
             {/* Calendar and Filters */}
             <Card className="lg:col-span-2 transition-all duration-300 ease-in-out hover:shadow-xl">
               <CardHeader>
-                <CardTitle>Contribution Calendar</CardTitle>
+                <CardTitle>Activity Calendar</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-stretch space-y-4">
                 <div className="flex flex-wrap gap-4 justify-center">
@@ -217,40 +313,42 @@ const MemberContributionsDetail: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Contribution Summary */}
+            {/* Financial Summary */}
             <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
               <CardHeader>
                 <CardTitle>Summary for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <p className="text-muted-foreground">Total Contributed:</p>
-                  <p className="text-xl font-bold text-primary">${totalOverviewContributed.toFixed(2)}</p>
+                  <p className="text-muted-foreground">Total Income:</p>
+                  <p className="text-xl font-bold text-primary">${totalIncome.toFixed(2)}</p>
                 </div>
                 <div className="flex justify-between items-center">
-                  <p className="text-muted-foreground">Total Expected:</p>
-                  <p className="text-xl font-bold text-secondary">${totalOverviewExpected.toFixed(2)}</p>
+                  <p className="text-muted-foreground">Total Expenditure:</p>
+                  <p className="text-xl font-bold text-destructive">${totalExpenditure.toFixed(2)}</p>
                 </div>
                 <div className="flex justify-between items-center border-t pt-4">
-                  <p className="text-muted-foreground">Deficit:</p>
-                  <p className={cn("text-xl font-bold", overviewDeficit > 0 ? "text-destructive" : "text-green-600")}>
-                    ${overviewDeficit.toFixed(2)}
+                  <p className="text-muted-foreground">Net Balance:</p>
+                  <p className={cn("text-xl font-bold", netBalance >= 0 ? "text-green-600" : "text-red-600")}>
+                    ${netBalance.toFixed(2)}
                   </p>
                 </div>
 
-                {selectedDate && overviewContributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
+                {selectedDate && contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
                   <div className="mt-6 space-y-2">
-                    <h3 className="font-semibold text-lg">Contributions on {format(selectedDate, "PPP")}</h3>
-                    {overviewContributionsByDate[format(selectedDate, "yyyy-MM-dd")].map((c) => (
+                    <h3 className="font-semibold text-lg">Activity on {format(selectedDate, "PPP")}</h3>
+                    {contributionsByDate[format(selectedDate, "yyyy-MM-dd")].map((c) => (
                       <div key={c.id} className="flex justify-between items-center text-sm">
-                        <span>{c.projectName}</span>
-                        <Badge variant="secondary">${c.amount.toFixed(2)} / ${c.expected.toFixed(2)}</Badge>
+                        <span>{c.sourceOrPurpose} ({c.accountName})</span>
+                        <Badge variant={getContributionStatus(c.type).variant}>
+                          {c.type === 'income' ? '+' : '-'}${c.amount.toFixed(2)}
+                        </Badge>
                       </div>
                     ))}
                   </div>
                 )}
-                {selectedDate && !overviewContributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
-                  <p className="text-muted-foreground text-sm mt-6">No contributions on {format(selectedDate, "PPP")}.</p>
+                {selectedDate && !contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
+                  <p className="text-muted-foreground text-sm mt-6">No activity on {format(selectedDate, "PPP")}.</p>
                 )}
               </CardContent>
             </Card>
@@ -261,7 +359,7 @@ const MemberContributionsDetail: React.FC = () => {
         <TabsContent value="detailed" className="space-y-6 mt-6">
           <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
             <CardHeader>
-              <CardTitle>Detailed Contributions for {memberName} ({months[parseInt(filterMonth)].label} {filterYear})</CardTitle>
+              <CardTitle>Detailed Transactions for {memberName} ({months[parseInt(filterMonth)].label} {filterYear})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
@@ -305,7 +403,7 @@ const MemberContributionsDetail: React.FC = () => {
                   <div className="relative flex items-center">
                     <Input
                       type="text"
-                      placeholder="Search project..."
+                      placeholder="Search description..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-8"
@@ -315,28 +413,30 @@ const MemberContributionsDetail: React.FC = () => {
                 </div>
               </div>
 
-              {filteredDetailedContributions.length > 0 ? (
+              {memberContributions.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Project</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Contributed</TableHead>
-                      <TableHead className="text-right">Expected</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredDetailedContributions.map((contribution) => {
-                      const status = getContributionStatus(contribution.amount, contribution.expected);
+                    {memberContributions.map((contribution) => {
+                      const status = getContributionStatus(contribution.type);
                       return (
                         <TableRow key={contribution.id}>
-                          <TableCell className="font-medium">{contribution.projectName}</TableCell>
-                          <TableCell>{format(parseISO(contribution.date), "MMM dd, yyyy")}</TableCell>
-                          <TableCell className="text-right">${contribution.amount.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">${contribution.expected.toFixed(2)}</TableCell>
-                          <TableCell className="text-center">
+                          <TableCell>{format(contribution.date, "MMM dd, yyyy")}</TableCell>
+                          <TableCell>
                             <Badge variant={status.variant}>{status.text}</Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">{contribution.sourceOrPurpose}</TableCell>
+                          <TableCell>{contribution.accountName}</TableCell>
+                          <TableCell className="text-right">
+                            {contribution.type === 'income' ? '+' : '-'}${contribution.amount.toFixed(2)}
                           </TableCell>
                         </TableRow>
                       );
@@ -344,7 +444,7 @@ const MemberContributionsDetail: React.FC = () => {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-muted-foreground text-center mt-4">No contributions found for the selected period or matching your search.</p>
+                <p className="text-muted-foreground text-center mt-4">No transactions found for the selected period or matching your search.</p>
               )}
             </CardContent>
           </Card>

@@ -9,7 +9,8 @@ import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmi
 import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings";
 import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization";
 import UserRolesSettings from "@/components/admin/UserRolesSettings";
-import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings"; // New import
+import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings";
+import DefaultPasswordSettings from "@/components/admin/DefaultPasswordSettings"; // New import
 
 const AdminSettings = () => {
   return (
@@ -20,7 +21,7 @@ const AdminSettings = () => {
       </p>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-8"> {/* Increased grid-cols to accommodate new tab */}
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="app-customization">App Customization</TabsTrigger>
@@ -28,13 +29,14 @@ const AdminSettings = () => {
           <TabsTrigger value="user-profiles">User Management</TabsTrigger>
           <TabsTrigger value="user-roles">User Roles</TabsTrigger>
           <TabsTrigger value="reports-templates">Reports Templates</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance</TabsTrigger> {/* New tab trigger */}
+          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
         </TabsList>
         <TabsContent value="general">
           <SystemCurrencySettings />
         </TabsContent>
-        <TabsContent value="security">
+        <TabsContent value="security" className="space-y-6"> {/* Added space-y-6 for spacing */}
           <SecuritySettings />
+          <DefaultPasswordSettings /> {/* New: Default Password Settings */}
         </TabsContent>
         <TabsContent value="app-customization">
           <AppCustomization />
@@ -51,7 +53,7 @@ const AdminSettings = () => {
         <TabsContent value="reports-templates">
           <ReportsTemplateCustomization />
         </TabsContent>
-        <TabsContent value="maintenance"> {/* New tab content */}
+        <TabsContent value="maintenance">
           <DatabaseUpdateSettings />
         </TabsContent>
       </Tabs>

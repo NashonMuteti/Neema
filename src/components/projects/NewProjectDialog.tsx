@@ -21,9 +21,10 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
-import { useForm, Controller } from "react-hook-form"; // Import useForm and Controller
-import { zodResolver } from "@hookform/resolvers/zod"; // Import zodResolver
-import { z } from "zod"; // Import z from zod
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 
 interface NewProjectDialogProps {
   onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => void;
@@ -46,9 +47,15 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+  const { canManageProjects } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageProjects: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+    return { canManageProjects };
+  }, [currentUser, definedRoles]);
 
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -89,24 +96,47 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
     }
   };
 
-  const onSubmit = (data: NewProjectFormValues) => {
+  const onSubmit = async (data: NewProjectFormValues) => {
+    if (!currentUser) {
+      showError("You must be logged in to create a project.");
+      return;
+    }
+
     let projectThumbnailUrl: string | undefined = undefined;
     if (selectedFile && previewUrl) {
+      // In a real app, you'd upload the file to Supabase Storage here
+      // For now, we're using a blob URL for preview.
       projectThumbnailUrl = previewUrl;
     }
 
-    onAddProject({
-      name: data.name,
-      description: data.description || "",
-      thumbnailUrl: projectThumbnailUrl,
-      dueDate: data.dueDate || undefined,
-      memberContributionAmount: data.memberContributionAmount || undefined,
-    });
-    showSuccess("Project added successfully!");
-    setIsOpen(false);
-    reset(); // Reset form fields
-    setSelectedFile(null);
-    setPreviewUrl(null);
+    const { error } = await supabase
+      .from('projects')
+      .insert({
+        name: data.name,
+        description: data.description || "",
+        thumbnail_url: projectThumbnailUrl,
+        due_date: data.dueDate?.toISOString(),
+        member_contribution_amount: data.memberContributionAmount,
+        user_id: currentUser.id, // Assign current user as creator
+      });
+
+    if (error) {
+      console.error("Error adding project:", error);
+      showError("Failed to add project.");
+    } else {
+      onAddProject({
+        name: data.name,
+        description: data.description || "",
+        thumbnailUrl: projectThumbnailUrl,
+        dueDate: data.dueDate || undefined,
+        memberContributionAmount: data.memberContributionAmount || undefined,
+      });
+      showSuccess("Project added successfully!");
+      setIsOpen(false);
+      reset(); // Reset form fields
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    }
   };
 
   return (

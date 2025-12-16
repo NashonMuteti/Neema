@@ -12,24 +12,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User, Shield, ToggleLeft, ToggleRight } from "lucide-react";
+import { LogOut, Settings, User, Shield } from "lucide-react"; // Removed ToggleLeft, ToggleRight
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSelector } from "./LanguageSelector";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
-import { useViewingMember } from "@/context/ViewingMemberContext"; // New import
+import { useViewingMember } from "@/context/ViewingMemberContext";
+import { supabase } from '@/integrations/supabase/client'; // Import Supabase client
 
 const Header = () => {
-  const { isAdmin, toggleAdmin, currentUser } = useAuth(); // Use isAdmin, toggleAdmin, and currentUser from AuthContext
-  const { brandLogoUrl, tagline } = useBranding();
-  const { viewingMemberName } = useViewingMember(); // Use the viewing member name
+  const { currentUser, isLoading } = useAuth(); // Use currentUser and isLoading from AuthContext
+  const { brandLogoUrl } = useBranding();
+  const { viewingMemberName } = useViewingMember();
 
-  // Use currentUser from context, fallback to dummy if not available
-  const user = currentUser || {
-    name: "Guest User",
-    email: "guest@example.com",
-    initials: "GU",
+  // Determine if the current user is an admin based on their role
+  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin"; // Check for Super Admin too
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    // The onAuthStateChange listener in AuthContext will handle state update and redirection
   };
+
+  if (isLoading) {
+    return null; // Or a loading spinner for the header
+  }
+
+  // If no current user, don't render the header (handled by ProtectedRoute redirecting to Login)
+  if (!currentUser) {
+    return null;
+  }
 
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b bg-card shadow-sm transition-all duration-300 ease-in-out">
@@ -45,16 +56,7 @@ const Header = () => {
       <div className="flex items-center space-x-4">
         <LanguageSelector />
         <ThemeToggle />
-        {/* Admin Toggle Button */}
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleAdmin}>
-          {isAdmin ? (
-            <ToggleRight className="h-[1.2rem] w-[1.2rem] text-primary" />
-          ) : (
-            <ToggleLeft className="h-[1.2rem] w-[1.2rem] text-muted-foreground" />
-          )}
-          <span className="sr-only">Toggle Admin Mode</span>
-        </Button>
-
+        {/* Admin Menu - only visible if the user's role is 'Admin' or 'Super Admin' */}
         {isAdmin && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -79,18 +81,18 @@ const Header = () => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarFallback>{user.name.charAt(0).toUpperCase() + user.name.split(' ')[1].charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarFallback>{currentUser.name.charAt(0).toUpperCase() + (currentUser.name.split(' ')[1]?.charAt(0).toUpperCase() || '')}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user.name}</p>
+                <p className="text-sm font-medium leading-none">{currentUser.name}</p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {user.email}
+                  {currentUser.email}
                 </p>
-              </div>
+              </div >
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
@@ -106,7 +108,7 @@ const Header = () => {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>

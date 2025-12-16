@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,7 +13,7 @@ import {
 import AddMemberDialog from "@/components/members/AddMemberDialog";
 import EditMemberDialog from "@/components/members/EditMemberDialog";
 import DeleteMemberDialog from "@/components/members/DeleteMemberDialog";
-import { showSuccess } from "@/utils/toast";
+import { showSuccess, showError } from "@/utils/toast";
 import { User as UserIcon, Printer, FileSpreadsheet, Search, Eye } from "lucide-react";
 import {
   Select,
@@ -26,83 +26,114 @@ import {
 import { Input } from "@/components/ui/input";
 import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils";
 import { Link } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth, User } from "@/context/AuthContext"; // Import useAuth and User interface
 import { useBranding } from "@/context/BrandingContext"; // Import useBranding
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-  enableLogin: boolean;
-  imageUrl?: string;
-  status: "Active" | "Inactive" | "Suspended";
-  // Add other member fields as needed
-}
+import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 
 const Members = () => {
   const { currentUser } = useAuth(); // Use the auth context to get current user
   const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
 
   // Determine if the current user has the "Manage Members" privilege
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageMembers = currentUserPrivileges.includes("Manage Members"); // Check for the specific privilege
-  const canExportPdf = currentUserPrivileges.includes("Export Member List PDF"); // New privilege check
-  const canExportExcel = currentUserPrivileges.includes("Export Member List Excel"); // New privilege check
+  const { canManageMembers, canExportPdf, canExportExcel } = useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageMembers: false, canExportPdf: false, canExportExcel: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageMembers = currentUserPrivileges.includes("Manage Members"); // Check for the specific privilege
+    const canExportPdf = currentUserPrivileges.includes("Export Member List PDF"); // New privilege check
+    const canExportExcel = currentUserPrivileges.includes("Export Member List Excel"); // New privilege check
+    return { canManageMembers, canExportPdf, canExportExcel };
+  }, [currentUser, definedRoles]);
 
   const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
 
-  const [members, setMembers] = React.useState<Member[]>([
-    { id: "m1", name: "Alice Johnson", email: "alice@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Alice", status: "Active" },
-    { id: "m2", name: "Bob Williams", email: "bob@example.com", enableLogin: false, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Bob", status: "Inactive" },
-    { id: "m3", name: "Charlie Brown", email: "charlie@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Charlie", status: "Active" },
-    { id: "m4", name: "David Green", email: "david@example.com", enableLogin: true, imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=David", status: "Suspended" },
-  ]);
+  const [members, setMembers] = React.useState<User[]>([]); // Use the centralized User interface
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Inactive" | "Suspended">("All");
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const filteredMembers = members.filter(member => {
-    const matchesStatus = filterStatus === "All" || member.status === filterStatus;
-    const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          member.email.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+  const fetchMembers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  const handleAddMember = (memberData: { name: string; email: string; enableLogin: boolean; imageUrl?: string; defaultPassword?: string }) => {
-    const newMember: Member = {
-      id: `m${members.length + 1}`, // Simple ID generation
-      name: memberData.name,
-      email: memberData.email,
-      enableLogin: memberData.enableLogin,
-      imageUrl: memberData.imageUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${memberData.name}`,
-      status: "Active", // Default status for new members
-    };
-    setMembers((prev) => [...prev, newMember]);
-    console.log("Adding member with data:", memberData);
+    let query = supabase.from('profiles').select('*');
+
+    if (filterStatus !== "All") {
+      query = query.eq('status', filterStatus);
+    }
+
+    if (searchQuery) {
+      query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+    }
+
+    const { data, error } = await query.order('name', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching members:", error);
+      setError("Failed to load members.");
+      showError("Failed to load members.");
+      setMembers([]);
+    } else {
+      setMembers(data.map(p => ({
+        id: p.id,
+        name: p.name || p.email || "Unknown",
+        email: p.email || "N/A",
+        enableLogin: p.enable_login ?? false,
+        imageUrl: p.image_url || undefined,
+        status: p.status as "Active" | "Inactive" | "Suspended",
+        role: p.role || "Contributor", // Default role if not set
+      })));
+    }
+    setLoading(false);
+  }, [filterStatus, searchQuery]);
+
+  useEffect(() => {
+    fetchMembers();
+  }, [fetchMembers]);
+
+  const handleAddMember = () => {
+    fetchMembers(); // Re-fetch members after adding
   };
 
-  const handleEditMember = (updatedMember: Member) => {
-    setMembers((prev) =>
-      prev.map((member) => (member.id === updatedMember.id ? updatedMember : member))
-    );
-    console.log("Editing member:", updatedMember);
+  const handleEditMember = () => {
+    fetchMembers(); // Re-fetch members after editing
   };
 
-  const handleDeleteMember = (memberId: string) => {
-    setMembers((prev) => prev.filter((member) => member.id !== memberId));
-    console.log("Deleting member ID:", memberId);
+  const handleDeleteMember = () => {
+    fetchMembers(); // Re-fetch members after deleting
   };
 
-  const handleToggleMemberStatus = (memberId: string) => {
-    setMembers((prev) =>
-      prev.map((member) =>
-        member.id === memberId
-          ? { ...member, status: member.status === "Active" ? "Inactive" : "Active" }
-          : member
-      )
-    );
-    showSuccess("Member status updated!");
+  const handleToggleMemberStatus = async (memberId: string, currentStatus: User['status']) => {
+    if (!canManageMembers) {
+      showError("You do not have permission to change member status.");
+      return;
+    }
+
+    let newStatus: User['status'];
+    if (currentStatus === "Active") {
+      newStatus = "Inactive";
+    } else if (currentStatus === "Inactive") {
+      newStatus = "Active";
+    } else {
+      newStatus = "Active"; // If suspended, reactivate
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: newStatus })
+      .eq('id', memberId);
+
+    if (error) {
+      console.error("Error updating member status:", error);
+      showError("Failed to update member status.");
+    } else {
+      showSuccess(`Member status updated to '${newStatus}'!`);
+      fetchMembers(); // Re-fetch to update UI
+    }
   };
 
   const reportOptions = {
@@ -112,16 +143,16 @@ const Members = () => {
   };
 
   const handlePrintPdf = () => {
-    exportMembersToPdf(filteredMembers, reportOptions);
+    exportMembersToPdf(members, reportOptions); // Use fetched members
     showSuccess("Generating PDF report...");
   };
 
   const handleExportExcel = () => {
-    exportMembersToExcel(filteredMembers, reportOptions);
+    exportMembersToExcel(members, reportOptions); // Use fetched members
     showSuccess("Generating Excel report...");
   };
 
-  const getStatusBadgeClasses = (status: Member['status']) => {
+  const getStatusBadgeClasses = (status: User['status']) => {
     switch (status) {
       case "Active":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
@@ -133,6 +164,24 @@ const Members = () => {
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
     }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Members</h1>
+        <p className="text-lg text-muted-foreground">Loading members...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Members</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -197,7 +246,7 @@ const Members = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredMembers.map((member) => (
+            {members.map((member) => (
               <TableRow key={member.id}>
                 <TableCell>
                   {member.imageUrl ? (
@@ -225,7 +274,7 @@ const Members = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleToggleMemberStatus(member.id)}
+                        onClick={() => handleToggleMemberStatus(member.id, member.status)}
                       >
                         {member.status === "Active" ? "Deactivate" : "Activate"}
                       </Button>
@@ -244,7 +293,7 @@ const Members = () => {
             ))}
           </TableBody>
         </Table>
-        {filteredMembers.length === 0 && (
+        {members.length === 0 && (
           <p className="text-muted-foreground text-center mt-4">No members found with status "{filterStatus}" or matching your search.</p>
         )}
       </div>

@@ -7,7 +7,6 @@ import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handsha
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
-// No longer importing PrivilegeItem or deriving privileges from navItems here
 
 export interface NavItem {
   name: string;
@@ -24,9 +23,7 @@ export interface NavHeading {
   children: NavItem[];
 }
 
-// Removed PrivilegeItem interface as privileges are now defined separately
-
-type SidebarItem = NavItem | NavHeading; // Only navigation items and headings
+type SidebarItem = NavItem | NavHeading;
 
 export const navItems: SidebarItem[] = [
   {
@@ -174,11 +171,16 @@ export const navItems: SidebarItem[] = [
 
 const Sidebar = () => {
   const location = useLocation();
-  const { currentUser } = useAuth();
+  const { currentUser, isLoading } = useAuth(); // Use currentUser and isLoading
   const { userRoles: definedRoles } = useUserRoles();
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
   const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false);
+
+  // If still loading or no current user, don't render sidebar content
+  if (isLoading || !currentUser) {
+    return null;
+  }
 
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
@@ -223,8 +225,6 @@ const Sidebar = () => {
     <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">
       <nav className="flex-1 space-y-2">
         {navItems.map((item) => {
-          // No longer checking for item.type === "privilege" here as they are removed from navItems
-
           if (!hasAccess(item.requiredPrivileges)) {
             return null;
           }

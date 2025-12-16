@@ -37,9 +37,15 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances");
+  const { canInitializeBalances } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canInitializeBalances: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances");
+    return { canInitializeBalances };
+  }, [currentUser, definedRoles]);
 
   const [isOpen, setIsOpen] = React.useState(false);
   const [newBalances, setNewBalances] = React.useState<Record<string, string>>({});

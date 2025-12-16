@@ -13,9 +13,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { showError, showSuccess } from "@/utils/toast"; // Assuming toast utility
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { showError, showSuccess } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Member {
   id: string;
@@ -24,19 +25,34 @@ interface Member {
 
 interface DeleteMemberDialogProps {
   member: Member;
-  onDeleteMember: (memberId: string) => void;
+  onDeleteMember: () => void; // Changed to trigger a re-fetch in parent
 }
 
 const DeleteMemberDialog: React.FC<DeleteMemberDialogProps> = ({ member, onDeleteMember }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageMembers = currentUserPrivileges.includes("Manage Members");
+  const { canManageMembers } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageMembers: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageMembers = currentUserPrivileges.includes("Manage Members");
+    return { canManageMembers };
+  }, [currentUser, definedRoles]);
 
-  const handleDelete = () => {
-    onDeleteMember(member.id);
+  const handleDelete = async () => {
+    // Delete user from Supabase Auth (this will cascade delete from profiles table due to RLS)
+    const { error } = await supabase.rpc('delete_user_by_id', { user_id_to_delete: member.id });
+
+    if (error) {
+      console.error("Error deleting user from Supabase Auth:", error);
+      showError(`Failed to delete ${member.name}: ${error.message}`);
+      return;
+    }
+
+    onDeleteMember(); // Trigger parent to re-fetch members
     showSuccess(`${member.name} deleted successfully.`);
   };
 

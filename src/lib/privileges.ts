@@ -21,8 +21,8 @@ export const allPrivilegeNames = [
   "Manage Debts",
   "View Members",
   "Manage Members",
-  "Export Member List PDF", // New privilege
-  "Export Member List Excel", // New privilege
+  "Export Member List PDF",
+  "Export Member List Excel",
   "View Board Members",
   "Manage Board Members",
   "View Reports",
@@ -43,4 +43,5 @@ export const allPrivilegeNames = [
   "Manage System Currency",
   "Manage Member Fields",
   "Manage Database Maintenance",
+  "Manage Default Password", // New privilege for default password setting
 ];

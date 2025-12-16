@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react"; // Ensure useMemo is imported
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
@@ -17,13 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon, CalendarIcon, DollarSign, Handshake, Search } from "lucide-react"; // Added Search icon
+import { Image as ImageIcon, CalendarIcon, DollarSign, Handshake, Search } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
-import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook
-import { Input } from "@/components/ui/input"; // Import Input for search
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useAuth } from "@/context/AuthContext";
+import { getProjectFinancialSummary } from "@/utils/projectFinancials";
+import { Input } from "@/components/ui/input";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 
 interface Project {
   id: string;
@@ -33,74 +34,137 @@ interface Project {
   thumbnailUrl?: string;
   dueDate?: Date;
   memberContributionAmount?: number;
+  user_id: string; // Add user_id to match Supabase table
 }
 
 const Projects = () => {
-  const { currentUser } = useAuth(); // Use the auth context
-  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
 
-  // Determine if the current user has the "Manage Projects" privilege
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+  // Calculate canManageProjects using useMemo for stability
+  const { canManageProjects } = useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageProjects: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+    return { canManageProjects };
+  }, [currentUser, definedRoles]);
 
-  // In a real application, this would come from your member management system
-  // For now, we'll use a dummy value.
-  const activeMembersCount = 5;
+  const activeMembersCount = 5; // This will eventually come from a dynamic source
 
-  const [projects, setProjects] = React.useState<Project[]>([
-    { id: "proj1", name: "Film Production X", description: "Main film project for the year.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 11, 15), memberContributionAmount: 100 },
-    { id: "proj2", name: "Marketing Campaign Y", description: "Promotional activities for new releases.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 7, 30), memberContributionAmount: 50 },
-    { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 8, 10), memberContributionAmount: 75 },
-    { id: "proj4", name: "Archived Project A", description: "An old project that was deleted.", status: "Deleted" },
-    { id: "proj5", name: "Short Film Contest", description: "Submission for a local short film festival.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 6, 20), memberContributionAmount: 20 },
-    { id: "proj6", name: "Documentary Research", description: "Initial research phase for a new documentary.", status: "Open", thumbnailUrl: "/placeholder.svg", memberContributionAmount: 0 },
-    { id: "proj7", name: "Suspended Feature Film", description: "Production paused due to funding issues.", status: "Suspended", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2025, 0, 1), memberContributionAmount: 150 },
-  ]);
+  const [projects, setProjects] = React.useState<Project[]>([]);
   const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "Suspended" | "All">("Open");
-  const [searchQuery, setSearchQuery] = React.useState(""); // New: Search query state
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const filteredProjects = projects
-    .filter(project => {
-      const matchesStatus = filterStatus === "All" || project.status === filterStatus;
-      const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            project.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesStatus && matchesSearch;
-    })
-    .sort((a, b) => {
-      if (a.dueDate && b.dueDate) {
-        return a.dueDate.getTime() - b.dueDate.getTime();
-      }
-      if (a.dueDate) return -1;
-      if (b.dueDate) return 1;
-      return 0;
-    });
+  const fetchProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    let query = supabase.from('projects').select('*');
 
-  const handleAddProject = (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => {
-    const newProject: Project = {
-      id: `proj${projects.length + 1}`,
-      name: projectData.name,
-      description: projectData.description,
-      status: "Open",
-      thumbnailUrl: projectData.thumbnailUrl || "/placeholder.svg",
-      dueDate: projectData.dueDate,
-      memberContributionAmount: projectData.memberContributionAmount,
-    };
-    setProjects((prev) => [...prev, newProject]);
-    console.log("Adding project:", newProject);
+    if (filterStatus !== "All") {
+      query = query.eq('status', filterStatus);
+    } else {
+      // Exclude 'Deleted' projects from 'All' view
+      query = query.neq('status', 'Deleted');
+    }
+
+    if (searchQuery) {
+      query = query.ilike('name', `%${searchQuery}%`);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching projects:", error);
+      setError("Failed to load projects.");
+      showError("Failed to load projects.");
+      setProjects([]);
+    } else {
+      setProjects(data.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        status: p.status as "Open" | "Closed" | "Deleted" | "Suspended",
+        thumbnailUrl: p.thumbnail_url || undefined,
+        dueDate: p.due_date ? new Date(p.due_date) : undefined,
+        memberContributionAmount: p.member_contribution_amount || undefined,
+        user_id: p.user_id,
+      })));
+    }
+    setLoading(false);
+  }, [filterStatus, searchQuery]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  const handleAddProject = async (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => {
+    if (!currentUser) {
+      showError("You must be logged in to add a project.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({
+        name: projectData.name,
+        description: projectData.description,
+        status: "Open",
+        thumbnail_url: projectData.thumbnailUrl,
+        due_date: projectData.dueDate?.toISOString(),
+        member_contribution_amount: projectData.memberContributionAmount,
+        user_id: currentUser.id, // Assign current user as creator
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding project:", error);
+      showError("Failed to add project.");
+    } else {
+      showSuccess("Project added successfully!");
+      fetchProjects(); // Re-fetch projects to update the list
+    }
   };
 
-  const handleEditProject = (updatedProject: Project) => {
-    setProjects((prev) =>
-      prev.map((project) =>
-        project.id === updatedProject.id ? updatedProject : project
-      )
-    );
-    showSuccess(`Project '${updatedProject.name}' updated successfully!`);
-    console.log("Editing project:", updatedProject);
+  const handleEditProject = async (updatedProject: Project) => {
+    if (!currentUser || updatedProject.user_id !== currentUser.id) {
+      showError("You do not have permission to edit this project.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        name: updatedProject.name,
+        description: updatedProject.description,
+        status: updatedProject.status,
+        thumbnail_url: updatedProject.thumbnailUrl,
+        due_date: updatedProject.dueDate?.toISOString(),
+        member_contribution_amount: updatedProject.memberContributionAmount,
+      })
+      .eq('id', updatedProject.id);
+
+    if (error) {
+      console.error("Error updating project:", error);
+      showError("Failed to update project.");
+    } else {
+      showSuccess(`Project '${updatedProject.name}' updated successfully!`);
+      fetchProjects(); // Re-fetch projects to update the list
+    }
   };
 
-  const handleToggleProjectStatus = (projectId: string, currentStatus: Project['status']) => {
+  const handleToggleProjectStatus = async (projectId: string, currentStatus: Project['status']) => {
+    const projectToUpdate = projects.find(p => p.id === projectId);
+    if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
+      showError("You do not have permission to change the status of this project.");
+      return;
+    }
+
     let newStatus: Project['status'];
     if (currentStatus === "Open") {
       newStatus = "Suspended";
@@ -109,41 +173,89 @@ const Projects = () => {
     } else if (currentStatus === "Closed") {
       newStatus = "Open";
     } else {
-      newStatus = "Open";
+      newStatus = "Open"; // Default if status is 'Deleted' or unknown
     }
 
-    setProjects((prev) =>
-      prev.map((project) =>
-        project.id === projectId
-          ? { ...project, status: newStatus }
-          : project
-      )
-    );
-    showSuccess(`Project status updated to '${newStatus}'!`);
-    console.log(`Toggling project status for: ${projectId} to ${newStatus}`);
+    const { error } = await supabase
+      .from('projects')
+      .update({ status: newStatus })
+      .eq('id', projectId);
+
+    if (error) {
+      console.error("Error updating project status:", error);
+      showError("Failed to update project status.");
+    } else {
+      showSuccess(`Project status updated to '${newStatus}'!`);
+      fetchProjects(); // Re-fetch projects to update the list
+    }
   };
 
-  const handleDeleteProject = (projectId: string, projectName: string) => {
-    setProjects((prev) =>
-      prev.map((project) =>
-        project.id === projectId ? { ...project, status: "Deleted" } : project
-      )
-    );
-    showSuccess(`Project '${projectName}' moved to deleted status.`);
-    console.log("Deleting project:", projectId);
+  const handleDeleteProject = async (projectId: string, projectName: string) => {
+    const projectToUpdate = projects.find(p => p.id === projectId);
+    if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
+      showError("You do not have permission to delete this project.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('projects')
+      .update({ status: "Deleted" })
+      .eq('id', projectId);
+
+    if (error) {
+      console.error("Error deleting project:", error);
+      showError("Failed to delete project.");
+    } else {
+      showSuccess(`Project '${projectName}' moved to deleted status.`);
+      fetchProjects(); // Re-fetch projects to update the list
+    }
   };
 
   const handleSaveCollections = (data: any) => {
     console.log("Saving collections data:", data);
+    // This would involve inserting into a 'collections' table
   };
 
-  const handleThumbnailUpload = (projectId: string, newUrl: string) => {
-    setProjects((prev) =>
-      prev.map((project) =>
-        project.id === projectId ? { ...project, thumbnailUrl: newUrl } : project
-      )
-    );
+  const handleThumbnailUpload = async (projectId: string, newUrl: string) => {
+    const projectToUpdate = projects.find(p => p.id === projectId);
+    if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
+      showError("You do not have permission to upload a thumbnail for this project.");
+      return;
+    }
+
+    // In a real app, you'd upload the file to Supabase Storage here
+    // For now, we're using a blob URL for preview.
+    const { error } = await supabase
+      .from('projects')
+      .update({ thumbnail_url: newUrl })
+      .eq('id', projectId);
+
+    if (error) {
+      console.error("Error updating project thumbnail:", error);
+      showError("Failed to update project thumbnail.");
+    } else {
+      showSuccess(`Thumbnail for project updated successfully!`);
+      fetchProjects(); // Re-fetch projects to update the list
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Project Accounts</h1>
+        <p className="text-lg text-muted-foreground">Loading projects...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Project Accounts</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -167,7 +279,6 @@ const Projects = () => {
               </SelectGroup>
             </SelectContent>
           </Select>
-          {/* New: Search Input */}
           <div className="relative flex items-center">
             <Input
               type="text"
@@ -184,10 +295,10 @@ const Projects = () => {
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.length > 0 ? (
-          filteredProjects.map((project) => {
+        {projects.length > 0 ? (
+          projects.map((project) => {
             const expectedAmount = (project.memberContributionAmount || 0) * activeMembersCount;
-            const { totalCollections, totalPledges } = useProjectFinancials(project.id); // Use the hook
+            const { totalCollections, totalPledges } = getProjectFinancialSummary(project.id);
 
             return (
               <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">
@@ -195,7 +306,6 @@ const Projects = () => {
                   <CardTitle>{project.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Project Image Thumbnail */}
                   <div className="w-full h-32 bg-muted rounded-md flex items-center justify-center overflow-hidden">
                     {project.thumbnailUrl ? (
                       <img src={project.thumbnailUrl} alt="Project Thumbnail" className="h-full w-full object-cover" />
@@ -241,11 +351,12 @@ const Projects = () => {
                       <CollectionsDialog
                         projectId={project.id}
                         projectName={project.name}
-                        onSaveCollections={handleSaveCollections}
+                        onCollectionAdded={fetchProjects}
                       />
                       <ProjectPledgesDialog
                         projectId={project.id}
                         projectName={project.name}
+                        onPledgesUpdated={fetchProjects}
                       />
                       <EditProjectDialog project={project} onEditProject={handleEditProject} />
                       <Button

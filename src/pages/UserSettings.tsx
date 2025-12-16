@@ -9,7 +9,9 @@ import { Switch } from "@/components/ui/switch";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { showSuccess } from "@/utils/toast";
+import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 // Define the schema for form validation
 const userSettingsSchema = z.object({
@@ -21,33 +23,85 @@ const userSettingsSchema = z.object({
 type UserSettingsFormValues = z.infer<typeof userSettingsSchema>;
 
 const UserSettings = () => {
-  // Placeholder for user data, will be replaced with actual user context
-  const currentUser = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    receiveNotifications: true,
-    themePreference: "system",
-  };
+  const { currentUser, supabaseUser, isLoading } = useAuth();
 
   const {
     register,
     handleSubmit,
     control,
+    reset,
     formState: { errors },
   } = useForm<UserSettingsFormValues>({
     resolver: zodResolver(userSettingsSchema),
     defaultValues: {
-      name: currentUser.name,
-      email: currentUser.email,
-      receiveNotifications: currentUser.receiveNotifications,
+      name: currentUser?.name || "",
+      email: currentUser?.email || "",
+      receiveNotifications: true, // Default to true, will be loaded from profile later
     },
   });
 
-  const onSubmit = (data: UserSettingsFormValues) => {
-    // In a real app, this would send updated settings to the backend
-    console.log("Saving user settings:", data);
+  React.useEffect(() => {
+    if (currentUser) {
+      reset({
+        name: currentUser.name,
+        email: currentUser.email,
+        receiveNotifications: true, // Placeholder, needs to come from profile
+      });
+    }
+  }, [currentUser, reset]);
+
+  const onSubmit = async (data: UserSettingsFormValues) => {
+    if (!currentUser || !supabaseUser) {
+      console.error("No current user to update settings for.");
+      showError("User not logged in.");
+      return;
+    }
+
+    // Update Supabase auth user metadata (for full_name)
+    const { error: authUpdateError } = await supabase.auth.updateUser({
+      data: { full_name: data.name },
+    });
+
+    if (authUpdateError) {
+      console.error("Error updating user metadata:", authUpdateError);
+      showError("Failed to update user name in authentication.");
+      return;
+    }
+
+    // Update public.profiles table (for name, and other profile-specific settings like notifications)
+    const { error: profileUpdateError } = await supabase
+      .from('profiles')
+      .update({ name: data.name /* Add receive_notifications here when column exists */ })
+      .eq('id', currentUser.id);
+
+    if (profileUpdateError) {
+      console.error("Error updating user profile:", profileUpdateError);
+      showError("Failed to update user profile details.");
+      return;
+    }
+
     showSuccess("Settings saved successfully!");
+    // A full refresh of AuthContext might be needed to reflect changes immediately
+    // For now, the next page load or manual refresh will pick up changes.
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">My Settings</h1>
+        <p className="text-lg text-muted-foreground">Loading user settings...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">My Settings</h1>
+        <p className="text-lg text-destructive">User not found. Please log in.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

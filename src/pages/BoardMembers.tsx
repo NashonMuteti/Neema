@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddEditBoardMemberDialog, { BoardMember } from "@/components/board-members/AddEditBoardMemberDialog";
 import { showSuccess, showError } from "@/utils/toast";
-import { PlusCircle, Edit, Trash2, UserCog, User as UserIcon, Search } from "lucide-react";
+import { PlusCircle, Edit, Trash2, User as UserIcon, Search } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,74 +23,136 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const BoardMembers = () => {
-  const { currentUser } = useAuth(); // Use the auth context
-  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageBoardMembers = currentUserPrivileges.includes("Manage Board Members");
+  const { canManageBoardMembers } = useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageBoardMembers: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageBoardMembers = currentUserPrivileges.includes("Manage Board Members");
+    return { canManageBoardMembers };
+  }, [currentUser, definedRoles]);
 
-  const [boardMembers, setBoardMembers] = React.useState<BoardMember[]>([
-    { id: "bm1", name: "Jane Doe", role: "Chairperson", email: "jane.doe@example.com", phone: "555-123-4567", address: "123 Main St, Anytown", notes: "Oversees strategic direction.", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Jane" },
-    { id: "bm2", name: "Richard Roe", role: "Treasurer", email: "richard.roe@example.com", phone: "555-987-6543", notes: "Manages financial oversight.", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Richard" },
-    { id: "bm3", name: "Emily White", role: "Secretary", email: "emily.white@example.com", phone: "555-111-2222", imageUrl: "https://api.dicebear.com/8.x/initials/svg?seed=Emily" },
-  ]);
-  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [boardMembers, setBoardMembers] = React.useState<BoardMember[]>([]);
+  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = React.useState(false);
   const [editingMember, setEditingMember] = React.useState<BoardMember | undefined>(undefined);
   const [deletingMemberId, setDeletingMemberId] = React.useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const filteredBoardMembers = boardMembers.filter(member => {
-    const query = searchQuery.toLowerCase();
-    return (
-      member.name.toLowerCase().includes(query) ||
-      member.role.toLowerCase().includes(query) ||
-      member.email.toLowerCase().includes(query) ||
-      member.phone.toLowerCase().includes(query)
-    );
-  });
+  const fetchBoardMembers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  const handleAddMember = (newMemberData: Omit<BoardMember, 'id'>) => {
-    const newMember: BoardMember = {
-      id: `bm${boardMembers.length + 1}`, // Simple ID generation
-      ...newMemberData,
-      imageUrl: newMemberData.imageUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${newMemberData.name}`,
-    };
-    setBoardMembers((prev) => [...prev, newMember]);
+    let query = supabase.from('board_members').select('*');
+
+    if (searchQuery) {
+      query = query.or(`name.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%`);
+    }
+
+    const { data, error } = await query.order('name', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching board members:", error);
+      setError("Failed to load board members.");
+      showError("Failed to load board members.");
+      setBoardMembers([]);
+    } else {
+      setBoardMembers(data || []);
+    }
+    setLoading(false);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    fetchBoardMembers();
+  }, [fetchBoardMembers]);
+
+  const handleAddMember = async (newMemberData: Omit<BoardMember, 'id'>) => {
+    const { data, error } = await supabase
+      .from('board_members')
+      .insert(newMemberData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding board member:", error);
+      showError("Failed to add board member.");
+    } else {
+      showSuccess("Board member added successfully!");
+      fetchBoardMembers(); // Re-fetch to update the list
+    }
   };
 
-  const handleEditMember = (updatedMemberData: BoardMember) => {
-    setBoardMembers((prev) =>
-      prev.map((member) =>
-        member.id === updatedMemberData.id ? updatedMemberData : member
-      )
-    );
+  const handleEditMember = async (updatedMemberData: BoardMember) => {
+    const { error } = await supabase
+      .from('board_members')
+      .update(updatedMemberData)
+      .eq('id', updatedMemberData.id);
+
+    if (error) {
+      console.error("Error updating board member:", error);
+      showError("Failed to update board member.");
+    } else {
+      showSuccess("Board member updated successfully!");
+      fetchBoardMembers(); // Re-fetch to update the list
+    }
   };
 
-  const handleDeleteMember = () => {
+  const handleDeleteMember = async () => {
     if (deletingMemberId) {
-      setBoardMembers((prev) => prev.filter((member) => member.id !== deletingMemberId));
-      showSuccess("Board member deleted successfully!");
-      setDeletingMemberId(undefined);
+      const { error } = await supabase
+        .from('board_members')
+        .delete()
+        .eq('id', deletingMemberId);
+
+      if (error) {
+        console.error("Error deleting board member:", error);
+        showError("Failed to delete board member.");
+      } else {
+        showSuccess("Board member deleted successfully!");
+        setDeletingMemberId(undefined);
+        fetchBoardMembers(); // Re-fetch to update the list
+      }
     }
   };
 
   const openEditDialog = (member: BoardMember) => {
     setEditingMember(member);
-    setIsEditDialogOpen(true);
+    setIsAddEditDialogOpen(true);
   };
 
   const openDeleteDialog = (memberId: string) => {
     setDeletingMemberId(memberId);
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Board Members</h1>
+        <p className="text-lg text-muted-foreground">Loading board members...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Board Members</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -114,14 +176,14 @@ const BoardMembers = () => {
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
             {canManageBoardMembers && (
-              <Button onClick={() => setIsAddDialogOpen(true)}>
+              <Button onClick={() => { setEditingMember(undefined); setIsAddEditDialogOpen(true); }}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Board Member
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent>
-          {filteredBoardMembers.length > 0 ? (
+          {boardMembers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -136,11 +198,11 @@ const BoardMembers = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBoardMembers.map((member) => (
+                {boardMembers.map((member) => (
                   <TableRow key={member.id}>
                     <TableCell>
-                      {member.imageUrl ? (
-                        <img src={member.imageUrl} alt={member.name} className="h-8 w-8 rounded-full object-cover" />
+                      {member.image_url ? (
+                        <img src={member.image_url} alt={member.name} className="h-8 w-8 rounded-full object-cover" />
                       ) : (
                         <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
                           <UserIcon className="h-4 w-4 text-muted-foreground" />
@@ -175,22 +237,13 @@ const BoardMembers = () => {
         </CardContent>
       </Card>
 
-      {/* Add Member Dialog */}
+      {/* Add/Edit Member Dialog */}
       <AddEditBoardMemberDialog
-        isOpen={isAddDialogOpen}
-        setIsOpen={setIsAddDialogOpen}
-        onSave={handleAddMember}
+        isOpen={isAddEditDialogOpen}
+        setIsOpen={setIsAddEditDialogOpen}
+        initialData={editingMember}
+        onSave={editingMember ? handleEditMember : handleAddMember}
       />
-
-      {/* Edit Member Dialog */}
-      {editingMember && (
-        <AddEditBoardMemberDialog
-          initialData={editingMember}
-          isOpen={isEditDialogOpen}
-          setIsOpen={setIsEditDialogOpen}
-          onSave={handleEditMember}
-        />
-      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingMemberId} onOpenChange={(open) => !open && setDeletingMemberId(undefined)}>

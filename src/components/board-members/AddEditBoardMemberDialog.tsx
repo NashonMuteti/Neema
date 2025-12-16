@@ -7,16 +7,16 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { showSuccess, showError } from "@/utils/toast";
-import { PlusCircle, Save, Image as ImageIcon } from "lucide-react"; // Added ImageIcon
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { Save, Image as ImageIcon, Upload } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 
 export interface BoardMember {
   id: string;
@@ -26,7 +26,7 @@ export interface BoardMember {
   phone: string;
   address?: string;
   notes?: string;
-  imageUrl?: string; // Added imageUrl
+  image_url?: string; // Changed to image_url to match Supabase column
 }
 
 interface AddEditBoardMemberDialogProps {
@@ -45,9 +45,15 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageBoardMembers = currentUserPrivileges.includes("Manage Board Members");
+  const { canManageBoardMembers } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageBoardMembers: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageBoardMembers = currentUserPrivileges.includes("Manage Board Members");
+    return { canManageBoardMembers };
+  }, [currentUser, definedRoles]);
 
   const [name, setName] = React.useState(initialData?.name || "");
   const [role, setRole] = React.useState(initialData?.role || "");
@@ -56,7 +62,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
   const [address, setAddress] = React.useState(initialData?.address || "");
   const [notes, setNotes] = React.useState(initialData?.notes || "");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.image_url || null); // Use image_url
 
   React.useEffect(() => {
     if (isOpen) {
@@ -67,7 +73,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       setAddress(initialData?.address || "");
       setNotes(initialData?.notes || "");
       setSelectedFile(null); // Reset selected file
-      setPreviewUrl(initialData?.imageUrl || null); // Reset preview to current image
+      setPreviewUrl(initialData?.image_url || null); // Reset preview to current image
     }
     return () => {
       if (previewUrl && previewUrl.startsWith("blob:")) {
@@ -80,25 +86,25 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      setPreviewUrl(URL.createObjectURL(file)); // Create a URL for immediate preview
     } else {
       setSelectedFile(null);
-      setPreviewUrl(initialData?.imageUrl || null);
+      setPreviewUrl(initialData?.image_url || null);
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name || !role || !email || !phone) {
       showError("Name, Role, Email, and Phone are required.");
       return;
     }
 
-    let memberImageUrl: string | undefined = initialData?.imageUrl;
+    let memberImageUrl: string | undefined = initialData?.image_url;
     if (selectedFile && previewUrl) {
       // In a real app, this is where you'd upload the file to a storage service
       // and get a permanent URL. For now, we use the preview URL.
       memberImageUrl = previewUrl;
-    } else if (!selectedFile && !initialData?.imageUrl) {
+    } else if (!selectedFile && !initialData?.image_url) {
       // If no new file and no existing image, ensure imageUrl is undefined
       memberImageUrl = undefined;
     }
@@ -110,14 +116,14 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       phone,
       address: address || undefined,
       notes: notes || undefined,
-      imageUrl: memberImageUrl,
+      image_url: memberImageUrl, // Use image_url
     };
 
     if (initialData?.id) {
       memberData.id = initialData.id;
     }
 
-    onSave(memberData);
+    onSave(memberData); // Call the parent's onSave for local state update (if still used)
     showSuccess(`Board member ${initialData ? "updated" : "added"} successfully!`);
     setIsOpen(false);
   };

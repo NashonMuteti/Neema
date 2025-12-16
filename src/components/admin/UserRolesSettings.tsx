@@ -25,15 +25,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showSuccess, showError } from "@/utils/toast";
 import AddEditUserRoleDialog, { UserRole } from "./AddEditUserRoleDialog";
-import { useUserRoles } from "@/context/UserRolesContext"; // Import useUserRoles
-import { useAuth } from "@/context/AuthContext"; // New import
+import { useUserRoles } from "@/context/UserRolesContext";
+import { useAuth } from "@/context/AuthContext";
 
 // Dummy data for users (reusing from UserProfileSettingsAdmin)
 interface User {
   id: string;
   name: string;
   email: string;
-  role: string; // Updated to string to support custom roles
+  role: string;
 }
 
 const dummyUsers: User[] = [
@@ -41,11 +41,12 @@ const dummyUsers: User[] = [
   { id: "u2", name: "Bob Williams", email: "bob@example.com", role: "Project Manager" },
   { id: "u3", name: "Charlie Brown", email: "charlie@example.com", role: "Contributor" },
   { id: "u4", name: "David Green", email: "david@example.com", role: "Contributor" },
+  { id: "u5", name: "Nashon Muteti", email: "nashonmuteti@gmail.com", role: "Super Admin" }, // New Super Admin user
 ];
 
 const UserRolesSettings = () => {
-  const { currentUser } = useAuth(); // Use the auth context
-  const { userRoles, addRole, updateRole, deleteRole } = useUserRoles(); // Use context
+  const { currentUser } = useAuth();
+  const { userRoles, addRole, updateRole, deleteRole } = useUserRoles();
 
   const currentUserRoleDefinition = userRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
@@ -63,10 +64,8 @@ const UserRolesSettings = () => {
 
   const handleSaveRole = (roleData: Omit<UserRole, 'id'> & { id?: string }) => {
     if (roleData.id) {
-      // Edit existing role
-      updateRole(roleData as UserRole); // Cast to UserRole as it now has an ID
+      updateRole(roleData as UserRole);
     } else {
-      // Add new role
       addRole(roleData);
     }
   };

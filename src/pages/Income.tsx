@@ -17,8 +17,8 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { format, getMonth, getYear } from "date-fns";
-import { CalendarIcon, Edit, Trash2, Search } from "lucide-react"; // Added Search icon
+import { format, getMonth, getYear, parseISO } from "date-fns";
+import { CalendarIcon, Edit, Trash2, Search } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -29,32 +29,43 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
 
-// Dummy financial accounts (should ideally come from a backend/admin setup)
-const financialAccounts = [
-  { id: "acc1", name: "Cash at Hand" },
-  { id: "acc2", name: "Petty Cash" },
-  { id: "acc3", name: "Bank Mpesa Account" },
-  { id: "acc4", name: "Main Bank Account" },
-];
+interface FinancialAccount {
+  id: string;
+  name: string;
+  current_balance: number;
+}
 
 interface IncomeTransaction {
   id: string;
   date: Date;
   amount: number;
-  accountId: string;
+  account_id: string;
   source: string;
+  user_id: string;
 }
 
 const Income = () => {
-  const { currentUser } = useAuth(); // Use the auth context
-  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageIncome = currentUserPrivileges.includes("Manage Income");
+  const { canManageIncome } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageIncome: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageIncome = currentUserPrivileges.includes("Manage Income");
+    return { canManageIncome };
+  }, [currentUser, definedRoles]);
+
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
+  const [transactions, setTransactions] = React.useState<IncomeTransaction[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   // Form State
   const [incomeDate, setIncomeDate] = React.useState<Date | undefined>(new Date());
@@ -62,21 +73,12 @@ const Income = () => {
   const [incomeAccount, setIncomeAccount] = React.useState<string | undefined>(undefined);
   const [incomeSource, setIncomeSource] = React.useState("");
 
-  // Transactions List State
-  const [transactions, setTransactions] = React.useState<IncomeTransaction[]>([
-    { id: "inc1", date: new Date(2023, 10, 15), amount: 1500, accountId: "acc1", source: "Grant from Film Fund" },
-    { id: "inc2", date: new Date(2023, 10, 20), amount: 500, accountId: "acc2", source: "Donation from Sponsor" },
-    { id: "inc3", date: new Date(2023, 11, 5), amount: 2000, accountId: "acc3", source: "Crowdfunding" },
-    { id: "inc4", date: new Date(2024, 0, 10), amount: 1000, accountId: "acc4", source: "Investment Return" },
-    { id: "inc5", date: new Date(2024, 0, 25), amount: 750, accountId: "acc1", source: "Merchandise Sales" },
-  ]);
-
   // Filter State
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  const [searchQuery, setSearchQuery] = React.useState(""); // New: Search query state
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -87,17 +89,74 @@ const Income = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const filteredTransactions = React.useMemo(() => {
-    return transactions.filter(tx => {
-      const txMonth = getMonth(tx.date);
-      const txYear = getYear(tx.date);
-      const matchesDate = txMonth.toString() === filterMonth && txYear.toString() === filterYear;
-      const matchesSearch = tx.source.toLowerCase().includes(searchQuery.toLowerCase()); // New: Filter by search query
-      return matchesDate && matchesSearch;
-    }).sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
-  }, [transactions, filterMonth, filterYear, searchQuery]); // Added searchQuery to dependencies
+  const fetchFinancialAccounts = React.useCallback(async () => {
+    const { data, error } = await supabase
+      .from('financial_accounts')
+      .select('id, name, current_balance');
+    if (error) {
+      console.error("Error fetching financial accounts:", error);
+      showError("Failed to load financial accounts.");
+    } else {
+      setFinancialAccounts(data || []);
+      if (!incomeAccount && data && data.length > 0) {
+        setIncomeAccount(data[0].id); // Set default account if none selected
+      }
+    }
+  }, [incomeAccount]);
 
-  const handlePostIncome = () => {
+  const fetchIncomeTransactions = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
+    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
+
+    let query = supabase
+      .from('income_transactions')
+      .select('*, financial_accounts(name)')
+      .eq('user_id', currentUser.id)
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString());
+
+    if (searchQuery) {
+      query = query.ilike('source', `%${searchQuery}%`);
+    }
+
+    const { data, error } = await query.order('date', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching income transactions:", error);
+      setError("Failed to load income transactions.");
+      showError("Failed to load income transactions.");
+      setTransactions([]);
+    } else {
+      setTransactions(data.map(tx => ({
+        id: tx.id,
+        date: parseISO(tx.date),
+        amount: tx.amount,
+        account_id: tx.account_id,
+        source: tx.source,
+        user_id: tx.user_id,
+        account_name: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+      })));
+    }
+    setLoading(false);
+  }, [currentUser, filterMonth, filterYear, searchQuery]);
+
+  React.useEffect(() => {
+    fetchFinancialAccounts();
+    fetchIncomeTransactions();
+  }, [fetchFinancialAccounts, fetchIncomeTransactions]);
+
+  const handlePostIncome = async () => {
+    if (!currentUser) {
+      showError("You must be logged in to post income.");
+      return;
+    }
     if (!incomeDate || !incomeAmount || !incomeAccount || !incomeSource) {
       showError("All income fields are required.");
       return;
@@ -108,34 +167,105 @@ const Income = () => {
       return;
     }
 
-    const newTransaction: IncomeTransaction = {
-      id: `inc${transactions.length + 1}`,
-      date: incomeDate,
-      amount,
-      accountId: incomeAccount,
-      source: incomeSource,
-    };
+    const { error: insertError } = await supabase
+      .from('income_transactions')
+      .insert({
+        date: incomeDate.toISOString(),
+        amount,
+        account_id: incomeAccount,
+        source: incomeSource,
+        user_id: currentUser.id,
+      });
 
-    setTransactions((prev) => [...prev, newTransaction]);
-    showSuccess("Income posted successfully!");
-    // Reset form
-    setIncomeDate(new Date());
-    setIncomeAmount("");
-    setIncomeAccount(undefined);
-    setIncomeSource("");
+    if (insertError) {
+      console.error("Error posting income:", insertError);
+      showError("Failed to post income.");
+    } else {
+      // Update account balance
+      const currentAccount = financialAccounts.find(acc => acc.id === incomeAccount);
+      if (currentAccount) {
+        const newBalance = currentAccount.current_balance + amount;
+        const { error: updateBalanceError } = await supabase
+          .from('financial_accounts')
+          .update({ current_balance: newBalance })
+          .eq('id', incomeAccount);
+
+        if (updateBalanceError) {
+          console.error("Error updating account balance:", updateBalanceError);
+          showError("Income posted, but failed to update account balance.");
+        }
+      }
+
+      showSuccess("Income posted successfully!");
+      fetchIncomeTransactions();
+      fetchFinancialAccounts(); // Re-fetch accounts to update balances
+      // Reset form
+      setIncomeDate(new Date());
+      setIncomeAmount("");
+      setIncomeAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
+      setIncomeSource("");
+    }
   };
 
   const handleEditTransaction = (id: string) => {
     // In a real app, this would open an edit dialog pre-filled with transaction data
     console.log("Editing income transaction:", id);
-    showSuccess(`Edit functionality for transaction ${id} (placeholder).`);
+    showError("Edit functionality is not yet implemented for income transactions.");
   };
 
-  const handleDeleteTransaction = (id: string) => {
-    setTransactions((prev) => prev.filter((tx) => tx.id !== id));
-    showSuccess("Income transaction deleted successfully!");
-    console.log("Deleting income transaction:", id);
+  const handleDeleteTransaction = async (id: string, amount: number, accountId: string) => {
+    if (!currentUser) {
+      showError("You must be logged in to delete income.");
+      return;
+    }
+
+    const { error: deleteError } = await supabase
+      .from('income_transactions')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', currentUser.id); // Ensure only owner can delete
+
+    if (deleteError) {
+      console.error("Error deleting income transaction:", deleteError);
+      showError("Failed to delete income transaction.");
+    } else {
+      // Revert account balance
+      const currentAccount = financialAccounts.find(acc => acc.id === accountId);
+      if (currentAccount) {
+        const newBalance = currentAccount.current_balance - amount;
+        const { error: updateBalanceError } = await supabase
+          .from('financial_accounts')
+          .update({ current_balance: newBalance })
+          .eq('id', accountId);
+
+        if (updateBalanceError) {
+          console.error("Error reverting account balance:", updateBalanceError);
+          showError("Income transaction deleted, but failed to revert account balance.");
+        }
+      }
+      showSuccess("Income transaction deleted successfully!");
+      fetchIncomeTransactions();
+      fetchFinancialAccounts(); // Re-fetch accounts to update balances
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Income</h1>
+        <p className="text-lg text-muted-foreground">Loading income data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Income</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -202,7 +332,7 @@ const Income = () => {
                     <SelectLabel>Financial Accounts</SelectLabel>
                     {financialAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.name}
+                        {account.name} (Balance: ${account.current_balance.toFixed(2)})
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -264,7 +394,6 @@ const Income = () => {
                   </SelectContent>
                 </Select>
               </div>
-              {/* New: Search Input */}
               <div className="relative flex items-center flex-1 min-w-[180px]">
                 <Input
                   type="text"
@@ -277,7 +406,7 @@ const Income = () => {
               </div>
             </div>
 
-            {filteredTransactions.length > 0 ? (
+            {transactions.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -289,11 +418,11 @@ const Income = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTransactions.map((tx) => (
+                  {transactions.map((tx) => (
                     <TableRow key={tx.id}>
                       <TableCell>{format(tx.date, "MMM dd, yyyy")}</TableCell>
                       <TableCell>{tx.source}</TableCell>
-                      <TableCell>{financialAccounts.find(acc => acc.id === tx.accountId)?.name}</TableCell>
+                      <TableCell>{(tx as any).account_name}</TableCell>
                       <TableCell className="text-right">${tx.amount.toFixed(2)}</TableCell>
                       {canManageIncome && (
                         <TableCell className="text-center">
@@ -301,7 +430,7 @@ const Income = () => {
                             <Button variant="ghost" size="icon" onClick={() => handleEditTransaction(tx.id)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx.id)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx.id, tx.amount, tx.account_id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
