@@ -81,7 +81,7 @@ const MigrateData: React.FC = () => {
         const { data: existingUsers, error: searchError } = await supabase.auth.admin.listUsers({
           page: 1,
           perPage: 1,
-          email: user.email,
+          filter: `email eq '${user.email}'`, // Corrected: Use 'filter' property
         });
 
         if (searchError) {

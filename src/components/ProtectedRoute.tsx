@@ -1,14 +1,15 @@
 "use client";
 
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Navigate, Outlet } from 'react-router-dom';
 
 interface ProtectedRouteProps {
   allowedRoles?: string[]; // Optional: specify roles that can access this route
+  children?: ReactNode; // Add children prop
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, children }) => {
   const { session, isLoading, currentUser } = useAuth();
 
   if (isLoading) {
@@ -31,8 +32,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
     return <Navigate to="/" replace />; // Redirect to dashboard for unauthorized roles
   }
 
-  // Authenticated and authorized, render the child routes
-  return <Outlet />;
+  // Authenticated and authorized, render the children if provided, otherwise render nested routes via Outlet
+  return children ? <>{children}</> : <Outlet />;
 };
 
 export default ProtectedRoute;
