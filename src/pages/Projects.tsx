@@ -59,7 +59,7 @@ const Projects = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [projectFinancialSummaries, setProjectFinancialSummaries] = useState<Map<string, { totalCollections: number; totalPledges: number }>>(new Map());
+  const [projectFinancialSummaries, setProjectFinancialSummaries] = useState<Map<string, { totalCollections: number; totalPledged: number }>>(new Map());
   const [loadingFinancials, setLoadingFinancials] = useState(false);
 
 
@@ -108,7 +108,7 @@ const Projects = () => {
   useEffect(() => {
     const fetchAllProjectFinancials = async () => {
       setLoadingFinancials(true);
-      const newSummaries = new Map<string, { totalCollections: number; totalPledges: number }>();
+      const newSummaries = new Map<string, { totalCollections: number; totalPledged: number }>();
       for (const project of projects) {
         try {
           const summary = await getProjectFinancialSummary(project.id);

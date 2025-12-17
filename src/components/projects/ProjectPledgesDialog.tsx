@@ -40,6 +40,7 @@ import { CalendarIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
+import { PostgrestError } from "@supabase/supabase-js";
 
 interface ProjectPledge {
   id: string;
@@ -60,6 +61,16 @@ interface Member {
   id: string;
   name: string;
   email: string;
+}
+
+// Define the expected structure of a pledge row with joined profile data
+interface PledgeRowWithProfile {
+  id: string;
+  member_id: string;
+  amount: number;
+  due_date: string; // ISO string from DB
+  status: "Active" | "Paid" | "Overdue";
+  profiles: { name: string } | null; // Joined profile data
 }
 
 const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
@@ -104,9 +115,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         due_date,
         status,
         profiles ( name )
-      `)
-      .eq('project_id', projectId)
-      .order('due_date', { ascending: true });
+      `) as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
 
     if (error) {
       console.error("Error fetching pledges:", error);
@@ -114,10 +123,10 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
       showError("Failed to load pledges.");
       setPledges([]);
     } else {
-      setPledges(data.map(p => ({
+      setPledges((data || []).map(p => ({
         id: p.id,
         member_id: p.member_id,
-        member_name: (p.profiles as { name: string } | null)?.name || 'Unknown Member',
+        member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
         amount: p.amount,
         due_date: parseISO(p.due_date),
         status: p.status as "Active" | "Paid" | "Overdue",

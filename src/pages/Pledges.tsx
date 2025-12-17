@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
+import { PostgrestError } from "@supabase/supabase-js";
 
 interface Member {
   id: string;
@@ -53,6 +54,18 @@ interface Pledge {
   status: "Active" | "Paid" | "Overdue";
   member_name?: string; // Added for joined data
   project_name?: string; // Added for joined data
+}
+
+// Define the expected structure of a pledge row with joined profile and project data
+interface PledgeRowWithJoinedData {
+  id: string;
+  member_id: string;
+  project_id: string;
+  amount: number;
+  due_date: string; // ISO string from DB
+  status: "Active" | "Paid" | "Overdue";
+  profiles: { name: string } | null; // Joined profile data
+  projects: { name: string } | null; // Joined project data
 }
 
 const Pledges = () => {
@@ -158,9 +171,7 @@ const Pledges = () => {
         status,
         profiles ( name ),
         projects ( name )
-      `)
-      .gte('due_date', startOfMonth.toISOString())
-      .lte('due_date', endOfMonth.toISOString());
+      `) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null }; // Explicitly cast the result
 
     const { data: pledgesData, error: pledgesError } = await pledgesQuery.order('due_date', { ascending: false });
 
@@ -176,15 +187,15 @@ const Pledges = () => {
         amount: p.amount,
         due_date: parseISO(p.due_date),
         status: p.status as "Active" | "Paid" | "Overdue",
-        member_name: (p.profiles as { name: string } | null)?.name || 'Unknown Member',
-        project_name: (p.projects as { name: string } | null)?.name || 'Unknown Project',
+        member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
+        project_name: p.projects?.name || 'Unknown Project', // Access name directly from typed projects
       }));
 
       const filteredByStatusAndSearch = fetchedPledges.filter(pledge => {
         const actualStatus = getPledgeStatus(pledge);
         const matchesStatus = filterStatus === "All" || actualStatus === filterStatus;
-        const memberName = (pledge as any).member_name.toLowerCase();
-        const projectName = (pledge as any).project_name.toLowerCase();
+        const memberName = (pledge.member_name || "").toLowerCase();
+        const projectName = (pledge.project_name || "").toLowerCase();
         const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || projectName.includes(searchQuery.toLowerCase());
         return matchesStatus && matchesSearch;
       });

@@ -29,6 +29,7 @@ import { Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { PostgrestError } from "@supabase/supabase-js";
 
 interface UserContribution {
   id: string;
@@ -51,6 +52,35 @@ const getContributionStatus = (type: UserContribution['type']): { text: string; 
   }
   return { text: "Unknown", variant: "outline" };
 };
+
+// Define expected structure for joined financial_accounts data
+interface FinancialAccountName {
+  name: string;
+}
+
+interface IncomeTxRow {
+  id: string;
+  date: string;
+  amount: number;
+  source: string;
+  financial_accounts: FinancialAccountName | null;
+}
+
+interface ExpenditureTxRow {
+  id: string;
+  date: string;
+  amount: number;
+  purpose: string;
+  financial_accounts: FinancialAccountName | null;
+}
+
+interface PettyCashTxRow {
+  id: string;
+  date: string;
+  amount: number;
+  purpose: string;
+  financial_accounts: FinancialAccountName | null;
+}
 
 const MyContributions: React.FC = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
@@ -86,24 +116,15 @@ const MyContributions: React.FC = () => {
 
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
-      .select('id, date, amount, source, financial_accounts(name)')
-      .eq('user_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString());
+      .select('id, date, amount, source, financial_accounts(name)') as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
     const { data: expenditureData, error: expenditureError } = await supabase
       .from('expenditure_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('user_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString());
+      .select('id, date, amount, purpose, financial_accounts(name)') as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
 
     const { data: pettyCashData, error: pettyCashError } = await supabase
       .from('petty_cash_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('user_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString());
+      .select('id, date, amount, purpose, financial_accounts(name)') as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
 
     if (incomeError || expenditureError || pettyCashError) {
       console.error("Error fetching contributions:", incomeError || expenditureError || pettyCashError);
@@ -118,7 +139,7 @@ const MyContributions: React.FC = () => {
         sourceOrPurpose: tx.source,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
+        accountName: tx.financial_accounts?.name || 'Unknown Account'
       }));
 
       expenditureData?.forEach(tx => allContributions.push({
@@ -127,7 +148,7 @@ const MyContributions: React.FC = () => {
         sourceOrPurpose: tx.purpose,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
+        accountName: tx.financial_accounts?.name || 'Unknown Account'
       }));
 
       pettyCashData?.forEach(tx => allContributions.push({
@@ -136,7 +157,7 @@ const MyContributions: React.FC = () => {
         sourceOrPurpose: tx.purpose,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
+        accountName: tx.financial_accounts?.name || 'Unknown Account'
       }));
 
       const filteredAndSorted = allContributions
@@ -321,8 +342,7 @@ const MyContributions: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="grid gap-1.5">
+                <div className="grid gap-1.5">
                     <Label htmlFor="filter-month-all">Month</Label>
                     <Select value={filterMonth} onValueChange={setFilterMonth}>
                       <SelectTrigger id="filter-month-all" className="w-[140px]">
@@ -369,7 +389,6 @@ const MyContributions: React.FC = () => {
                     <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>
-              </div>
 
               {myContributions.length > 0 ? (
                 <Table>

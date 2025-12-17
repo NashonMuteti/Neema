@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { PostgrestError } from "@supabase/supabase-js";
 
 export interface Project {
   id: string;
@@ -41,6 +42,28 @@ export interface ProjectFinancialSummary {
   pledges: ProjectPledge[];
 }
 
+// Define the expected structure of a collection row with joined profile data
+interface CollectionRowWithProfile {
+  id: string;
+  project_id: string;
+  member_id: string;
+  amount: number;
+  date: string; // ISO string from DB
+  payment_method: string;
+  profiles: { name: string } | null; // Joined profile data
+}
+
+// Define the expected structure of a pledge row with joined profile data
+interface PledgeRowWithProfile {
+  id: string;
+  project_id: string;
+  member_id: string;
+  amount: number;
+  due_date: string; // ISO string from DB
+  status: "Active" | "Paid" | "Overdue";
+  profiles: { name: string } | null; // Joined profile data
+}
+
 export const getProjectFinancialSummary = async (projectId: string): Promise<ProjectFinancialSummary> => {
   // Fetch collections
   const { data: collectionsData, error: collectionsError } = await supabase
@@ -53,8 +76,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
       date,
       payment_method,
       profiles ( name )
-    `)
-    .eq('project_id', projectId);
+    `) as { data: CollectionRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
 
   if (collectionsError) {
     console.error("Error fetching project collections:", collectionsError);
@@ -65,7 +87,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
     id: c.id,
     project_id: c.project_id,
     member_id: c.member_id,
-    member_name: (c.profiles as { name: string } | null)?.name || 'Unknown Member',
+    member_name: c.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
     amount: c.amount,
     date: new Date(c.date),
     payment_method: c.payment_method,
@@ -82,8 +104,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
       due_date,
       status,
       profiles ( name )
-    `)
-    .eq('project_id', projectId);
+    `) as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
 
   if (pledgesError) {
     console.error("Error fetching project pledges:", pledgesError);
@@ -94,7 +115,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
     id: p.id,
     project_id: p.project_id,
     member_id: p.member_id,
-    member_name: (p.profiles as { name: string } | null)?.name || 'Unknown Member',
+    member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
     amount: p.amount,
     due_date: new Date(p.due_date),
     status: p.status as "Active" | "Paid" | "Overdue",
