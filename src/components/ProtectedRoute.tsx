@@ -9,7 +9,8 @@ interface ProtectedRouteProps {
   children?: ReactNode; // Add children prop
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, children }) => {
+// Changed from React.FC to explicit props
+const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
   const { session, isLoading, currentUser } = useAuth();
 
   if (isLoading) {
