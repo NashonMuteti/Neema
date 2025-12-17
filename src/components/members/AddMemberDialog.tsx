@@ -18,6 +18,15 @@ import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon a
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client"; // Import supabase client
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface AddMemberDialogProps {
   onAddMember: () => void; // Changed to trigger a re-fetch in parent
@@ -41,8 +50,10 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [email, setEmail] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // State for the uploaded file
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null); // State for image preview
-  const [enableLogin, setEnableLogin] = React.useState(false); // Corrected line
+  const [enableLogin, setEnableLogin] = React.useState(false);
   const [defaultPassword, setDefaultPassword] = React.useState("");
+  const [selectedRole, setSelectedRole] = React.useState<string>(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
+  const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Active");
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -53,6 +64,12 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       }
     };
   }, [previewUrl]);
+
+  React.useEffect(() => {
+    if (definedRoles.length > 0 && !selectedRole) {
+      setSelectedRole(definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name);
+    }
+  }, [definedRoles, selectedRole]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -74,6 +91,10 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       showError("Default password is required if login is enabled.");
       return;
     }
+    if (!selectedRole) {
+      showError("A role must be selected for the new member.");
+      return;
+    }
 
     let memberImageUrl: string | undefined = undefined;
     if (selectedFile) {
@@ -82,34 +103,39 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       memberImageUrl = previewUrl || undefined;
     }
 
-    // Create user in Supabase Auth
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    // Create user in Supabase Auth using admin API
+    const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
       email: email,
-      password: defaultPassword || "default_secure_password", // Fallback password if not provided
-      options: {
-        data: {
-          full_name: name,
-          avatar_url: memberImageUrl,
-        },
+      password: enableLogin ? defaultPassword : undefined, // Only set password if login is enabled
+      email_confirm: true, // Automatically confirm email for admin-created users
+      user_metadata: {
+        full_name: name,
+        avatar_url: memberImageUrl,
       },
     });
 
-    if (signUpError) {
-      console.error("Error signing up new member:", signUpError);
-      showError(`Failed to add new member: ${signUpError.message}`);
+    if (createUserError) {
+      console.error("Error creating new member in Auth:", createUserError);
+      showError(`Failed to add new member: ${createUserError.message}`);
       return;
     }
 
-    if (signUpData.user) {
-      // The handle_new_user trigger should create the profile.
-      // We might need to explicitly update the role and enable_login if the trigger doesn't handle it.
+    if (userData.user) {
+      // Update public.profiles table with role, status, and enable_login
       const { error: profileUpdateError } = await supabase
         .from('profiles')
-        .update({ role: "Contributor", status: "Active", enable_login: enableLogin })
-        .eq('id', signUpData.user.id);
+        .update({
+          name: name,
+          email: email,
+          role: selectedRole,
+          status: status,
+          enable_login: enableLogin,
+          image_url: memberImageUrl,
+        })
+        .eq('id', userData.user.id);
 
       if (profileUpdateError) {
-        console.error("Error updating new member's profile with role/status:", profileUpdateError);
+        console.error("Error updating new member's profile:", profileUpdateError);
         showError("Failed to set new member's role and status.");
         return;
       }
@@ -125,6 +151,8 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     setPreviewUrl(null);
     setEnableLogin(false);
     setDefaultPassword("");
+    setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
+    setStatus("Active");
   };
 
   return (
@@ -186,6 +214,44 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="member-role" className="text-right">
+              Role
+            </Label>
+            <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!canManageMembers}>
+              <SelectTrigger id="member-role" className="col-span-3">
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Member Role</SelectLabel>
+                  {definedRoles.map((roleOption) => (
+                    <SelectItem key={roleOption.id} value={roleOption.name}>
+                      {roleOption.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="member-status" className="text-right">
+              Status
+            </Label>
+            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageMembers}>
+              <SelectTrigger id="member-status" className="col-span-3">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Member Status</SelectLabel>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Suspended">Suspended</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="enableLogin" className="text-right">
               Enable Login
             </Label>
@@ -214,7 +280,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
           )}
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!name || !email || (enableLogin && !defaultPassword) || !canManageMembers}>
+          <Button onClick={handleSubmit} disabled={!name || !email || (enableLogin && !defaultPassword) || !canManageMembers || !selectedRole}>
             <Upload className="mr-2 h-4 w-4" /> Save Member
           </Button>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,27 +26,12 @@ import {
 import { showSuccess, showError } from "@/utils/toast";
 import AddEditUserRoleDialog, { UserRole } from "./AddEditUserRoleDialog";
 import { useUserRoles } from "@/context/UserRolesContext";
-import { useAuth } from "@/context/AuthContext";
-
-// Dummy data for users (reusing from UserProfileSettingsAdmin)
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
-const dummyUsers: User[] = [
-  { id: "u1", name: "Alice Johnson", email: "alice@example.com", role: "Admin" },
-  { id: "u2", name: "Bob Williams", email: "bob@example.com", role: "Project Manager" },
-  { id: "u3", name: "Charlie Brown", email: "charlie@example.com", role: "Contributor" },
-  { id: "u4", name: "David Green", email: "david@example.com", role: "Contributor" },
-  { id: "u5", name: "Nashon Muteti", email: "nashonmuteti@gmail.com", role: "Super Admin" }, // New Super Admin user
-];
+import { useAuth, User } from "@/context/AuthContext"; // Import User interface
+import { supabase } from "@/integrations/supabase/client";
 
 const UserRolesSettings = () => {
   const { currentUser } = useAuth();
-  const { userRoles, addRole, updateRole, deleteRole } = useUserRoles();
+  const { userRoles, addRole, updateRole, deleteRole, fetchRoles } = useUserRoles();
 
   const currentUserRoleDefinition = userRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
@@ -56,25 +41,87 @@ const UserRolesSettings = () => {
   const [editingRole, setEditingRole] = React.useState<UserRole | undefined>(undefined);
   const [deletingRoleId, setDeletingRoleId] = React.useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [roleMemberCounts, setRoleMemberCounts] = useState<Record<string, number>>({});
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingCounts, setLoadingCounts] = useState(true);
+
+  const fetchAllUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email, role')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching all users:", error);
+      showError("Failed to load users for role assignment.");
+      setAllUsers([]);
+    } else {
+      setAllUsers(data.map(p => ({
+        id: p.id,
+        name: p.name || p.email || "Unknown",
+        email: p.email || "N/A",
+        role: p.role || "Contributor",
+        status: "Active", // Default, as status is not directly used here
+        enableLogin: true, // Default
+      })));
+    }
+    setLoadingUsers(false);
+  }, []);
+
+  const fetchRoleMemberCounts = useCallback(async () => {
+    setLoadingCounts(true);
+    const counts: Record<string, number> = {};
+    for (const role of userRoles) {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact' })
+        .eq('role', role.name);
+
+      if (error) {
+        console.error(`Error fetching count for role ${role.name}:`, error);
+        counts[role.name] = 0;
+      } else {
+        counts[role.name] = count || 0;
+      }
+    }
+    setRoleMemberCounts(counts);
+    setLoadingCounts(false);
+  }, [userRoles]);
+
+  useEffect(() => {
+    fetchAllUsers();
+  }, [fetchAllUsers]);
+
+  useEffect(() => {
+    if (userRoles.length > 0) {
+      fetchRoleMemberCounts();
+    }
+  }, [userRoles, fetchRoleMemberCounts]);
 
   const filteredRoles = userRoles.filter(role =>
     role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     role.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSaveRole = (roleData: Omit<UserRole, 'id'> & { id?: string }) => {
+  const handleSaveRole = async (roleData: Omit<UserRole, 'id'> & { id?: string }) => {
     if (roleData.id) {
-      updateRole(roleData as UserRole);
+      await updateRole(roleData as UserRole);
+      showSuccess("User role updated successfully!");
     } else {
-      addRole(roleData);
+      await addRole(roleData);
+      showSuccess("User role added successfully!");
     }
+    setIsAddEditRoleDialogOpen(false);
+    fetchRoles(); // Re-fetch roles after save
   };
 
-  const handleDeleteRole = () => {
+  const handleDeleteRole = async () => {
     if (deletingRoleId) {
-      deleteRole(deletingRoleId);
-      showSuccess("User role deleted successfully!");
+      await deleteRole(deletingRoleId);
       setDeletingRoleId(undefined);
+      fetchRoles(); // Re-fetch roles after delete
     }
   };
 
@@ -129,7 +176,9 @@ const UserRolesSettings = () => {
                   <TableRow key={role.id}>
                     <TableCell className="font-medium">{role.name}</TableCell>
                     <TableCell className="max-w-[300px] truncate">{role.description}</TableCell>
-                    <TableCell className="text-center">{role.memberUserIds.length}</TableCell>
+                    <TableCell className="text-center">
+                      {loadingCounts ? "..." : roleMemberCounts[role.name] || 0}
+                    </TableCell>
                     {canManageUserRoles && (
                       <TableCell className="text-center">
                         <div className="flex justify-center space-x-2">
@@ -158,33 +207,34 @@ const UserRolesSettings = () => {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-4">
-            View which users belong to which roles. Actual assignment would require backend integration.
+            View which users belong to which roles. User roles can be changed in the "User Management" section.
           </p>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Assigned Role(s)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dummyUsers.map(user => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    {userRoles
-                      .filter(role => role.memberUserIds.includes(user.id))
-                      .map(role => role.name)
-                      .join(", ") || "No Role Assigned"}
-                  </TableCell>
+          {loadingUsers ? (
+            <p className="text-muted-foreground text-center">Loading users...</p>
+          ) : allUsers.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Assigned Role</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {allUsers.map(user => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.role}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-muted-foreground text-center mt-4">No users found.</p>
+          )}
           <p className="text-sm text-muted-foreground mt-4">
-            Note: The ability to dynamically assign users to roles from this UI requires backend integration to persist changes.
+            To change a user's role, navigate to the "User Management" tab.
           </p>
         </CardContent>
       </Card>
@@ -202,6 +252,7 @@ const UserRolesSettings = () => {
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the user role.
+              If there are users assigned to this role, you must reassign them first.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

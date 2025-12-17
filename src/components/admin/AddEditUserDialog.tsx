@@ -120,9 +120,11 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
 
     if (initialData?.id) {
       // Editing existing user in Supabase Auth and profiles table
-      const { error: authUpdateError } = await supabase.auth.updateUser({
-        email: email,
-        data: { full_name: name, avatar_url: userImageUrl },
+      // Only update metadata in auth.users, email changes are complex via admin
+      const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
+        email: email, // Admin can update email directly without confirmation
+        password: defaultPassword || undefined, // Only update if provided
+        user_metadata: { full_name: name, avatar_url: userImageUrl },
       });
 
       if (authUpdateError) {
@@ -140,17 +142,6 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         console.error("Error updating user profile:", profileUpdateError);
         showError("Failed to update user profile details.");
         return;
-      }
-
-      if (defaultPassword) {
-        const { error: passwordResetError } = await supabase.auth.updateUser({
-          password: defaultPassword,
-        });
-        if (passwordResetError) {
-          console.error("Error resetting password:", passwordResetError);
-          showError("Failed to reset user password.");
-          return;
-        }
       }
 
     } else {
