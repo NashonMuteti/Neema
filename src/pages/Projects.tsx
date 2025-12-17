@@ -114,11 +114,11 @@ const Projects = () => {
           const summary = await getProjectFinancialSummary(project.id);
           newSummaries.set(project.id, {
             totalCollections: summary.totalCollections,
-            totalPledges: summary.totalPledged, // Corrected from totalPledges
+            totalPledged: summary.totalPledged, 
           });
         } catch (err) {
           console.error(`Failed to fetch financial summary for project ${project.name}:`, err);
-          newSummaries.set(project.id, { totalCollections: 0, totalPledges: 0 }); // Provide defaults on error
+          newSummaries.set(project.id, { totalCollections: 0, totalPledged: 0 }); // Provide defaults on error
         }
       }
       setProjectFinancialSummaries(newSummaries);
@@ -330,7 +330,7 @@ const Projects = () => {
             const expectedAmount = (project.memberContributionAmount || 0) * activeMembersCount;
             const projectSummary = projectFinancialSummaries.get(project.id);
             const totalCollections = projectSummary?.totalCollections || 0;
-            const totalPledges = projectSummary?.totalPledges || 0;
+            const totalPledges = projectSummary?.totalPledged || 0;
 
             return (
               <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">

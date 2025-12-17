@@ -160,7 +160,7 @@ const Pledges = () => {
     const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
     const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
-    let pledgesQuery = supabase
+    const { data: pledgesData, error: pledgesError } = await supabase
       .from('project_pledges')
       .select(`
         id,
@@ -171,9 +171,8 @@ const Pledges = () => {
         status,
         profiles ( name ),
         projects ( name )
-      `) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null }; // Explicitly cast the result
-
-    const { data: pledgesData, error: pledgesError } = await pledgesQuery.order('due_date', { ascending: false });
+      `)
+      .order('due_date', { ascending: false }) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null };
 
     if (pledgesError) {
       console.error("Error fetching pledges:", pledgesError);
