@@ -59,9 +59,15 @@ const Pledges = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
-  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+  const { canManagePledges } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManagePledges: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
+    return { canManagePledges };
+  }, [currentUser, definedRoles]);
 
   // Data states
   const [members, setMembers] = React.useState<Member[]>([]);
@@ -170,8 +176,8 @@ const Pledges = () => {
         amount: p.amount,
         due_date: parseISO(p.due_date),
         status: p.status as "Active" | "Paid" | "Overdue",
-        member_name: (p.profiles as { name: string })?.name || 'Unknown Member',
-        project_name: (p.projects as { name: string })?.name || 'Unknown Project',
+        member_name: (p.profiles as { name: string } | null)?.name || 'Unknown Member',
+        project_name: (p.projects as { name: string } | null)?.name || 'Unknown Project',
       }));
 
       const filteredByStatusAndSearch = fetchedPledges.filter(pledge => {

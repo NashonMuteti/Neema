@@ -147,7 +147,7 @@ const MemberContributionsDetail: React.FC = () => {
         sourceOrPurpose: tx.source,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
       }));
 
       expenditureData?.forEach(tx => allContributions.push({
@@ -156,7 +156,7 @@ const MemberContributionsDetail: React.FC = () => {
         sourceOrPurpose: tx.purpose,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
       }));
 
       pettyCashData?.forEach(tx => allContributions.push({
@@ -165,7 +165,7 @@ const MemberContributionsDetail: React.FC = () => {
         sourceOrPurpose: tx.purpose,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
       }));
 
       const filteredAndSorted = allContributions
@@ -390,7 +390,7 @@ const MemberContributionsDetail: React.FC = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectLabel>Year</SelectLabel>
+                          <SelectLabel>Year</Label>
                           {years.map((year) => (
                             <SelectItem key={year.value} value={year.value}>
                               {year.label}

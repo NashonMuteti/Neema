@@ -117,7 +117,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
       setPledges(data.map(p => ({
         id: p.id,
         member_id: p.member_id,
-        member_name: (p.profiles as { name: string })?.name || 'Unknown Member',
+        member_name: (p.profiles as { name: string } | null)?.name || 'Unknown Member',
         amount: p.amount,
         due_date: parseISO(p.due_date),
         status: p.status as "Active" | "Paid" | "Overdue",

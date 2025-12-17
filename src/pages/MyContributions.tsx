@@ -118,7 +118,7 @@ const MyContributions: React.FC = () => {
         sourceOrPurpose: tx.source,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
       }));
 
       expenditureData?.forEach(tx => allContributions.push({
@@ -127,7 +127,7 @@ const MyContributions: React.FC = () => {
         sourceOrPurpose: tx.purpose,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
       }));
 
       pettyCashData?.forEach(tx => allContributions.push({
@@ -136,7 +136,7 @@ const MyContributions: React.FC = () => {
         sourceOrPurpose: tx.purpose,
         date: parseISO(tx.date),
         amount: tx.amount,
-        accountName: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
+        accountName: (tx.financial_accounts as { name: string } | null)?.name || 'Unknown Account'
       }));
 
       const filteredAndSorted = allContributions

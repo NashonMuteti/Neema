@@ -21,7 +21,7 @@ import { Image as ImageIcon, CalendarIcon, DollarSign, Handshake, Search } from 
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { getProjectFinancialSummary } from "@/utils/projectFinancials";
+import { getProjectFinancialSummary, ProjectFinancialSummary } from "@/utils/projectFinancials";
 import { Input } from "@/components/ui/input";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
@@ -59,6 +59,9 @@ const Projects = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [projectFinancialSummaries, setProjectFinancialSummaries] = useState<Map<string, { totalCollections: number; totalPledges: number }>>(new Map());
+  const [loadingFinancials, setLoadingFinancials] = useState(false);
+
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -101,6 +104,33 @@ const Projects = () => {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  useEffect(() => {
+    const fetchAllProjectFinancials = async () => {
+      setLoadingFinancials(true);
+      const newSummaries = new Map<string, { totalCollections: number; totalPledges: number }>();
+      for (const project of projects) {
+        try {
+          const summary = await getProjectFinancialSummary(project.id);
+          newSummaries.set(project.id, {
+            totalCollections: summary.totalCollections,
+            totalPledges: summary.totalPledges,
+          });
+        } catch (err) {
+          console.error(`Failed to fetch financial summary for project ${project.name}:`, err);
+          newSummaries.set(project.id, { totalCollections: 0, totalPledges: 0 }); // Provide defaults on error
+        }
+      }
+      setProjectFinancialSummaries(newSummaries);
+      setLoadingFinancials(false);
+    };
+
+    if (projects.length > 0) {
+      fetchAllProjectFinancials();
+    } else {
+      setProjectFinancialSummaries(new Map()); // Clear if no projects
+    }
+  }, [projects]); // Re-run when the list of projects changes
 
   const handleAddProject = async (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => {
     if (!currentUser) {
@@ -239,7 +269,7 @@ const Projects = () => {
     }
   };
 
-  if (loading) {
+  if (loading || loadingFinancials) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Project Accounts</h1>
@@ -298,7 +328,9 @@ const Projects = () => {
         {projects.length > 0 ? (
           projects.map((project) => {
             const expectedAmount = (project.memberContributionAmount || 0) * activeMembersCount;
-            const { totalCollections, totalPledges } = getProjectFinancialSummary(project.id);
+            const projectSummary = projectFinancialSummaries.get(project.id);
+            const totalCollections = projectSummary?.totalCollections || 0;
+            const totalPledges = projectSummary?.totalPledges || 0;
 
             return (
               <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">

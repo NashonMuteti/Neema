@@ -87,7 +87,9 @@ const ProjectFinancialsDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const project = dummyProjects.find(p => p.id === projectId);
 
-  const { totalCollections, totalPledges } = useProjectFinancials(projectId || ""); // Use the hook
+  const { financialSummary, loading: financialsLoading, error: financialsError } = useProjectFinancials(projectId || ""); // Use the hook
+  const totalCollections = financialSummary?.totalCollections || 0;
+  const totalPledges = financialSummary?.totalPledges || 0;
 
   if (!project) {
     return (
