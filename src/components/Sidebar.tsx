@@ -174,39 +174,33 @@ const Sidebar = () => {
   const { currentUser, isLoading } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   
-  // State for collapsible sections
+  // These hooks must be called unconditionally at the top level of the component
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
   const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false);
 
-  // If still loading or no current user, don't render sidebar content
-  if (isLoading || !currentUser) {
-    return null;
-  }
-
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
 
-  // Function to check if the user has any of the required privileges
+  // Memoize hasAccess function for stability
   const hasAccess = React.useCallback((requiredPrivileges?: string[]) => {
     if (!requiredPrivileges || requiredPrivileges.length === 0) return true;
     return requiredPrivileges.some(privilege => currentUserPrivileges.includes(privilege));
-  }, [currentUserPrivileges]); // Memoize hasAccess
+  }, [currentUserPrivileges]);
 
-  // Filter navItems once based on current user's privileges using useMemo
+  // Memoize accessibleNavItems to ensure consistent rendering logic
   const accessibleNavItems = React.useMemo(() => {
     return navItems.filter(item => {
       if (!hasAccess(item.requiredPrivileges)) {
         return false;
       }
       if (item.type === "heading") {
-        // For headings, check if any children are accessible
         const accessibleChildren = item.children.filter(child => hasAccess(child.requiredPrivileges));
         return accessibleChildren.length > 0;
       }
       return true;
     });
-  }, [hasAccess]); // Dependencies for memoization: hasAccess
+  }, [hasAccess]);
 
   React.useEffect(() => {
     // Update collapsible states based on current path and accessible items
@@ -228,72 +222,76 @@ const Sidebar = () => {
 
   return (
     <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">
-      <nav className="flex-1 space-y-2">
-        {accessibleNavItems.map((item) => {
-          if (item.type === "heading") {
-            const headingItem = item as NavHeading;
-            let isOpen = false;
-            let setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+      {isLoading ? (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">Loading navigation...</div>
+      ) : !currentUser ? (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">Please log in.</div>
+      ) : (
+        <nav className="flex-1 space-y-2">
+          {accessibleNavItems.map((item) => {
+            if (item.type === "heading") {
+              const headingItem = item as NavHeading;
+              let isOpen = false;
+              let setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 
-            // Determine which state setter to use for the collapsible
-            if (headingItem.name === "Reports") {
-              isOpen = isReportsOpen;
-              setIsOpen = setIsReportsOpen;
-            } else if (headingItem.name === "Actions") {
-              isOpen = isActionsOpen;
-              setIsOpen = setIsActionsManagementOpen;
-            } else if (headingItem.name === "Sales Management") {
-              isOpen = isSalesManagementOpen;
-              setIsOpen = setIsSalesManagementOpen;
+              // Determine which state setter to use for the collapsible
+              if (headingItem.name === "Reports") {
+                isOpen = isReportsOpen;
+                setIsOpen = setIsReportsOpen;
+              } else if (headingItem.name === "Actions") {
+                isOpen = isActionsOpen;
+                setIsOpen = setIsActionsOpen; // Corrected typo here
+              } else if (headingItem.name === "Sales Management") {
+                isOpen = isSalesManagementOpen;
+                setIsOpen = setIsSalesManagementOpen;
+              } else {
+                // Fallback for any other heading type, though not expected with current navItems
+                isOpen = false;
+                setIsOpen = () => {}; 
+              }
+
+              return (
+                <Collapsible key={headingItem.name} open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors duration-200 ease-in-out">
+                    {headingItem.name}
+                    <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isOpen && "rotate-180")} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-1 pl-4">
+                    {headingItem.children.filter(child => hasAccess(child.requiredPrivileges)).map((child) => (
+                      <Link
+                        key={child.name}
+                        to={child.href}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
+                          location.pathname.startsWith(child.href) && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                        )}
+                      >
+                        <child.icon className="h-5 w-5" />
+                        {child.name}
+                      </Link>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              );
             } else {
-              // Fallback for any other heading type, though not expected with current navItems
-              isOpen = false;
-              setIsOpen = () => {}; 
+              const navItem = item as NavItem;
+              return (
+                <Link
+                  key={navItem.name}
+                  to={navItem.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
+                    location.pathname === navItem.href && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                  )}
+                >
+                  <navItem.icon className="h-5 w-5" />
+                  {navItem.name}
+                </Link>
+              );
             }
-
-            // Children are already filtered by accessibleNavItems, so no need for another filter here
-            // and no need to check visibleChildren.length === 0
-            return (
-              <Collapsible key={headingItem.name} open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
-                <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors duration-200 ease-in-out">
-                  {headingItem.name}
-                  <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isOpen && "rotate-180")} />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-1 pl-4">
-                  {headingItem.children.filter(child => hasAccess(child.requiredPrivileges)).map((child) => ( // Filter children again for safety, though accessibleNavItems should handle it
-                    <Link
-                      key={child.name}
-                      to={child.href}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                        location.pathname.startsWith(child.href) && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
-                      )}
-                    >
-                      <child.icon className="h-5 w-5" />
-                      {child.name}
-                    </Link>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          } else {
-            const navItem = item as NavItem;
-            return (
-              <Link
-                key={navItem.name}
-                to={navItem.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                  location.pathname === navItem.href && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
-                )}
-              >
-                <navItem.icon className="h-5 w-5" />
-                {navItem.name}
-              </Link>
-            );
-          }
-        })}
-      </nav>
+          })}
+        </nav>
+      )}
     </aside>
   );
 };
