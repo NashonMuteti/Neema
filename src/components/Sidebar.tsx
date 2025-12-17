@@ -171,8 +171,10 @@ export const navItems: SidebarItem[] = [
 
 const Sidebar = () => {
   const location = useLocation();
-  const { currentUser, isLoading } = useAuth(); // Use currentUser and isLoading
+  const { currentUser, isLoading } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  
+  // State for collapsible sections
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
   const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false);
@@ -186,74 +188,71 @@ const Sidebar = () => {
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
 
   // Function to check if the user has any of the required privileges
-  const hasAccess = (requiredPrivileges?: string[]) => {
-    if (!requiredPrivileges || requiredPrivileges.length === 0) return true; // No privileges required, so access is granted
+  const hasAccess = React.useCallback((requiredPrivileges?: string[]) => {
+    if (!requiredPrivileges || requiredPrivileges.length === 0) return true;
     return requiredPrivileges.some(privilege => currentUserPrivileges.includes(privilege));
-  };
+  }, [currentUserPrivileges]); // Memoize hasAccess
+
+  // Filter navItems once based on current user's privileges using useMemo
+  const accessibleNavItems = React.useMemo(() => {
+    return navItems.filter(item => {
+      if (!hasAccess(item.requiredPrivileges)) {
+        return false;
+      }
+      if (item.type === "heading") {
+        // For headings, check if any children are accessible
+        const accessibleChildren = item.children.filter(child => hasAccess(child.requiredPrivileges));
+        return accessibleChildren.length > 0;
+      }
+      return true;
+    });
+  }, [hasAccess]); // Dependencies for memoization: hasAccess
 
   React.useEffect(() => {
-    const isChildOfReports = navItems.some(item =>
-      (item.type === "heading" && item.name === "Reports" && item.children?.some(child => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges)))
-    );
-    if (isChildOfReports) {
-      setIsReportsOpen(true);
-    } else {
-      setIsReportsOpen(false);
-    }
+    // Update collapsible states based on current path and accessible items
+    const checkAndSetOpen = (headingName: string, setter: React.Dispatch<React.SetStateAction<boolean>>) => {
+      const headingItem = accessibleNavItems.find(item => item.type === "heading" && item.name === headingName) as NavHeading | undefined;
+      if (headingItem) {
+        const isChildActive = headingItem.children.some(child => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges));
+        setter(isChildActive);
+      } else {
+        setter(false);
+      }
+    };
 
-    const isChildOfActions = navItems.some(item =>
-      (item.type === "heading" && item.name === "Actions" && item.children?.some(child => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges)))
-    );
-    if (isChildOfActions) {
-      setIsActionsOpen(true);
-    } else {
-      setIsActionsOpen(false);
-    }
-
-    const isChildOfSalesManagement = navItems.some(item =>
-      (item.type === "heading" && item.name === "Sales Management" && item.children?.some(child => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges)))
-    );
-    if (isChildOfSalesManagement) {
-      setIsSalesManagementOpen(true);
-    } else {
-      setIsSalesManagementOpen(false);
-    }
-  }, [location.pathname, currentUser, currentUserPrivileges, definedRoles]);
+    checkAndSetOpen("Reports", setIsReportsOpen);
+    checkAndSetOpen("Actions", setIsActionsOpen);
+    checkAndSetOpen("Sales Management", setIsSalesManagementOpen);
+  }, [location.pathname, accessibleNavItems, hasAccess]);
 
 
   return (
     <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">
       <nav className="flex-1 space-y-2">
-        {navItems.map((item) => {
-          if (!hasAccess(item.requiredPrivileges)) {
-            return null;
-          }
-
+        {accessibleNavItems.map((item) => {
           if (item.type === "heading") {
             const headingItem = item as NavHeading;
             let isOpen = false;
             let setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 
+            // Determine which state setter to use for the collapsible
             if (headingItem.name === "Reports") {
               isOpen = isReportsOpen;
               setIsOpen = setIsReportsOpen;
             } else if (headingItem.name === "Actions") {
               isOpen = isActionsOpen;
-              setIsOpen = setIsActionsOpen;
+              setIsOpen = setIsActionsManagementOpen;
             } else if (headingItem.name === "Sales Management") {
               isOpen = isSalesManagementOpen;
               setIsOpen = setIsSalesManagementOpen;
             } else {
+              // Fallback for any other heading type, though not expected with current navItems
               isOpen = false;
-              setIsOpen = () => {};
+              setIsOpen = () => {}; 
             }
 
-            const visibleChildren = headingItem.children.filter(child => hasAccess(child.requiredPrivileges));
-
-            if (visibleChildren.length === 0) {
-              return null;
-            }
-
+            // Children are already filtered by accessibleNavItems, so no need for another filter here
+            // and no need to check visibleChildren.length === 0
             return (
               <Collapsible key={headingItem.name} open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
                 <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors duration-200 ease-in-out">
@@ -261,7 +260,7 @@ const Sidebar = () => {
                   <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isOpen && "rotate-180")} />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-1 pl-4">
-                  {visibleChildren.map((child) => (
+                  {headingItem.children.filter(child => hasAccess(child.requiredPrivileges)).map((child) => ( // Filter children again for safety, though accessibleNavItems should handle it
                     <Link
                       key={child.name}
                       to={child.href}
