@@ -8,7 +8,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { AdminListUsersOptions } from '@supabase/supabase-js'; // Import AdminListUsersOptions
+// Removed: import { AdminListUsersOptions } from '@supabase/supabase-js'; // Import AdminListUsersOptions
 
 interface SampleUser {
   name: string;
@@ -83,7 +83,7 @@ const MigrateData: React.FC = () => {
           page: 1,
           perPage: 1,
           filter: `email eq '${user.email}'`,
-        } as AdminListUsersOptions); // Explicitly cast to AdminListUsersOptions
+        });
 
         if (searchError) {
           console.error(`Error searching for user ${user.email}:`, searchError);
