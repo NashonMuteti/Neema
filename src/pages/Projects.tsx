@@ -114,7 +114,7 @@ const Projects = () => {
           const summary = await getProjectFinancialSummary(project.id);
           newSummaries.set(project.id, {
             totalCollections: summary.totalCollections,
-            totalPledges: summary.totalPledges,
+            totalPledges: summary.totalPledged, // Corrected from totalPledges
           });
         } catch (err) {
           console.error(`Failed to fetch financial summary for project ${project.name}:`, err);

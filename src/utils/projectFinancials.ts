@@ -35,7 +35,7 @@ export interface ProjectPledge {
 export interface ProjectFinancialSummary {
   totalBudget: number;
   totalCollections: number;
-  totalPledged: number;
+  totalPledged: number; // Corrected from totalPledges
   totalOutstandingPledges: number;
   collections: ProjectCollection[];
   pledges: ProjectPledge[];
@@ -110,7 +110,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
   const totalBudget = projectData?.budget || 0;
 
   const totalCollections = collections.reduce((sum, c) => sum + c.amount, 0);
-  const totalPledged = pledges.reduce((sum, p) => sum + p.amount, 0);
+  const totalPledged = pledges.reduce((sum, p) => sum + p.amount, 0); // Corrected from totalPledges
   const totalOutstandingPledges = pledges
     .filter(p => p.status === "Active" || p.status === "Overdue")
     .reduce((sum, p) => sum + p.amount, 0);

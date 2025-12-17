@@ -89,7 +89,7 @@ const ProjectFinancialsDetail: React.FC = () => {
 
   const { financialSummary, loading: financialsLoading, error: financialsError } = useProjectFinancials(projectId || ""); // Use the hook
   const totalCollections = financialSummary?.totalCollections || 0;
-  const totalPledges = financialSummary?.totalPledges || 0;
+  const totalPledges = financialSummary?.totalPledged || 0; // Corrected from totalPledges
 
   if (!project) {
     return (

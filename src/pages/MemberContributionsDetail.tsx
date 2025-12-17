@@ -390,7 +390,7 @@ const MemberContributionsDetail: React.FC = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectLabel>Year</Label>
+                          <SelectLabel>Year</SelectLabel>
                           {years.map((year) => (
                             <SelectItem key={year.value} value={year.value}>
                               {year.label}

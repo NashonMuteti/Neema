@@ -224,11 +224,6 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={!canManagePledges}>
-          <Edit className="mr-2 h-4 w-4" /> Manage Pledges
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle>Manage Pledges for {projectName}</DialogTitle>
