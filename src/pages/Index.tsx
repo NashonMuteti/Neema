@@ -1,9 +1,13 @@
 "use client";
 
-import React from "react";
-import SoonDueProjectsGraph from "@/components/dashboard/SoonDueProjectsGraph"; // Import the new graph component
-import ContributionsProgressGraph from "@/components/dashboard/ContributionsProgressGraph"; // Import the new contributions graph
-import IncomeExpenditureGraph from "@/components/dashboard/IncomeExpenditureGraph"; // Import the new income/expenditure graph
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import SoonDueProjectsGraph from "@/components/dashboard/SoonDueProjectsGraph";
+import ContributionsProgressGraph from "@/components/dashboard/ContributionsProgressGraph";
+import IncomeExpenditureGraph from "@/components/dashboard/IncomeExpenditureGraph";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { getYear, format, parseISO } from "date-fns";
+import { showError } from "@/utils/toast";
 
 // Define a simplified Project interface for the dashboard's dummy data
 interface DashboardProject {
@@ -13,45 +17,241 @@ interface DashboardProject {
   status: "Open" | "Closed" | "Deleted";
 }
 
+// Define interface for monthly financial data, now including year
+interface MonthlyFinancialData {
+  year: number;
+  month: string;
+  income: number;
+  expenditure: number;
+}
+
+// Define interface for project contribution data
+interface ProjectContributionData {
+  name: string;
+  expected: number;
+  actual: number;
+}
+
 const Index = () => {
-  // Dummy project data for the dashboard graph
-  const dummyDashboardProjects: DashboardProject[] = [
-    { id: "dp1", name: "Film Production X", status: "Open", dueDate: new Date(2024, 6, 10) }, // July 10, 2024 (Overdue/This Week depending on current date)
-    { id: "dp2", name: "Marketing Campaign Y", status: "Open", dueDate: new Date(2024, 7, 5) }, // Aug 5, 2024 (Next 30 Days)
-    { id: "dp3", name: "Post-Production Z", status: "Open", dueDate: new Date(2024, 8, 25) }, // Sep 25, 2024 (Later)
-    { id: "dp4", name: "Short Film Contest", status: "Open", dueDate: new Date(2024, 6, 18) }, // July 18, 2024 (This Week)
-    { id: "dp5", name: "New Script Development", status: "Open", dueDate: new Date(2024, 9, 1) }, // Oct 1, 2024 (Later)
-    { id: "dp6", name: "Festival Submissions", status: "Open", dueDate: new Date(2024, 6, 3) }, // July 3, 2024 (Overdue)
-    { id: "dp7", name: "Budget Review", status: "Open", dueDate: new Date(2024, 7, 20) }, // Aug 20, 2024 (Next 30 Days)
-    { id: "dp8", name: "Archived Project B", status: "Closed", dueDate: new Date(2024, 5, 1) }, // Closed project
-    { id: "dp9", name: "Deleted Project C", status: "Deleted", dueDate: new Date(2024, 4, 15) }, // Deleted project
-  ];
+  const { currentUser, isLoading: authLoading } = useAuth();
+  const [monthlyFinancialData, setMonthlyFinancialData] = useState<MonthlyFinancialData[]>([]);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [loadingFinancials, setLoadingFinancials] = useState(true);
+  const [financialsError, setFinancialsError] = useState<string | null>(null);
 
-  // Dummy data for contributions progress graph
-  const dummyContributionsData = [
-    { name: "Film Production X", expected: 1000, actual: 750 },
-    { name: "Marketing Campaign Y", expected: 500, actual: 600 },
-    { name: "Short Film Contest", expected: 200, actual: 180 },
-    { name: "Budget Review", expected: 800, actual: 800 },
-  ];
+  const [dashboardProjects, setDashboardProjects] = useState<DashboardProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
 
-  // Dummy data for income and expenditure graph for a specific year (e.g., 2024)
-  const dummyFinancialData = [
-    { month: "Jan", income: 1200, expenditure: 800 },
-    { month: "Feb", income: 1500, expenditure: 1000 },
-    { month: "Mar", income: 1000, expenditure: 1100 },
-    { month: "Apr", income: 1800, expenditure: 1300 },
-    { month: "May", income: 2000, expenditure: 1500 },
-    { month: "Jun", income: 1700, expenditure: 900 },
-    { month: "Jul", income: 2200, expenditure: 1600 },
-    { month: "Aug", income: 1900, expenditure: 1200 },
-    { month: "Sep", income: 2500, expenditure: 1800 },
-    { month: "Oct", income: 1600, expenditure: 1400 },
-    { month: "Nov", income: 2100, expenditure: 1700 },
-    { month: "Dec", income: 2300, expenditure: 1900 },
-  ];
+  const [contributionsProgressData, setContributionsProgressData] = useState<ProjectContributionData[]>([]);
+  const [loadingContributions, setLoadingContributions] = useState(true);
+  const [contributionsError, setContributionsError] = useState<string | null>(null);
 
-  const availableYears = [2022, 2023, 2024, 2025]; // Dummy years for the filter
+  const fetchFinancialData = useCallback(async () => {
+    setLoadingFinancials(true);
+    setFinancialsError(null);
+
+    if (!currentUser) {
+      setLoadingFinancials(false);
+      return;
+    }
+
+    try {
+      const { data: incomeTransactions, error: incomeError } = await supabase
+        .from('income_transactions')
+        .select('date, amount')
+        .eq('user_id', currentUser.id);
+
+      const { data: expenditureTransactions, error: expenditureError } = await supabase
+        .from('expenditure_transactions')
+        .select('date, amount')
+        .eq('user_id', currentUser.id);
+
+      if (incomeError || expenditureError) {
+        console.error("Error fetching financial data:", incomeError || expenditureError);
+        setFinancialsError("Failed to load financial data.");
+        setMonthlyFinancialData([]);
+        setAvailableYears([]);
+        return;
+      }
+
+      const aggregatedData: Record<string, { income: number; expenditure: number }> = {};
+      const yearsSet = new Set<number>();
+
+      // Process income
+      incomeTransactions?.forEach(tx => {
+        const date = parseISO(tx.date);
+        const year = getYear(date);
+        const month = format(date, 'MMM'); // e.g., Jan, Feb
+        const key = `${year}-${month}`;
+        
+        if (!aggregatedData[key]) {
+          aggregatedData[key] = { income: 0, expenditure: 0 };
+        }
+        aggregatedData[key].income += tx.amount;
+        yearsSet.add(year);
+      });
+
+      // Process expenditure
+      expenditureTransactions?.forEach(tx => {
+        const date = parseISO(tx.date);
+        const year = getYear(date);
+        const month = format(date, 'MMM');
+        const key = `${year}-${month}`;
+
+        if (!aggregatedData[key]) {
+          aggregatedData[key] = { income: 0, expenditure: 0 };
+        }
+        aggregatedData[key].expenditure += tx.amount;
+        yearsSet.add(year);
+      });
+
+      // Convert to array and sort
+      const sortedData: MonthlyFinancialData[] = Object.keys(aggregatedData)
+        .map(key => {
+          const [yearStr, monthStr] = key.split('-');
+          return {
+            year: parseInt(yearStr),
+            month: monthStr,
+            income: aggregatedData[key].income,
+            expenditure: aggregatedData[key].expenditure,
+          };
+        })
+        .sort((a, b) => {
+          // Sort by year, then by month (Jan=0, Feb=1, etc.)
+          if (a.year !== b.year) return a.year - b.year;
+          const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
+        });
+
+      setMonthlyFinancialData(sortedData);
+      setAvailableYears(Array.from(yearsSet).sort((a, b) => b - a)); // Sort years descending
+    } catch (err) {
+      console.error("Unexpected error in fetchFinancialData:", err);
+      setFinancialsError("An unexpected error occurred while loading financial data.");
+    } finally {
+      setLoadingFinancials(false);
+    }
+  }, [currentUser]);
+
+  const fetchDashboardProjects = useCallback(async () => {
+    setLoadingProjects(true);
+    setProjectsError(null);
+
+    if (!currentUser) {
+      setLoadingProjects(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, due_date, status')
+        .eq('user_id', currentUser.id)
+        .neq('status', 'Deleted'); // Exclude deleted projects
+
+      if (error) {
+        console.error("Error fetching dashboard projects:", error);
+        setProjectsError("Failed to load projects for dashboard.");
+        setDashboardProjects([]);
+        return;
+      }
+
+      setDashboardProjects(data.map(p => ({
+        id: p.id,
+        name: p.name,
+        dueDate: p.due_date ? parseISO(p.due_date) : undefined,
+        status: p.status as "Open" | "Closed" | "Deleted",
+      })));
+    } catch (err) {
+      console.error("Unexpected error in fetchDashboardProjects:", err);
+      setProjectsError("An unexpected error occurred while loading projects.");
+    } finally {
+      setLoadingProjects(false);
+    }
+  }, [currentUser]);
+
+  const fetchContributionsProgress = useCallback(async () => {
+    setLoadingContributions(true);
+    setContributionsError(null);
+
+    if (!currentUser) {
+      setLoadingContributions(false);
+      return;
+    }
+
+    try {
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, member_contribution_amount')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'Open'); // Only consider open projects for contributions progress
+
+      if (projectsError) {
+        console.error("Error fetching projects for contributions progress:", projectsError);
+        setContributionsError("Failed to load projects for contributions progress.");
+        setContributionsProgressData([]);
+        return;
+      }
+
+      const projectContributions: ProjectContributionData[] = [];
+      for (const project of projectsData || []) {
+        const expected = project.member_contribution_amount || 0; // Assuming this is the expected per member, or total
+        // For simplicity, let's assume member_contribution_amount is the *total* expected for the project
+        // If it's per member, we'd need to fetch member count for the project.
+
+        const { data: collectionsData, error: collectionsError } = await supabase
+          .from('project_collections')
+          .select('amount')
+          .eq('project_id', project.id);
+
+        if (collectionsError) {
+          console.error(`Error fetching collections for project ${project.name}:`, collectionsError);
+          // Continue with 0 actual if error
+        }
+
+        const actual = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
+
+        projectContributions.push({
+          name: project.name,
+          expected: expected,
+          actual: actual,
+        });
+      }
+      setContributionsProgressData(projectContributions);
+    } catch (err) {
+      console.error("Unexpected error in fetchContributionsProgress:", err);
+      setContributionsError("An unexpected error occurred while loading contributions progress.");
+    } finally {
+      setLoadingContributions(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser && !authLoading) {
+      fetchFinancialData();
+      fetchDashboardProjects();
+      fetchContributionsProgress();
+    }
+  }, [currentUser, authLoading, fetchFinancialData, fetchDashboardProjects, fetchContributionsProgress]);
+
+  if (authLoading || loadingFinancials || loadingProjects || loadingContributions) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-lg text-muted-foreground">Loading dashboard data...</p>
+      </div>
+    );
+  }
+
+  if (financialsError || projectsError || contributionsError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-lg text-destructive">Error loading dashboard: {financialsError || projectsError || contributionsError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -61,12 +261,12 @@ const Index = () => {
       </p>
 
       {/* Main Financial Overview */}
-      <IncomeExpenditureGraph financialData={dummyFinancialData} availableYears={availableYears} />
+      <IncomeExpenditureGraph allFinancialData={monthlyFinancialData} availableYears={availableYears} />
       
       {/* Project-specific Graphs (side-by-side on larger screens) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <SoonDueProjectsGraph projects={dummyDashboardProjects} />
-        <ContributionsProgressGraph projectsData={dummyContributionsData} />
+        <SoonDueProjectsGraph projects={dashboardProjects} />
+        <ContributionsProgressGraph projectsData={contributionsProgressData} />
       </div>
     </div>
   );
