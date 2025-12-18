@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -41,43 +41,21 @@ import { CalendarIcon, ChevronDown } from "lucide-react"; // Added ChevronDown i
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible components
+import { supabase } from "@/integrations/supabase/client";
 
 interface FinancialAccount {
   id: string;
   name: string;
 }
 
-interface Collection {
+interface ProjectCollection {
   id: string;
   date: string; // ISO string
   amount: number;
-  accountId: string;
+  project_id: string;
+  member_id: string;
+  account_id: string; // This is the key for grouping
 }
-
-const financialAccounts: FinancialAccount[] = [
-  { id: "acc1", name: "Cash at Hand" },
-  { id: "acc2", name: "Petty Cash" },
-  { id: "acc3", name: "Bank Mpesa Account" },
-  { id: "acc4", name: "Main Bank Account" },
-];
-
-const dummyCollectionsData: Collection[] = [
-  { id: "c1", date: "2024-07-20", amount: 100, accountId: "acc1" },
-  { id: "c2", date: "2024-07-20", amount: 50, accountId: "acc2" },
-  { id: "c3", date: "2024-07-21", amount: 200, accountId: "acc3" },
-  { id: "c4", date: "2024-07-22", amount: 150, accountId: "acc1" },
-  { id: "c5", date: "2024-07-23", amount: 75, accountId: "acc2" },
-  { id: "c6", date: "2024-07-24", amount: 300, accountId: "acc4" },
-  { id: "c7", date: "2024-07-25", amount: 120, accountId: "acc1" },
-  { id: "c8", date: "2024-07-26", amount: 80, accountId: "acc3" },
-  { id: "c9", date: "2024-07-27", amount: 180, accountId: "acc4" },
-  { id: "c10", date: "2024-07-28", amount: 60, accountId: "acc2" },
-  { id: "c11", date: "2024-08-01", amount: 110, accountId: "acc1" },
-  { id: "c12", date: "2024-08-02", amount: 90, accountId: "acc3" },
-  { id: "c13", date: "2023-12-10", amount: 250, accountId: "acc4" },
-  { id: "c14", date: "2023-12-15", amount: 100, accountId: "acc1" },
-  { id: "c15", date: "2024-07-20", amount: 20, accountId: "acc1" }, // Another for same day/account
-];
 
 const TableBankingSummary: React.FC = () => {
   const currentYear = getYear(new Date());
@@ -89,6 +67,11 @@ const TableBankingSummary: React.FC = () => {
   const [selectedYear, setSelectedYear] = React.useState<string>(currentYear.toString());
   const [openCollapsibles, setOpenCollapsibles] = React.useState<Record<string, boolean>>({}); // State for open collapsibles
 
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
+  const [allCollections, setAllCollections] = React.useState<ProjectCollection[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
     label: format(new Date(0, i), "MMMM"),
@@ -97,6 +80,42 @@ const TableBankingSummary: React.FC = () => {
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
   }));
+
+  const fetchTableBankingData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    const { data: accountsData, error: accountsError } = await supabase
+      .from('financial_accounts')
+      .select('id, name')
+      .order('name', { ascending: true });
+
+    if (accountsError) {
+      console.error("Error fetching financial accounts:", accountsError);
+      setError("Failed to load financial accounts.");
+      setFinancialAccounts([]);
+    } else {
+      setFinancialAccounts(accountsData || []);
+    }
+
+    const { data: collectionsData, error: collectionsError } = await supabase
+      .from('project_collections')
+      .select('id, date, amount, project_id, member_id, account_id')
+      .order('date', { ascending: false });
+
+    if (collectionsError) {
+      console.error("Error fetching project collections:", collectionsError);
+      setError("Failed to load project collections.");
+      setAllCollections([]);
+    } else {
+      setAllCollections(collectionsData || []);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchTableBankingData();
+  }, [fetchTableBankingData]);
 
   const getPeriodInterval = (period: typeof filterPeriod, date?: Date, month?: string, year?: string) => {
     let start: Date;
@@ -131,16 +150,16 @@ const TableBankingSummary: React.FC = () => {
   }, [filterPeriod, selectedDate, selectedMonth, selectedYear, currentYear, currentMonth]);
 
   const filteredCollections = React.useMemo(() => {
-    return dummyCollectionsData.filter(collection => {
+    return allCollections.filter(collection => {
       const collectionDate = parseISO(collection.date);
       return isWithinInterval(collectionDate, { start, end });
     });
-  }, [dummyCollectionsData, start, end]);
+  }, [allCollections, start, end]);
 
   const groupedContributions = React.useMemo(() => {
     const groups: Record<string, number> = {};
     filteredCollections.forEach(collection => {
-      groups[collection.accountId] = (groups[collection.accountId] || 0) + collection.amount;
+      groups[collection.account_id] = (groups[collection.account_id] || 0) + collection.amount;
     });
     return groups;
   }, [filteredCollections]);
@@ -168,6 +187,24 @@ const TableBankingSummary: React.FC = () => {
       [accountId]: !prev[accountId],
     }));
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Table Banking Summary</h1>
+        <p className="text-lg text-muted-foreground">Loading data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Table Banking Summary</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -294,7 +331,7 @@ const TableBankingSummary: React.FC = () => {
               <TableBody>
                 {financialAccounts.map((account) => {
                   const total = groupedContributions[account.id] || 0;
-                  const accountCollections = filteredCollections.filter(c => c.accountId === account.id);
+                  const accountCollections = filteredCollections.filter(c => c.account_id === account.id);
                   const isOpen = openCollapsibles[account.id];
 
                   return (

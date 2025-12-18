@@ -52,7 +52,7 @@ const Projects = () => {
     return { canManageProjects };
   }, [currentUser, definedRoles]);
 
-  const activeMembersCount = 5; // This will eventually come from a dynamic source
+  const [activeMembersCount, setActiveMembersCount] = useState(0); // New state for active members count
 
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "Suspended" | "All">("Open");
@@ -61,6 +61,24 @@ const Projects = () => {
   const [error, setError] = React.useState<string | null>(null);
   const [projectFinancialSummaries, setProjectFinancialSummaries] = useState<Map<string, { totalCollections: number; totalPledged: number }>>(new Map());
   const [loadingFinancials, setLoadingFinancials] = useState(false);
+
+  // New useEffect to fetch active members count
+  useEffect(() => {
+    const fetchActiveMembersCount = async () => {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'Active');
+
+      if (error) {
+        console.error("Error fetching active members count:", error);
+        // Handle error, maybe set count to 0
+      } else {
+        setActiveMembersCount(count || 0);
+      }
+    };
+    fetchActiveMembersCount();
+  }, []); // Run once on mount
 
 
   const fetchProjects = useCallback(async () => {
@@ -330,7 +348,7 @@ const Projects = () => {
             const expectedAmount = (project.memberContributionAmount || 0) * activeMembersCount;
             const projectSummary = projectFinancialSummaries.get(project.id);
             const totalCollections = projectSummary?.totalCollections || 0;
-            const totalPledges = projectSummary?.totalPledged || 0;
+            const totalPledges = projectSummary?.totalPledges || 0;
 
             return (
               <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -11,29 +11,81 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { showSuccess } from "@/utils/toast";
+import { showSuccess, showError } from "@/utils/toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Project {
   id: string;
   name: string;
   description: string;
-  status: "Open" | "Closed" | "Deleted";
+  status: "Open" | "Closed" | "Deleted" | "Suspended";
 }
 
-const dummyDeletedProjects: Project[] = [
-  { id: "proj4", name: "Archived Project A", description: "An old project that was deleted.", status: "Deleted" },
-  { id: "proj5", name: "Legacy System Migration", description: "Project to migrate data from old system.", status: "Deleted" },
-];
-
 const DeletedProjectsReport = () => {
-  const [deletedProjects, setDeletedProjects] = React.useState<Project[]>(dummyDeletedProjects);
+  const [deletedProjects, setDeletedProjects] = React.useState<Project[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const handleRestoreProject = (projectId: string, projectName: string) => {
-    // In a real app, this would update the project status in the backend
-    setDeletedProjects((prev) => prev.filter((p) => p.id !== projectId));
-    showSuccess(`Project '${projectName}' restored successfully.`);
-    console.log("Restoring project:", projectId);
+  const fetchDeletedProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name, description, status')
+      .eq('status', 'Deleted')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching deleted projects:", error);
+      setError("Failed to load deleted projects.");
+      setDeletedProjects([]);
+    } else {
+      setDeletedProjects(data.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        status: p.status as "Open" | "Closed" | "Deleted" | "Suspended",
+      })));
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchDeletedProjects();
+  }, [fetchDeletedProjects]);
+
+  const handleRestoreProject = async (projectId: string, projectName: string) => {
+    const { error } = await supabase
+      .from('projects')
+      .update({ status: "Open" }) // Restore to "Open" status
+      .eq('id', projectId);
+
+    if (error) {
+      console.error("Error restoring project:", error);
+      showError("Failed to restore project.");
+    } else {
+      showSuccess(`Project '${projectName}' restored successfully.`);
+      fetchDeletedProjects(); // Re-fetch to update the list
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Deleted Projects Report</h1>
+        <p className="text-lg text-muted-foreground">Loading deleted projects...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Deleted Projects Report</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -1,11 +1,18 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import InitializeBalancesDialog from "@/components/admin/InitializeBalancesDialog"; // Import the new dialog
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { supabase } from "@/integrations/supabase/client";
+
+interface FinancialAccount {
+  id: string;
+  name: string;
+  current_balance: number;
+}
 
 const InitializeBalances = () => {
   const { currentUser } = useAuth();
@@ -21,14 +28,77 @@ const InitializeBalances = () => {
     return { canInitializeBalances };
   }, [currentUser, definedRoles]);
 
-  const handleInitialize = (balances: Record<string, number>) => {
+  const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchFinancialAccounts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error } = await supabase
+      .from('financial_accounts')
+      .select('id, name, current_balance')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching financial accounts for initialization:", error);
+      setError("Failed to load financial accounts for initialization.");
+      setFinancialAccounts([]);
+    } else {
+      setFinancialAccounts(data || []);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchFinancialAccounts();
+  }, [fetchFinancialAccounts]);
+
+  const handleInitialize = async (balances: Record<string, number>) => {
     // In a real application, this would trigger a backend process
     // to reset or set default values for all account balances.
     console.log("Initializing all account balances with:", balances);
-    showSuccess("Account balances initialization initiated.");
-    // Simulate a potential error
-    // showError("Failed to initialize balances. Please try again.");
+
+    let hasError = false;
+    for (const accountId in balances) {
+      const newBalance = balances[accountId];
+      const { error } = await supabase
+        .from('financial_accounts')
+        .update({ current_balance: newBalance })
+        .eq('id', accountId);
+
+      if (error) {
+        console.error(`Error updating balance for account ${accountId}:`, error);
+        showError(`Failed to update balance for ${financialAccounts.find(acc => acc.id === accountId)?.name || accountId}.`);
+        hasError = true;
+      }
+    }
+
+    if (!hasError) {
+      showSuccess("Account balances initialized successfully!");
+      fetchFinancialAccounts(); // Re-fetch to update the displayed balances
+    } else {
+      showError("Some account balances failed to update. Check console for details.");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Initialize Account Balances</h1>
+        <p className="text-lg text-muted-foreground">Loading financial accounts...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Initialize Account Balances</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -47,7 +117,7 @@ const InitializeBalances = () => {
             Ensure you have backed up any necessary data before proceeding.
           </p>
           {canInitializeBalances ? (
-            <InitializeBalancesDialog onInitialize={handleInitialize} />
+            <InitializeBalancesDialog onInitialize={handleInitialize} financialAccounts={financialAccounts} />
           ) : (
             <p className="text-muted-foreground">You do not have permission to initialize balances.</p>
           )}

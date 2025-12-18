@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,61 +16,31 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, DollarSign, Handshake } from "lucide-react";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook
+import { useProjectFinancials, ProjectPledge as HookProjectPledge, ProjectCollection as HookProjectCollection } from "@/hooks/use-project-financials"; // Import the new hook and types
+import { supabase } from "@/integrations/supabase/client";
 
-// Dummy data for projects (to get project name)
-const dummyProjects = [
-  { id: "proj1", name: "Film Production X", description: "Main film project for the year.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 11, 15), memberContributionAmount: 100 },
-  { id: "proj2", name: "Marketing Campaign Y", description: "Promotional activities for new releases.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 7, 30), memberContributionAmount: 50 },
-  { id: "proj3", name: "Post-Production Z", description: "Editing and final touches for upcoming film.", status: "Closed", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 8, 10), memberContributionAmount: 75 },
-  { id: "proj5", name: "Short Film Contest", description: "Submission for a local short film festival.", status: "Open", thumbnailUrl: "/placeholder.svg", dueDate: new Date(2024, 6, 20), memberContributionAmount: 20 },
-];
-
-// Dummy data for members (to get member name)
-const dummyMembers = [
-  { id: "m1", name: "Alice Johnson" },
-  { id: "m2", name: "Bob Williams" },
-  { id: "m3", name: "Charlie Brown" },
-];
-
-// Dummy data for project collections
-const allProjectCollections = [
-  { id: "col1", projectId: "proj1", memberId: "m1", amount: 50, date: "2024-07-10", paymentMethod: "cash" },
-  { id: "col2", projectId: "proj1", memberId: "m3", amount: 25, date: "2024-07-12", paymentMethod: "bank-transfer" },
-  { id: "col3", projectId: "proj5", memberId: "m1", amount: 20, date: "2024-07-15", paymentMethod: "cash" },
-  { id: "col4", projectId: "proj2", memberId: "m2", amount: 50, date: "2024-08-01", paymentMethod: "online-payment" },
-  { id: "col5", projectId: "proj1", memberId: "m1", amount: 50, date: "2024-08-05", paymentMethod: "cash" },
-];
-
-interface Pledge {
+interface Project {
   id: string;
-  memberId: string;
-  projectId: string;
-  amount: number;
-  dueDate: string; // ISO string
-  status: "Active" | "Paid" | "Overdue";
+  name: string;
+  description: string;
+  status: "Open" | "Closed" | "Deleted" | "Suspended";
+  thumbnailUrl?: string;
+  dueDate?: Date;
+  memberContributionAmount?: number;
+  user_id: string;
 }
 
-// Dummy data for project pledges - explicitly typed
-const allProjectPledges: Pledge[] = [
-  { id: "p1", projectId: "proj1", memberId: "m1", amount: 500, dueDate: "2024-07-15", status: "Active" },
-  { id: "p2", projectId: "proj2", memberId: "m2", amount: 250, dueDate: "2024-05-01", status: "Overdue" },
-  { id: "p3", projectId: "proj1", memberId: "m3", amount: 750, dueDate: "2024-08-10", status: "Active" },
-  { id: "p4", projectId: "proj3", memberId: "m1", amount: 100, dueDate: "2024-04-20", status: "Paid" },
-  { id: "p5", projectId: "proj5", memberId: "m2", amount: 150, dueDate: "2024-07-25", status: "Active" },
-];
-
-const getPledgeStatus = (pledge: Pledge): Pledge['status'] => {
+const getPledgeStatus = (pledge: HookProjectPledge): HookProjectPledge['status'] => {
   if (pledge.status === "Paid") return "Paid";
   const today = startOfDay(new Date());
-  const dueDate = startOfDay(parseISO(pledge.dueDate));
+  const dueDate = startOfDay(pledge.due_date); // Use due_date which is already a Date object
   if (isBefore(dueDate, today)) {
     return "Overdue";
   }
   return "Active";
 };
 
-const getStatusBadgeClasses = (status: Pledge['status']) => {
+const getStatusBadgeClasses = (status: HookProjectPledge['status']) => {
   switch (status) {
     case "Active":
       return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
@@ -85,13 +55,75 @@ const getStatusBadgeClasses = (status: Pledge['status']) => {
 
 const ProjectFinancialsDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const project = dummyProjects.find(p => p.id === projectId);
 
-  const { financialSummary, loading: financialsLoading, error: financialsError } = useProjectFinancials(projectId || ""); // Use the hook
-  const totalCollections = financialSummary?.totalCollections || 0;
-  const totalPledges = financialSummary?.totalPledged || 0; // Corrected from totalPledges
+  const [projectDetails, setProjectDetails] = useState<Project | null>(null);
+  const [loadingProjectDetails, setLoadingProjectDetails] = useState(true);
+  const [projectDetailsError, setProjectDetailsError] = useState<string | null>(null);
 
-  if (!project) {
+  const { financialSummary, loading: financialsLoading, error: financialsError, refreshFinancials } = useProjectFinancials(projectId || "");
+
+  useEffect(() => {
+    const fetchProjectDetails = async () => {
+      setLoadingProjectDetails(true);
+      setProjectDetailsError(null);
+      if (!projectId) {
+        setProjectDetailsError("Project ID is missing.");
+        setLoadingProjectDetails(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching project details:", error);
+        setProjectDetailsError("Failed to load project details.");
+        setProjectDetails(null);
+      } else {
+        setProjectDetails({
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          status: data.status as "Open" | "Closed" | "Deleted" | "Suspended",
+          thumbnailUrl: data.thumbnail_url || undefined,
+          dueDate: data.due_date ? parseISO(data.due_date) : undefined,
+          memberContributionAmount: data.member_contribution_amount || undefined,
+          user_id: data.user_id,
+        });
+      }
+      setLoadingProjectDetails(false);
+    };
+    fetchProjectDetails();
+  }, [projectId]);
+
+  if (loadingProjectDetails || financialsLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Loading Project Financials...</h1>
+        <p className="text-lg text-muted-foreground">Fetching project details and financial summary.</p>
+      </div>
+    );
+  }
+
+  if (projectDetailsError || financialsError) {
+    return (
+      <div className="space-y-6 text-center">
+        <h1 className="text-3xl font-bold text-foreground">Error Loading Project</h1>
+        <p className="text-lg text-destructive">
+          {projectDetailsError || financialsError || "An unexpected error occurred."}
+        </p>
+        <Link to="/projects">
+          <Button variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!projectDetails) {
     return (
       <div className="space-y-6 text-center">
         <h1 className="text-3xl font-bold text-foreground">Project Not Found</h1>
@@ -107,8 +139,10 @@ const ProjectFinancialsDetail: React.FC = () => {
     );
   }
 
-  const projectCollections = allProjectCollections.filter(c => c.projectId === projectId);
-  const projectPledges = allProjectPledges.filter(p => p.projectId === projectId);
+  const collections = financialSummary?.collections || [];
+  const pledges = financialSummary?.pledges || [];
+  const totalCollections = financialSummary?.totalCollections || 0;
+  const totalPledged = financialSummary?.totalPledged || 0;
 
   return (
     <div className="space-y-6">
@@ -118,7 +152,7 @@ const ProjectFinancialsDetail: React.FC = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold text-foreground">Financial Details for {project.name}</h1>
+        <h1 className="text-3xl font-bold text-foreground">Financial Details for {projectDetails.name}</h1>
       </div>
       <p className="text-lg text-muted-foreground">
         Overview of all collections and pledges related to this project.
@@ -144,7 +178,7 @@ const ProjectFinancialsDetail: React.FC = () => {
             <Handshake className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalPledges.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${totalPledged.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
               Total outstanding and paid pledges.
             </p>
@@ -160,7 +194,7 @@ const ProjectFinancialsDetail: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {projectCollections.length > 0 ? (
+          {collections.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -171,12 +205,12 @@ const ProjectFinancialsDetail: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projectCollections.map((collection) => (
+                {collections.map((collection) => (
                   <TableRow key={collection.id}>
-                    <TableCell>{format(parseISO(collection.date), "MMM dd, yyyy")}</TableCell>
-                    <TableCell>{dummyMembers.find(m => m.id === collection.memberId)?.name}</TableCell>
+                    <TableCell>{format(collection.date, "MMM dd, yyyy")}</TableCell>
+                    <TableCell>{collection.member_name}</TableCell>
                     <TableCell className="text-right">${collection.amount.toFixed(2)}</TableCell>
-                    <TableCell className="capitalize">{collection.paymentMethod.replace(/-/g, " ")}</TableCell>
+                    <TableCell className="capitalize">{collection.payment_method.replace(/-/g, " ")}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
@@ -200,7 +234,7 @@ const ProjectFinancialsDetail: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {projectPledges.length > 0 ? (
+          {pledges.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -211,13 +245,13 @@ const ProjectFinancialsDetail: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projectPledges.map((pledge) => {
+                {pledges.map((pledge) => {
                   const status = getPledgeStatus(pledge);
                   return (
                     <TableRow key={pledge.id}>
-                      <TableCell>{dummyMembers.find(m => m.id === pledge.memberId)?.name}</TableCell>
+                      <TableCell>{pledge.member_name}</TableCell>
                       <TableCell className="text-right">${pledge.amount.toFixed(2)}</TableCell>
-                      <TableCell>{format(parseISO(pledge.dueDate), "MMM dd, yyyy")}</TableCell>
+                      <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClasses(status)}>
                           {status}
@@ -228,7 +262,7 @@ const ProjectFinancialsDetail: React.FC = () => {
                 })}
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                   <TableCell colSpan={1}>Total Pledges</TableCell>
-                  <TableCell className="text-right">${totalPledges.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">${totalPledged.toFixed(2)}</TableCell>
                   <TableCell colSpan={2}></TableCell>
                 </TableRow>
               </TableBody>

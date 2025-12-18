@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -24,19 +24,14 @@ import {
 import { Search, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format, getMonth, getYear, parseISO } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { PostgrestError } from "@supabase/supabase-js";
 
-// Dummy data for all members' contributions (aggregated from various sources)
-export const allMembersContributions = [ // Exported for reuse
-  { id: "mc1", memberId: "u1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-07-10", amount: 50, expected: 100 },
-  { id: "mc2", memberId: "u1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj5", projectName: "Short Film Contest", date: "2024-07-15", amount: 20, expected: 20 },
-  { id: "mc3", memberId: "u1", memberName: "Alice Johnson", memberEmail: "alice@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-08-01", amount: 50, expected: 100 },
-  { id: "mc4", memberId: "u2", memberName: "Bob Williams", memberEmail: "bob@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-08-10", amount: 25, expected: 50 },
-  { id: "mc5", memberId: "u2", memberName: "Bob Williams", memberEmail: "bob@example.com", projectId: "proj5", projectName: "Short Film Contest", date: "2024-09-05", amount: 10, expected: 20 },
-  { id: "mc6", memberId: "u3", memberName: "Charlie Brown", memberEmail: "charlie@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-09-20", amount: 25, expected: 100 },
-  { id: "mc7", memberId: "u3", memberName: "Charlie Brown", memberEmail: "charlie@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-10-01", amount: 25, expected: 50 },
-  { id: "mc8", memberId: "u4", memberName: "David Green", memberEmail: "david@example.com", projectId: "proj1", projectName: "Film Production X", date: "2024-07-22", amount: 70, expected: 100 },
-  { id: "mc9", memberId: "u4", memberName: "David Green", memberEmail: "david@example.com", projectId: "proj2", projectName: "Marketing Campaign Y", date: "2024-08-15", amount: 30, expected: 50 },
-];
+interface MemberProfile {
+  id: string;
+  name: string;
+  email: string;
+}
 
 interface MemberSummary {
   id: string;
@@ -53,6 +48,9 @@ const MemberContributions = () => {
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [memberSummaries, setMemberSummaries] = React.useState<MemberSummary[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -63,41 +61,105 @@ const MemberContributions = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const aggregatedContributions: MemberSummary[] = React.useMemo(() => {
-    const filteredByDate = allMembersContributions.filter(contribution => {
-      const contributionDate = parseISO(contribution.date);
-      return (
-        getMonth(contributionDate).toString() === filterMonth &&
-        getYear(contributionDate).toString() === filterYear
-      );
-    });
+  const fetchMemberContributions = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-    const memberMap = new Map<string, MemberSummary>();
+    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
+    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
-    filteredByDate.forEach(contribution => {
-      if (!memberMap.has(contribution.memberId)) {
-        memberMap.set(contribution.memberId, {
-          id: contribution.memberId,
-          name: contribution.memberName,
-          email: contribution.memberEmail,
-          totalContributed: 0,
-          totalExpected: 0,
-        });
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .order('name', { ascending: true });
+
+    if (profilesError) {
+      console.error("Error fetching profiles:", profilesError);
+      setError("Failed to load member profiles.");
+      setLoading(false);
+      return;
+    }
+
+    const summaries: MemberSummary[] = [];
+
+    for (const profile of profiles || []) {
+      let totalContributed = 0;
+      let totalExpected = 0;
+
+      // Fetch income transactions for this member
+      const { data: incomeData, error: incomeError } = await supabase
+        .from('income_transactions')
+        .select('amount')
+        .eq('user_id', profile.id)
+        .gte('date', startOfMonth.toISOString())
+        .lte('date', endOfMonth.toISOString());
+
+      if (incomeError) console.error(`Error fetching income for ${profile.name}:`, incomeError);
+      else totalContributed += (incomeData || []).reduce((sum, tx) => sum + tx.amount, 0);
+
+      // Fetch project collections (actual contributions to projects)
+      const { data: collectionsData, error: collectionsError } = await supabase
+        .from('project_collections')
+        .select('amount')
+        .eq('member_id', profile.id)
+        .gte('date', startOfMonth.toISOString())
+        .lte('date', endOfMonth.toISOString());
+
+      if (collectionsError) console.error(`Error fetching collections for ${profile.name}:`, collectionsError);
+      else totalContributed += (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
+
+      // Fetch project pledges (expected contributions)
+      const { data: pledgesData, error: pledgesError } = await supabase
+        .from('project_pledges')
+        .select('amount, status')
+        .eq('member_id', profile.id)
+        .gte('due_date', startOfMonth.toISOString())
+        .lte('due_date', endOfMonth.toISOString());
+
+      if (pledgesError) console.error(`Error fetching pledges for ${profile.name}:`, pledgesError);
+      else {
+        totalExpected += (pledgesData || []).reduce((sum, p) => sum + p.amount, 0);
       }
-      const memberSummary = memberMap.get(contribution.memberId)!;
-      memberSummary.totalContributed += contribution.amount;
-      memberSummary.totalExpected += contribution.expected;
-    });
 
-    const sortedMembers = Array.from(memberMap.values()).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
+      summaries.push({
+        id: profile.id,
+        name: profile.name || profile.email || "Unknown",
+        email: profile.email || "N/A",
+        totalContributed,
+        totalExpected,
+      });
+    }
 
-    return sortedMembers.filter(member =>
+    const filteredAndSorted = summaries.filter(member =>
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    ).sort((a, b) => a.name.localeCompare(b.name));
+
+    setMemberSummaries(filteredAndSorted);
+    setLoading(false);
   }, [filterMonth, filterYear, searchQuery]);
+
+  useEffect(() => {
+    fetchMemberContributions();
+  }, [fetchMemberContributions]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Member Contributions Report</h1>
+        <p className="text-lg text-muted-foreground">Loading member contributions...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Member Contributions Report</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -160,7 +222,7 @@ const MemberContributions = () => {
             </div>
           </div>
 
-          {aggregatedContributions.length > 0 ? (
+          {memberSummaries.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -172,7 +234,7 @@ const MemberContributions = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {aggregatedContributions.map((member) => (
+                {memberSummaries.map((member) => (
                   <TableRow key={member.id}>
                     <TableCell className="font-medium">{member.name}</TableCell>
                     <TableCell>{member.email}</TableCell>

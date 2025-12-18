@@ -16,24 +16,18 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 
-interface Account {
+interface FinancialAccount {
   id: string;
   name: string;
-  currentBalance: number;
+  current_balance: number; // Use current_balance to match Supabase
 }
 
 interface InitializeBalancesDialogProps {
   onInitialize: (balances: Record<string, number>) => void;
+  financialAccounts: FinancialAccount[]; // Pass fetched accounts as prop
 }
 
-const dummyAccounts: Account[] = [
-  { id: "acc1", name: "Cash at Hand", currentBalance: 1500.00 },
-  { id: "acc2", name: "Petty Cash", currentBalance: 300.00 },
-  { id: "acc3", name: "Bank Mpesa Account", currentBalance: 12500.00 },
-  { id: "acc4", name: "Main Bank Account", currentBalance: 50000.00 },
-];
-
-const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onInitialize }) => {
+const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onInitialize, financialAccounts }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
@@ -52,14 +46,14 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
 
   React.useEffect(() => {
     if (isOpen) {
-      // Initialize with current balances or zeros
+      // Initialize with current balances or zeros from fetched accounts
       const initialBalances: Record<string, string> = {};
-      dummyAccounts.forEach(acc => {
-        initialBalances[acc.id] = acc.currentBalance.toFixed(2);
+      financialAccounts.forEach(acc => {
+        initialBalances[acc.id] = acc.current_balance.toFixed(2);
       });
       setNewBalances(initialBalances);
     }
-  }, [isOpen]);
+  }, [isOpen, financialAccounts]); // Depend on financialAccounts
 
   const handleBalanceChange = (accountId: string, value: string) => {
     setNewBalances((prev) => ({ ...prev, [accountId]: value }));
@@ -71,7 +65,7 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
     for (const accountId in newBalances) {
       const value = parseFloat(newBalances[accountId]);
       if (isNaN(value) || value < 0) {
-        showError(`Invalid balance for ${dummyAccounts.find(a => a.id === accountId)?.name || accountId}. Please enter a non-negative number.`);
+        showError(`Invalid balance for ${financialAccounts.find(a => a.id === accountId)?.name || accountId}. Please enter a non-negative number.`);
         isValid = false;
         break;
       }
@@ -81,7 +75,6 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
     if (!isValid) return;
 
     onInitialize(parsedBalances);
-    showSuccess("Account balances initialized successfully!");
     setIsOpen(false);
   };
 
@@ -101,26 +94,30 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
           <p className="text-sm text-muted-foreground">
             Enter the desired starting balance for each account.
           </p>
-          {dummyAccounts.map((account) => (
-            <div key={account.id} className="grid grid-cols-3 items-center gap-4">
-              <Label htmlFor={`balance-${account.id}`} className="col-span-1">
-                {account.name}
-              </Label>
-              <Input
-                id={`balance-${account.id}`}
-                type="number"
-                step="0.01"
-                value={newBalances[account.id] || ""}
-                onChange={(e) => handleBalanceChange(account.id, e.target.value)}
-                className="col-span-2"
-                placeholder="0.00"
-                disabled={!canInitializeBalances}
-              />
-            </div>
-          ))}
+          {financialAccounts.length > 0 ? (
+            financialAccounts.map((account) => (
+              <div key={account.id} className="grid grid-cols-3 items-center gap-4">
+                <Label htmlFor={`balance-${account.id}`} className="col-span-1">
+                  {account.name}
+                </Label>
+                <Input
+                  id={`balance-${account.id}`}
+                  type="number"
+                  step="0.01"
+                  value={newBalances[account.id] || ""}
+                  onChange={(e) => handleBalanceChange(account.id, e.target.value)}
+                  className="col-span-2"
+                  placeholder="0.00"
+                  disabled={!canInitializeBalances}
+                />
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground">No financial accounts found. Please add some accounts first.</p>
+          )}
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canInitializeBalances}>Confirm Initialization</Button>
+          <Button onClick={handleSubmit} disabled={!canInitializeBalances || financialAccounts.length === 0}>Confirm Initialization</Button>
         </div>
         <p className="text-sm text-destructive-foreground bg-destructive/10 p-3 rounded-md border border-destructive mt-2">
           <span className="font-bold">Warning:</span> This action will overwrite existing balances.

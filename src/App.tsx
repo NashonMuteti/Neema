@@ -39,9 +39,6 @@ import Stocks from "./pages/SalesManagement/Stocks";
 import DailySales from "./pages/SalesManagement/DailySales";
 import Debts from "./pages/SalesManagement/Debts";
 
-// Data Migration Page (Temporary)
-import MigrateData from "./pages/MigrateData";
-
 
 const queryClient = new QueryClient();
 
@@ -84,8 +81,6 @@ const App = () => (
                       <Route path="/reports/deleted-projects" element={<DeletedProjectsReport />} />
                       <Route path="/initialize-balances" element={<InitializeBalances />} />
                       <Route path="/admin/settings" element={<AdminSettings />} />
-                      {/* New migration route, protected for Super Admin */}
-                      <Route path="/admin/migrate-data" element={<ProtectedRoute allowedRoles={["Super Admin"]}><MigrateData /></ProtectedRoute>} />
                     </Route>
                   </Route>
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

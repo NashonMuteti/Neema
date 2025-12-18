@@ -50,10 +50,10 @@ interface Pledge {
   member_id: string;
   project_id: string;
   amount: number;
-  due_date: Date;
+  due_date: Date; // Changed to Date
   status: "Active" | "Paid" | "Overdue";
-  member_name?: string; // Added for joined data
-  project_name?: string; // Added for joined data
+  member_name: string; // Added for joined data
+  project_name: string; // Added for joined data
 }
 
 // Define the expected structure of a pledge row with joined profile and project data
@@ -172,6 +172,8 @@ const Pledges = () => {
         profiles ( name ),
         projects ( name )
       `)
+      .gte('due_date', startOfMonth.toISOString())
+      .lte('due_date', endOfMonth.toISOString())
       .order('due_date', { ascending: false }) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null };
 
     if (pledgesError) {
