@@ -79,11 +79,11 @@ const MigrateData: React.FC = () => {
     for (const user of sampleUsers) {
       try {
         // 1. Check if user already exists in auth.users
-        const { data: existingUsers, error: searchError } = await supabase.auth.admin.listUsers({
-          page: 1,
-          perPage: 1,
-          filter: `email eq '${user.email}'`,
-        });
+        const { data: existingUsers, error: searchError } = await supabase.auth.admin.listUsers(
+          1, // page
+          1, // perPage
+          `email eq '${user.email}'` // filter
+        );
 
         if (searchError) {
           console.error(`Error searching for user ${user.email}:`, searchError);
