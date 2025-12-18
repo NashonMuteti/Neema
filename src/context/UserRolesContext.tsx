@@ -18,7 +18,7 @@ interface UserRolesContextType {
 const UserRolesContext = createContext<UserRolesContextType | undefined>(undefined);
 
 export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isLoading: authLoading } = useAuth(); // Get authLoading from useAuth
   const [userRoles, setUserRoles] = useState<UserRoleType[]>([]);
 
   const fetchRoles = useCallback(async () => {
@@ -41,12 +41,16 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         menuPrivileges: role.menu_privileges || [],
       }));
       setUserRoles(fetchedRoles);
+      console.log("UserRolesContext: fetchedRoles", fetchedRoles); // Log fetched roles
     }
   }, []);
 
   useEffect(() => {
-    fetchRoles();
-  }, [fetchRoles]);
+    // Fetch roles only when auth is not loading and currentUser is available
+    if (!authLoading && currentUser) {
+      fetchRoles();
+    }
+  }, [fetchRoles, currentUser, authLoading]); // Add currentUser and authLoading to dependencies
 
   // Effect to dynamically assign the current user's ID to their corresponding role
   // This is now handled by the `profiles` table directly, so this logic is less critical here

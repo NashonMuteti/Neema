@@ -84,6 +84,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       setCurrentUser(null);
     }
+    console.log("AuthContext: currentUser", currentUser); // Log currentUser
   };
 
   useEffect(() => {
