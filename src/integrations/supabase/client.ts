@@ -16,7 +16,21 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   );
 }
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Create a supabase client with security-focused configuration
+export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  // Configure auth settings for better security
+  auth: {
+    // Automatically refresh tokens when they expire
+    autoRefreshToken: true,
+    // Persist session data in localStorage
+    persistSession: true,
+    // Detect auth state changes
+    detectSessionInUrl: true
+  },
+  // Global error handler
+  global: {
+    headers: {
+      'X-Client-Info': 'group-finance-app'
+    }
+  }
+});

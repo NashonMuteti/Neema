@@ -1,25 +1,25 @@
 "use client";
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client'; // Import Supabase client
-import { Session, User as SupabaseUser } from '@supabase/supabase-js'; // Import Supabase types
+import { supabase } from '@/integrations/supabase/client';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Centralized User interface
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: string; // Changed to string to support custom roles
+  role: string;
   status: "Active" | "Inactive" | "Suspended";
   enableLogin: boolean;
   imageUrl?: string;
 }
 
 interface AuthContextType {
-  session: Session | null; // Supabase session
-  supabaseUser: SupabaseUser | null; // Supabase user object
-  currentUser: User | null; // Our application's user object
-  isLoading: boolean; // To indicate if auth state is being loaded
+  session: Session | null;
+  supabaseUser: SupabaseUser | null;
+  currentUser: User | null;
+  isLoading: boolean;
+  refreshSession: () => Promise<void>; // Added method to refresh session
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,61 +27,79 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>(null); // Our app's user object
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Function to refresh the session
+  const refreshSession = async () => {
+    try {
+      const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+      
+      if (refreshedSession) {
+        setSession(refreshedSession);
+        setSupabaseUser(refreshedSession.user);
+        await fetchUserProfile(refreshedSession.user);
+      }
+    } catch (error) {
+      console.error("Error refreshing session:", error);
+    }
+  };
 
   // Function to fetch and set the application's currentUser profile
   const fetchUserProfile = async (user: SupabaseUser | null) => {
     if (user) {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found (new user)
-        console.error("Error fetching user profile:", error);
-        // Even if there's an error, try to create a basic user
-        setCurrentUser({
-          id: user.id,
-          name: user.user_metadata.full_name || user.email || "User",
-          email: user.email || "",
-          role: "Contributor", // Default role if profile fetch fails
-          status: "Active",
-          enableLogin: true,
-          imageUrl: user.user_metadata.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`,
-        });
-        return;
-      }
+        if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+          console.error("Error fetching user profile:", error);
+          // Create a minimal user object if profile fetch fails
+          setCurrentUser({
+            id: user.id,
+            name: user.user_metadata?.full_name || user.email || "User",
+            email: user.email || "",
+            role: "Contributor",
+            status: "Active",
+            enableLogin: true,
+            imageUrl: user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`,
+          });
+          return;
+        }
 
-      if (profile) {
-        setCurrentUser({
-          id: profile.id,
-          name: profile.name || user.user_metadata.full_name || user.email || "User",
-          email: profile.email || user.email || "",
-          role: profile.role || "Contributor", // Use role from profile, default to Contributor
-          status: profile.status || "Active",
-          enableLogin: profile.enable_login ?? true, // Default to true if null
-          imageUrl: profile.image_url || user.user_metadata.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${profile.name || user.email}`,
-        });
-      } else {
-        // This case should ideally be handled by the handle_new_user trigger,
-        // but as a fallback, create a basic profile if it somehow doesn't exist.
-        console.warn("No profile found for user, creating a default one (this should be handled by trigger).");
-        setCurrentUser({
-          id: user.id,
-          name: user.user_metadata.full_name || user.email || "User",
-          email: user.email || "",
-          role: "Contributor", // Default role for new users
-          status: "Active",
-          enableLogin: true,
-          imageUrl: user.user_metadata.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`,
-        });
+        if (profile) {
+          setCurrentUser({
+            id: profile.id,
+            name: profile.name || user.user_metadata?.full_name || user.email || "User",
+            email: profile.email || user.email || "",
+            role: profile.role || "Contributor",
+            status: profile.status || "Active",
+            enableLogin: profile.enable_login ?? true,
+            imageUrl: profile.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${profile.name || user.email}`,
+          });
+        } else {
+          // Fallback for new users
+          setCurrentUser({
+            id: user.id,
+            name: user.user_metadata?.full_name || user.email || "User",
+            email: user.email || "",
+            role: "Contributor",
+            status: "Active",
+            enableLogin: true,
+            imageUrl: user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`,
+          });
+        }
+      } catch (error) {
+        console.error("Error in fetchUserProfile:", error);
+        setCurrentUser(null);
       }
     } else {
       setCurrentUser(null);
     }
-    console.log("AuthContext: currentUser", currentUser); // Log currentUser
   };
 
   useEffect(() => {
@@ -108,7 +126,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, supabaseUser, currentUser, isLoading }}>
+    <AuthContext.Provider value={{ 
+      session, 
+      supabaseUser, 
+      currentUser, 
+      isLoading,
+      refreshSession
+    }}>
       {children}
     </AuthContext.Provider>
   );
