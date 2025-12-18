@@ -166,7 +166,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
   return (
     <UserRolesContext.Provider value={{ userRoles, addRole, updateRole, deleteRole, fetchRoles }}>
       {children}
-    </UserRoles.Provider>
+    </UserRolesContext.Provider>
   );
 };
 

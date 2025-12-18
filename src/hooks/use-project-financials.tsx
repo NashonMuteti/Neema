@@ -22,7 +22,6 @@ export const useProjectFinancials = (projectId: string | undefined): UseProjectF
       setLoading(false);
       return;
     }
-
     setLoading(true);
     setError(null);
     try {
@@ -51,3 +50,6 @@ export const useProjectFinancials = (projectId: string | undefined): UseProjectF
     pledges: financialSummary?.pledges || [],
   };
 };
+
+// Export the types
+export type { ProjectPledge, ProjectCollection };

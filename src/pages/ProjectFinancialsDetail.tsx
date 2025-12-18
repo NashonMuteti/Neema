@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, DollarSign, Handshake } from "lucide-react";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useProjectFinancials, ProjectPledge as HookProjectPledge, ProjectCollection as HookProjectCollection } from "@/hooks/use-project-financials"; // Import the new hook and types
+import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook and types
 import { supabase } from "@/integrations/supabase/client";
 
 interface Project {
@@ -29,6 +29,10 @@ interface Project {
   memberContributionAmount?: number;
   user_id: string;
 }
+
+// Use the exported types from the hook
+type HookProjectPledge = ReturnType<typeof useProjectFinancials>['pledges'][0];
+type HookProjectCollection = ReturnType<typeof useProjectFinancials>['collections'][0];
 
 const getPledgeStatus = (pledge: HookProjectPledge): HookProjectPledge['status'] => {
   if (pledge.status === "Paid") return "Paid";
@@ -55,7 +59,6 @@ const getStatusBadgeClasses = (status: HookProjectPledge['status']) => {
 
 const ProjectFinancialsDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
-
   const [projectDetails, setProjectDetails] = useState<Project | null>(null);
   const [loadingProjectDetails, setLoadingProjectDetails] = useState(true);
   const [projectDetailsError, setProjectDetailsError] = useState<string | null>(null);
@@ -76,7 +79,6 @@ const ProjectFinancialsDetail: React.FC = () => {
         .select('*')
         .eq('id', projectId)
         .single();
-
       if (error) {
         console.error("Error fetching project details:", error);
         setProjectDetailsError("Failed to load project details.");
@@ -116,7 +118,8 @@ const ProjectFinancialsDetail: React.FC = () => {
         </p>
         <Link to="/projects">
           <Button variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Projects
           </Button>
         </Link>
       </div>
@@ -132,7 +135,8 @@ const ProjectFinancialsDetail: React.FC = () => {
         </p>
         <Link to="/projects">
           <Button variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Projects
           </Button>
         </Link>
       </div>
@@ -157,7 +161,6 @@ const ProjectFinancialsDetail: React.FC = () => {
       <p className="text-lg text-muted-foreground">
         Overview of all collections and pledges related to this project.
       </p>
-
       {/* Financial Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
@@ -185,12 +188,12 @@ const ProjectFinancialsDetail: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-
       {/* Collections Section */}
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" /> Collections
+            <DollarSign className="h-5 w-5" />
+            Collections
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -225,12 +228,12 @@ const ProjectFinancialsDetail: React.FC = () => {
           )}
         </CardContent>
       </Card>
-
       {/* Pledges Section */}
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Handshake className="h-5 w-5" /> Pledges
+            <Handshake className="h-5 w-5" />
+            Pledges
           </CardTitle>
         </CardHeader>
         <CardContent>

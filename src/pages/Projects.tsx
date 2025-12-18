@@ -40,7 +40,6 @@ interface Project {
 const Projects = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-
   // Calculate canManageProjects using useMemo for stability
   const { canManageProjects } = useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -53,23 +52,20 @@ const Projects = () => {
   }, [currentUser, definedRoles]);
 
   const [activeMembersCount, setActiveMembersCount] = useState(0); // New state for active members count
-
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "Suspended" | "All">("Open");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [projectFinancialSummaries, setProjectFinancialSummaries] = useState<Map<string, { totalCollections: number; totalPledged: number }>>(new Map());
-  const [loadingFinancials, setLoadingFinancials] = useState(false);
+  const [loadingFinancials, setLoadingFinancials] = useState(false); // New useEffect to fetch active members count
 
-  // New useEffect to fetch active members count
   useEffect(() => {
     const fetchActiveMembersCount = async () => {
       const { count, error } = await supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'Active');
-
       if (error) {
         console.error("Error fetching active members count:", error);
         // Handle error, maybe set count to 0
@@ -80,25 +76,20 @@ const Projects = () => {
     fetchActiveMembersCount();
   }, []); // Run once on mount
 
-
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError(null);
     let query = supabase.from('projects').select('*');
-
     if (filterStatus !== "All") {
       query = query.eq('status', filterStatus);
     } else {
       // Exclude 'Deleted' projects from 'All' view
       query = query.neq('status', 'Deleted');
     }
-
     if (searchQuery) {
       query = query.ilike('name', `%${searchQuery}%`);
     }
-
     const { data, error } = await query.order('created_at', { ascending: false });
-
     if (error) {
       console.error("Error fetching projects:", error);
       setError("Failed to load projects.");
@@ -132,7 +123,7 @@ const Projects = () => {
           const summary = await getProjectFinancialSummary(project.id);
           newSummaries.set(project.id, {
             totalCollections: summary.totalCollections,
-            totalPledged: summary.totalPledged, 
+            totalPledged: summary.totalPledged,
           });
         } catch (err) {
           console.error(`Failed to fetch financial summary for project ${project.name}:`, err);
@@ -142,7 +133,6 @@ const Projects = () => {
       setProjectFinancialSummaries(newSummaries);
       setLoadingFinancials(false);
     };
-
     if (projects.length > 0) {
       fetchAllProjectFinancials();
     } else {
@@ -155,7 +145,6 @@ const Projects = () => {
       showError("You must be logged in to add a project.");
       return;
     }
-
     const { data, error } = await supabase
       .from('projects')
       .insert({
@@ -169,7 +158,6 @@ const Projects = () => {
       })
       .select()
       .single();
-
     if (error) {
       console.error("Error adding project:", error);
       showError("Failed to add project.");
@@ -184,7 +172,6 @@ const Projects = () => {
       showError("You do not have permission to edit this project.");
       return;
     }
-
     const { error } = await supabase
       .from('projects')
       .update({
@@ -196,7 +183,6 @@ const Projects = () => {
         member_contribution_amount: updatedProject.memberContributionAmount,
       })
       .eq('id', updatedProject.id);
-
     if (error) {
       console.error("Error updating project:", error);
       showError("Failed to update project.");
@@ -212,7 +198,6 @@ const Projects = () => {
       showError("You do not have permission to change the status of this project.");
       return;
     }
-
     let newStatus: Project['status'];
     if (currentStatus === "Open") {
       newStatus = "Suspended";
@@ -223,12 +208,10 @@ const Projects = () => {
     } else {
       newStatus = "Open"; // Default if status is 'Deleted' or unknown
     }
-
     const { error } = await supabase
       .from('projects')
       .update({ status: newStatus })
       .eq('id', projectId);
-
     if (error) {
       console.error("Error updating project status:", error);
       showError("Failed to update project status.");
@@ -244,12 +227,10 @@ const Projects = () => {
       showError("You do not have permission to delete this project.");
       return;
     }
-
     const { error } = await supabase
       .from('projects')
       .update({ status: "Deleted" })
       .eq('id', projectId);
-
     if (error) {
       console.error("Error deleting project:", error);
       showError("Failed to delete project.");
@@ -270,14 +251,12 @@ const Projects = () => {
       showError("You do not have permission to upload a thumbnail for this project.");
       return;
     }
-
     // In a real app, you'd upload the file to Supabase Storage here
     // For now, we're using a blob URL for preview.
     const { error } = await supabase
       .from('projects')
       .update({ thumbnail_url: newUrl })
       .eq('id', projectId);
-
     if (error) {
       console.error("Error updating project thumbnail:", error);
       showError("Failed to update project thumbnail.");
@@ -328,13 +307,7 @@ const Projects = () => {
             </SelectContent>
           </Select>
           <div className="relative flex items-center">
-            <Input
-              type="text"
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
-            />
+            <Input type="text" placeholder="Search projects..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8" />
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
           </div>
         </div>
@@ -348,8 +321,8 @@ const Projects = () => {
             const expectedAmount = (project.memberContributionAmount || 0) * activeMembersCount;
             const projectSummary = projectFinancialSummaries.get(project.id);
             const totalCollections = projectSummary?.totalCollections || 0;
-            const totalPledges = projectSummary?.totalPledges || 0;
-
+            // Fix: Use totalPledged instead of totalPledges
+            const totalPledges = projectSummary?.totalPledged || 0;
             return (
               <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">
                 <CardHeader>
@@ -381,13 +354,15 @@ const Projects = () => {
                   </p>
                   <div className="flex items-center justify-between text-sm">
                     <p className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4 text-green-600" /> Collected:
+                      <DollarSign className="h-4 w-4 text-green-600" />
+                      Collected:
                     </p>
                     <span className="font-medium text-green-600">${totalCollections.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <p className="flex items-center gap-1">
-                      <Handshake className="h-4 w-4 text-blue-600" /> Pledged:
+                      <Handshake className="h-4 w-4 text-blue-600" />
+                      Pledged:
                     </p>
                     <span className="font-medium text-blue-600">${totalPledges.toFixed(2)}</span>
                   </div>
@@ -395,32 +370,17 @@ const Projects = () => {
                     <div className="flex flex-wrap gap-2 mt-4">
                       <Link to={`/projects/${project.id}/financials`}>
                         <Button variant="outline" size="sm">
-                          <DollarSign className="mr-2 h-4 w-4" /> View Financials
+                          <DollarSign className="mr-2 h-4 w-4" />
+                          View Financials
                         </Button>
                       </Link>
-                      <CollectionsDialog
-                        projectId={project.id}
-                        projectName={project.name}
-                        onCollectionAdded={fetchProjects}
-                      />
-                      <ProjectPledgesDialog
-                        projectId={project.id}
-                        projectName={project.name}
-                        onPledgesUpdated={fetchProjects}
-                      />
+                      <CollectionsDialog projectId={project.id} projectName={project.name} onCollectionAdded={fetchProjects} />
+                      <ProjectPledgesDialog projectId={project.id} projectName={project.name} onPledgesUpdated={fetchProjects} />
                       <EditProjectDialog project={project} onEditProject={handleEditProject} />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleProjectStatus(project.id, project.status)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleToggleProjectStatus(project.id, project.status)}>
                         {project.status === "Open" ? "Suspend" : project.status === "Suspended" ? "Close" : "Reopen"}
                       </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteProject(project.id, project.name)}
-                      >
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteProject(project.id, project.name)}>
                         Delete
                       </Button>
                     </div>
