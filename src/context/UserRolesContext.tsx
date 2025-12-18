@@ -81,14 +81,17 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
   useEffect(() => {
     if (currentUser?.role === "Super Admin" && userRoles.length > 0) {
       setUserRoles(prevRoles => {
-        return prevRoles.map(role => {
+        const updatedRoles = prevRoles.map(role => {
           if (role.name === "Super Admin") {
             // Ensure Super Admin role has ALL privileges defined in allPrivilegeNames
             const updatedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames]));
-            return { ...role, menuPrivileges: updatedPrivileges };
+            const newRole = { ...role, menuPrivileges: updatedPrivileges };
+            console.log("UserRolesContext: Super Admin role after privilege injection", newRole); // Added log
+            return newRole;
           }
           return role;
         });
+        return updatedRoles;
       });
     }
   }, [currentUser, userRoles]);
@@ -163,7 +166,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
   return (
     <UserRolesContext.Provider value={{ userRoles, addRole, updateRole, deleteRole, fetchRoles }}>
       {children}
-    </UserRolesContext.Provider>
+    </UserRoles.Provider>
   );
 };
 

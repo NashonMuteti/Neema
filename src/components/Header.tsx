@@ -27,6 +27,8 @@ const Header = () => {
 
   // Determine if the current user is an admin based on their role
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
+  console.log("Header: currentUser.role", currentUser?.role); // Log current user's role
+  console.log("Header: isAdmin", isAdmin); // Log isAdmin status
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
