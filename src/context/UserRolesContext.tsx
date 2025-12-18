@@ -77,6 +77,22 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [currentUser, userRoles]);
 
+  // New effect to ensure Super Admin always has all privileges
+  useEffect(() => {
+    if (currentUser?.role === "Super Admin" && userRoles.length > 0) {
+      setUserRoles(prevRoles => {
+        return prevRoles.map(role => {
+          if (role.name === "Super Admin") {
+            // Ensure Super Admin role has ALL privileges defined in allPrivilegeNames
+            const updatedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames]));
+            return { ...role, menuPrivileges: updatedPrivileges };
+          }
+          return role;
+        });
+      });
+    }
+  }, [currentUser, userRoles]);
+
 
   const addRole = async (role: Omit<UserRoleType, 'id'>) => {
     const { error } = await supabase
