@@ -10,52 +10,132 @@ import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings";
 import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization";
 import UserRolesSettings from "@/components/admin/UserRolesSettings";
 import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings";
-import DefaultPasswordSettings from "@/components/admin/DefaultPasswordSettings"; // New import
+import DefaultPasswordSettings from "@/components/admin/DefaultPasswordSettings";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
 
 const AdminSettings = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+  
+  // Get current user's role definition
+  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+  
+  // Check specific privileges
+  const canAccessAdminSettings = currentUserPrivileges.includes("Access Admin Settings");
+  const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
+  const canManageUserRoles = currentUserPrivileges.includes("Manage User Roles");
+  const canManageAppCustomization = currentUserPrivileges.includes("Manage App Customization");
+  const canManageSystemCurrency = currentUserPrivileges.includes("Manage System Currency");
+  const canManageMemberFields = currentUserPrivileges.includes("Manage Member Fields");
+  const canManageReportsTemplates = currentUserPrivileges.includes("Manage Reports Templates");
+  const canManageSecurity = currentUserPrivileges.includes("Perform Admin Actions");
+  const canManageDatabaseMaintenance = currentUserPrivileges.includes("Manage Database Maintenance");
+  const canManageDefaultPassword = currentUserPrivileges.includes("Manage Default Password");
+  const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances");
+
+  // If user doesn't have access to admin settings, show a message
+  if (!canAccessAdminSettings) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Admin Settings</h1>
+        <p className="text-lg text-muted-foreground">
+          You do not have permission to access admin settings.
+        </p>
+      </div>
+    );
+  }
+
+  // Determine which tabs to show based on privileges
+  const tabsToShow = [];
+  
+  if (canManageAppCustomization || canManageSystemCurrency || canManageDefaultPassword) {
+    tabsToShow.push({ value: "general", label: "General" });
+  }
+  
+  if (canManageSecurity || canManageDefaultPassword) {
+    tabsToShow.push({ value: "security", label: "Security" });
+  }
+  
+  if (canManageAppCustomization) {
+    tabsToShow.push({ value: "app-customization", label: "App Customization" });
+  }
+  
+  if (canManageMemberFields) {
+    tabsToShow.push({ value: "member-fields", label: "Member Fields" });
+  }
+  
+  if (canManageUserProfiles) {
+    tabsToShow.push({ value: "user-profiles", label: "User Management" });
+  }
+  
+  if (canManageUserRoles) {
+    tabsToShow.push({ value: "user-roles", label: "User Roles" });
+  }
+  
+  if (canManageReportsTemplates) {
+    tabsToShow.push({ value: "reports-templates", label: "Reports Templates" });
+  }
+  
+  if (canManageDatabaseMaintenance || canInitializeBalances) {
+    tabsToShow.push({ value: "maintenance", label: "Maintenance" });
+  }
+
+  // If no tabs are available, show a message
+  if (tabsToShow.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Admin Settings</h1>
+        <p className="text-lg text-muted-foreground">
+          You do not have permission to access any admin settings.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Admin Settings</h1>
       <p className="text-lg text-muted-foreground">
         Manage application-wide settings, security, customization, and user profiles.
       </p>
-
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-8">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="app-customization">App Customization</TabsTrigger>
-          <TabsTrigger value="member-fields">Member Fields</TabsTrigger>
-          <TabsTrigger value="user-profiles">User Management</TabsTrigger>
-          <TabsTrigger value="user-roles">User Roles</TabsTrigger>
-          <TabsTrigger value="reports-templates">Reports Templates</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+      <Tabs defaultValue={tabsToShow[0]?.value} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          {tabsToShow.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
-        <TabsContent value="general">
-          <SystemCurrencySettings />
-        </TabsContent>
-        <TabsContent value="security" className="space-y-6"> {/* Added space-y-6 for spacing */}
-          <SecuritySettings />
-          <DefaultPasswordSettings /> {/* New: Default Password Settings */}
-        </TabsContent>
-        <TabsContent value="app-customization">
-          <AppCustomization />
-        </TabsContent>
-        <TabsContent value="member-fields">
-          <MemberFieldCustomization />
-        </TabsContent>
-        <TabsContent value="user-profiles">
-          <UserProfileSettingsAdmin />
-        </TabsContent>
-        <TabsContent value="user-roles">
-          <UserRolesSettings />
-        </TabsContent>
-        <TabsContent value="reports-templates">
-          <ReportsTemplateCustomization />
-        </TabsContent>
-        <TabsContent value="maintenance">
-          <DatabaseUpdateSettings />
-        </TabsContent>
+        
+        {tabsToShow.map((tab) => (
+          <TabsContent key={tab.value} value={tab.value} className="space-y-6">
+            {tab.value === "general" && (
+              <>
+                <SystemCurrencySettings />
+                <DefaultPasswordSettings />
+              </>
+            )}
+            {tab.value === "security" && (
+              <>
+                <SecuritySettings />
+                <DefaultPasswordSettings />
+              </>
+            )}
+            {tab.value === "app-customization" && <AppCustomization />}
+            {tab.value === "member-fields" && <MemberFieldCustomization />}
+            {tab.value === "user-profiles" && <UserProfileSettingsAdmin />}
+            {tab.value === "user-roles" && <UserRolesSettings />}
+            {tab.value === "reports-templates" && <ReportsTemplateCustomization />}
+            {tab.value === "maintenance" && (
+              <>
+                <DatabaseUpdateSettings />
+                {/* InitializeBalances is handled within the InitializeBalances page */}
+              </>
+            )}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

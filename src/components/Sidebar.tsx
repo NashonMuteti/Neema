@@ -3,8 +3,33 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, DollarSign, Wallet, Users, Settings, BarChart2, FileText, Handshake, RefreshCcw, Activity, ChevronDown, FolderX, TrendingUp, TrendingDown, UserCog, CalendarDays, Banknote, ShoppingCart, Package, Scale } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Home,
+  DollarSign,
+  Wallet,
+  Users,
+  Settings,
+  BarChart2,
+  FileText,
+  Handshake,
+  RefreshCcw,
+  Activity,
+  ChevronDown,
+  FolderX,
+  TrendingUp,
+  TrendingDown,
+  UserCog,
+  CalendarDays,
+  Banknote,
+  ShoppingCart,
+  Package,
+  Scale
+} from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 
@@ -173,7 +198,7 @@ const Sidebar = () => {
   const location = useLocation();
   const { currentUser, isLoading } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-  
+
   // These hooks must be called unconditionally at the top level of the component
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
@@ -181,7 +206,8 @@ const Sidebar = () => {
 
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  console.log("Sidebar: currentUserPrivileges", currentUserPrivileges); // Log currentUserPrivileges
+
+  console.log("Sidebar: currentUserPrivileges", currentUserPrivileges);
 
   // Memoize hasAccess function for stability
   const hasAccess = React.useCallback((requiredPrivileges?: string[]) => {
@@ -208,7 +234,9 @@ const Sidebar = () => {
     const checkAndSetOpen = (headingName: string, setter: React.Dispatch<React.SetStateAction<boolean>>) => {
       const headingItem = accessibleNavItems.find(item => item.type === "heading" && item.name === headingName) as NavHeading | undefined;
       if (headingItem) {
-        const isChildActive = headingItem.children.some(child => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges));
+        const isChildActive = headingItem.children.some(child => 
+          location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges)
+        );
         setter(isChildActive);
       } else {
         setter(false);
@@ -220,13 +248,16 @@ const Sidebar = () => {
     checkAndSetOpen("Sales Management", setIsSalesManagementOpen);
   }, [location.pathname, accessibleNavItems, hasAccess]);
 
-
   return (
     <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">
       {isLoading ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">Loading navigation...</div>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          Loading navigation...
+        </div>
       ) : !currentUser ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">Please log in.</div>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          Please log in.
+        </div>
       ) : (
         <nav className="flex-1 space-y-2">
           {accessibleNavItems.map((item) => {
@@ -241,36 +272,53 @@ const Sidebar = () => {
                 setIsOpen = setIsReportsOpen;
               } else if (headingItem.name === "Actions") {
                 isOpen = isActionsOpen;
-                setIsOpen = setIsActionsOpen; // Corrected typo here
+                setIsOpen = setIsActionsOpen;
               } else if (headingItem.name === "Sales Management") {
                 isOpen = isSalesManagementOpen;
                 setIsOpen = setIsSalesManagementOpen;
               } else {
-                // Fallback for any other heading type, though not expected with current navItems
+                // Fallback for any other heading type
                 isOpen = false;
-                setIsOpen = () => {}; 
+                setIsOpen = () => {};
               }
 
               return (
-                <Collapsible key={headingItem.name} open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors duration-200 ease-in-out">
+                <Collapsible
+                  key={headingItem.name}
+                  open={isOpen}
+                  onOpenChange={setIsOpen}
+                  className="space-y-2"
+                >
+                  <CollapsibleTrigger
+                    className={cn(
+                      "flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors duration-200 ease-in-out"
+                    )}
+                  >
                     {headingItem.name}
-                    <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isOpen && "rotate-180")} />
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 transition-transform duration-200",
+                        isOpen && "rotate-180"
+                      )}
+                    />
                   </CollapsibleTrigger>
                   <CollapsibleContent className="space-y-1 pl-4">
-                    {headingItem.children.filter(child => hasAccess(child.requiredPrivileges)).map((child) => (
-                      <Link
-                        key={child.name}
-                        to={child.href}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                          location.pathname.startsWith(child.href) && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
-                        )}
-                      >
-                        <child.icon className="h-5 w-5" />
-                        {child.name}
-                      </Link>
-                    ))}
+                    {headingItem.children
+                      .filter(child => hasAccess(child.requiredPrivileges))
+                      .map((child) => (
+                        <Link
+                          key={child.name}
+                          to={child.href}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
+                            location.pathname.startsWith(child.href) &&
+                              "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                          )}
+                        >
+                          <child.icon className="h-5 w-5" />
+                          {child.name}
+                        </Link>
+                      ))}
                   </CollapsibleContent>
                 </Collapsible>
               );
@@ -282,7 +330,8 @@ const Sidebar = () => {
                   to={navItem.href}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                    location.pathname === navItem.href && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                    location.pathname === navItem.href &&
+                      "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
                   )}
                 >
                   <navItem.icon className="h-5 w-5" />

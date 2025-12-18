@@ -24,11 +24,12 @@ const Header = () => {
   const { currentUser, isLoading } = useAuth();
   const { brandLogoUrl } = useBranding();
   const { viewingMemberName } = useViewingMember();
-
+  
   // Determine if the current user is an admin based on their role
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
-  console.log("Header: currentUser.role", currentUser?.role); // Log current user's role
-  console.log("Header: isAdmin", isAdmin); // Log isAdmin status
+  
+  console.log("Header: currentUser.role", currentUser?.role);
+  console.log("Header: isAdmin", isAdmin);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -38,9 +39,13 @@ const Header = () => {
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b bg-card shadow-sm transition-all duration-300 ease-in-out">
       {isLoading ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">Loading header...</div>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          Loading header...
+        </div>
       ) : !currentUser ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">Please log in.</div>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          Please log in.
+        </div>
       ) : (
         <>
           <div className="flex items-center">
@@ -48,7 +53,9 @@ const Header = () => {
               <img src={brandLogoUrl} alt="Logo" className="h-8 w-auto mr-2" />
               Group Finance
               {viewingMemberName && (
-                <span className="ml-2 text-base font-normal text-muted-foreground"> - {viewingMemberName}</span>
+                <span className="ml-2 text-base font-normal text-muted-foreground">
+                  {" - " + viewingMemberName}
+                </span>
               )}
             </Link>
           </div>
@@ -80,7 +87,10 @@ const Header = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback>{currentUser.name.charAt(0).toUpperCase() + (currentUser.name.split(' ')[1]?.charAt(0).toUpperCase() || '')}</AvatarFallback>
+                    <AvatarFallback>
+                      {currentUser.name.charAt(0).toUpperCase() + 
+                        (currentUser.name.split(' ')[1]?.charAt(0).toUpperCase() || '')}
+                    </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -91,7 +101,7 @@ const Header = () => {
                     <p className="text-xs leading-none text-muted-foreground">
                       {currentUser.email}
                     </p>
-                  </div >
+                  </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

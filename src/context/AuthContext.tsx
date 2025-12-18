@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client'; // Import Supabase client
 import { Session, User as SupabaseUser } from '@supabase/supabase-js'; // Import Supabase types
-// Removed: import { useUserRoles } from './UserRolesContext'; // Import useUserRoles to get role definitions
 
 // Centralized User interface
 export interface User {
@@ -21,7 +20,6 @@ interface AuthContextType {
   supabaseUser: SupabaseUser | null; // Supabase user object
   currentUser: User | null; // Our application's user object
   isLoading: boolean; // To indicate if auth state is being loaded
-  // Removed setCurrentUser as it will now be derived from Supabase
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,7 +29,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null); // Our app's user object
   const [isLoading, setIsLoading] = useState(true);
-  // Removed: const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles from context
 
   // Function to fetch and set the application's currentUser profile
   const fetchUserProfile = async (user: SupabaseUser | null) => {
@@ -108,7 +105,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []); // Removed definedRoles from dependency array
+  }, []);
 
   return (
     <AuthContext.Provider value={{ session, supabaseUser, currentUser, isLoading }}>
