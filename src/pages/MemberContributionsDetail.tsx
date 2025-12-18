@@ -1,37 +1,24 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { format, getMonth, getYear, isSameDay, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Search, ArrowLeft } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useViewingMember } from "@/context/ViewingMemberContext";
+import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
+import { canAccessMemberData, logSecurityEvent } from "@/utils/security";
+import { showError } from "@/utils/toast";
 
 interface MemberContribution {
   id: string;
@@ -87,6 +74,8 @@ interface PettyCashTxRow {
 const MemberContributionsDetail: React.FC = () => {
   const { memberId } = useParams<{ memberId: string }>();
   const { setViewingMemberName } = useViewingMember();
+  const { currentUser, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
@@ -97,25 +86,40 @@ const MemberContributionsDetail: React.FC = () => {
   const [memberName, setMemberName] = useState("Unknown Member");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
     label: format(new Date(0, i), "MMMM"),
   }));
+
   const years = Array.from({ length: 5 }, (_, i) => ({
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
   }));
 
   const fetchMemberData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    if (authLoading || !currentUser || !memberId) {
+      return;
+    }
 
-    if (!memberId) {
-      setError("Member ID is missing.");
+    // Security check: Verify user is authorized to access this member's data
+    const isAuthorized = await canAccessMemberData(currentUser.id, memberId);
+    setAuthorized(isAuthorized);
+    
+    if (!isAuthorized) {
+      logSecurityEvent('Unauthorized member data access attempt', {
+        userId: currentUser.id,
+        targetMemberId: memberId,
+        path: window.location.pathname
+      });
+      setError("You are not authorized to view this member's contributions.");
       setLoading(false);
       return;
     }
+
+    setLoading(true);
+    setError(null);
 
     // Fetch member name
     const { data: profileData, error: profileError } = await supabase
@@ -132,8 +136,9 @@ const MemberContributionsDetail: React.FC = () => {
     }
 
     if (profileData) {
-      setMemberName(profileData.name || profileData.email || "Unknown Member");
-      setViewingMemberName(profileData.name || profileData.email || "Unknown Member");
+      const name = profileData.name || profileData.email || "Unknown Member";
+      setMemberName(name);
+      setViewingMemberName(name);
     } else {
       setError("Member not found.");
       setLoading(false);
@@ -145,15 +150,24 @@ const MemberContributionsDetail: React.FC = () => {
 
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
-      .select('id, date, amount, source, financial_accounts(name)') as { data: IncomeTxRow[] | null, error: PostgrestError | null };
+      .select('id, date, amount, source, financial_accounts(name)')
+      .eq('user_id', memberId) // Use memberId instead of currentUser.id
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString()) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
     const { data: expenditureData, error: expenditureError } = await supabase
       .from('expenditure_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)') as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
+      .select('id, date, amount, purpose, financial_accounts(name)')
+      .eq('user_id', memberId) // Use memberId instead of currentUser.id
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString()) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
 
     const { data: pettyCashData, error: pettyCashError } = await supabase
       .from('petty_cash_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)') as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
+      .select('id, date, amount, purpose, financial_accounts(name)')
+      .eq('user_id', memberId) // Use memberId instead of currentUser.id
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString()) as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
 
     if (incomeError || expenditureError || pettyCashError) {
       console.error("Error fetching contributions:", incomeError || expenditureError || pettyCashError);
@@ -161,7 +175,7 @@ const MemberContributionsDetail: React.FC = () => {
       setMemberContributions([]);
     } else {
       const allContributions: MemberContribution[] = [];
-
+      
       incomeData?.forEach(tx => allContributions.push({
         id: tx.id,
         type: 'income',
@@ -170,7 +184,7 @@ const MemberContributionsDetail: React.FC = () => {
         amount: tx.amount,
         accountName: tx.financial_accounts?.name || 'Unknown Account'
       }));
-
+      
       expenditureData?.forEach(tx => allContributions.push({
         id: tx.id,
         type: 'expenditure',
@@ -179,7 +193,7 @@ const MemberContributionsDetail: React.FC = () => {
         amount: tx.amount,
         accountName: tx.financial_accounts?.name || 'Unknown Account'
       }));
-
+      
       pettyCashData?.forEach(tx => allContributions.push({
         id: tx.id,
         type: 'petty_cash',
@@ -192,14 +206,16 @@ const MemberContributionsDetail: React.FC = () => {
       const filteredAndSorted = allContributions
         .filter(c => c.sourceOrPurpose.toLowerCase().includes(searchQuery.toLowerCase()))
         .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
-
+      
       setMemberContributions(filteredAndSorted);
     }
+    
     setLoading(false);
-  }, [memberId, filterMonth, filterYear, searchQuery, setViewingMemberName]);
+  }, [memberId, currentUser, authLoading, filterMonth, filterYear, searchQuery, setViewingMemberName]);
 
   useEffect(() => {
     fetchMemberData();
+    
     return () => {
       setViewingMemberName(null); // Clear the name when component unmounts
     };
@@ -221,6 +237,7 @@ const MemberContributionsDetail: React.FC = () => {
   const renderDay = (day: Date) => {
     const dateKey = format(day, "yyyy-MM-dd");
     const dayContributions = contributionsByDate[dateKey];
+    
     return (
       <div className="relative text-center">
         {day.getDate()}
@@ -233,11 +250,23 @@ const MemberContributionsDetail: React.FC = () => {
     );
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Member Contributions</h1>
         <p className="text-lg text-muted-foreground">Loading member contributions...</p>
+      </div>
+    );
+  }
+
+  if (authorized === false) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">Access Denied</h1>
+        <p className="text-lg text-destructive">You do not have permission to view this member's contributions.</p>
+        <Button onClick={() => navigate(-1)} variant="outline">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+        </Button>
       </div>
     );
   }
@@ -269,13 +298,13 @@ const MemberContributionsDetail: React.FC = () => {
       <p className="text-lg text-muted-foreground">
         Detailed view of {memberName}'s financial activities.
       </p>
-
+      
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="detailed">Detailed Transactions</TabsTrigger>
         </TabsList>
-
+        
         {/* Contributions Overview Tab Content */}
         <TabsContent value="overview" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -333,7 +362,7 @@ const MemberContributionsDetail: React.FC = () => {
                 />
               </CardContent>
             </Card>
-
+            
             {/* Financial Summary */}
             <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
               <CardHeader>
@@ -354,7 +383,7 @@ const MemberContributionsDetail: React.FC = () => {
                     ${netBalance.toFixed(2)}
                   </p>
                 </div>
-
+                
                 {selectedDate && contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
                   <div className="mt-6 space-y-2">
                     <h3 className="font-semibold text-lg">Activity on {format(selectedDate, "PPP")}</h3>
@@ -368,14 +397,17 @@ const MemberContributionsDetail: React.FC = () => {
                     ))}
                   </div>
                 )}
+                
                 {selectedDate && !contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
-                  <p className="text-muted-foreground text-sm mt-6">No activity on {format(selectedDate, "PPP")}.</p>
+                  <p className="text-muted-foreground text-sm mt-6">
+                    No activity on {format(selectedDate, "PPP")}.
+                  </p>
                 )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-
+        
         {/* Detailed Contributions Tab Content */}
         <TabsContent value="detailed" className="space-y-6 mt-6">
           <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
@@ -385,53 +417,53 @@ const MemberContributionsDetail: React.FC = () => {
             <CardContent>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                 <div className="grid gap-1.5">
-                    <Label htmlFor="filter-month-detailed">Month</Label>
-                    <Select value={filterMonth} onValueChange={setFilterMonth}>
-                      <SelectTrigger id="filter-month-detailed" className="w-[140px]">
-                        <SelectValue placeholder="Select month" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Month</SelectLabel>
-                          {months.map((month) => (
-                            <SelectItem key={month.value} value={month.value}>
-                              {month.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="filter-year-detailed">Year</Label>
-                    <Select value={filterYear} onValueChange={setFilterYear}>
-                      <SelectTrigger id="filter-year-detailed" className="w-[120px]">
-                        <SelectValue placeholder="Select year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Year</SelectLabel>
-                          {years.map((year) => (
-                            <SelectItem key={year.value} value={year.value}>
-                              {year.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="relative flex items-center">
-                    <Input
-                      type="text"
-                      placeholder="Search description..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8"
-                    />
-                    <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
-                  </div>
+                  <Label htmlFor="filter-month-detailed">Month</Label>
+                  <Select value={filterMonth} onValueChange={setFilterMonth}>
+                    <SelectTrigger id="filter-month-detailed" className="w-[140px]">
+                      <SelectValue placeholder="Select month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Month</SelectLabel>
+                        {months.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 </div>
-
+                <div className="grid gap-1.5">
+                  <Label htmlFor="filter-year-detailed">Year</Label>
+                  <Select value={filterYear} onValueChange={setFilterYear}>
+                    <SelectTrigger id="filter-year-detailed" className="w-[120px]">
+                      <SelectValue placeholder="Select year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Year</SelectLabel>
+                        {years.map((year) => (
+                          <SelectItem key={year.value} value={year.value}>
+                            {year.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="relative flex items-center">
+                  <Input
+                    type="text"
+                    placeholder="Search description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8"
+                  />
+                  <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+              
               {memberContributions.length > 0 ? (
                 <Table>
                   <TableHeader>
@@ -463,7 +495,9 @@ const MemberContributionsDetail: React.FC = () => {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-muted-foreground text-center mt-4">No transactions found for the selected period or matching your search.</p>
+                <p className="text-muted-foreground text-center mt-4">
+                  No transactions found for the selected period or matching your search.
+                </p>
               )}
             </CardContent>
           </Card>

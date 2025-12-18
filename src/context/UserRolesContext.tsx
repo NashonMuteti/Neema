@@ -1,11 +1,11 @@
 "use client";
-
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { UserRole as UserRoleType } from '@/components/admin/AddEditUserRoleDialog';
 import { allPrivilegeNames } from '@/lib/privileges';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
+import { canManageRoles, logSecurityEvent } from '@/utils/security';
 
 interface UserRolesContextType {
   userRoles: UserRoleType[];
@@ -26,7 +26,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       .from('roles')
       .select('*')
       .order('name', { ascending: true });
-
+      
     if (error) {
       console.error("Error fetching roles:", error);
       showError("Failed to load user roles.");
@@ -40,6 +40,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         memberUserIds: [], // This will be populated dynamically in UserRolesSettings
         menuPrivileges: role.menu_privileges || [],
       }));
+      
       setUserRoles(fetchedRoles);
       console.log("UserRolesContext: fetchedRoles", fetchedRoles); // Log fetched roles
     }
@@ -64,11 +65,17 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
           if (role.name === currentUser.role) {
             // For display purposes, we can add the current user's ID if it's not there
             if (!role.memberUserIds.includes(currentUser.id)) {
-              return { ...role, memberUserIds: [...role.memberUserIds, currentUser.id] };
+              return {
+                ...role,
+                memberUserIds: [...role.memberUserIds, currentUser.id]
+              };
             }
           } else {
             // Ensure current user's ID is removed from other roles if they changed roles
-            return { ...role, memberUserIds: role.memberUserIds.filter(id => id !== currentUser.id) };
+            return {
+              ...role,
+              memberUserIds: role.memberUserIds.filter(id => id !== currentUser.id)
+            };
           }
           return role;
         });
@@ -85,7 +92,10 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
           if (role.name === "Super Admin") {
             // Ensure Super Admin role has ALL privileges defined in allPrivilegeNames
             const updatedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames]));
-            const newRole = { ...role, menuPrivileges: updatedPrivileges };
+            const newRole = {
+              ...role,
+              menuPrivileges: updatedPrivileges
+            };
             console.log("UserRolesContext: Super Admin role after privilege injection", newRole); // Added log
             return newRole;
           }
@@ -96,8 +106,17 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [currentUser, userRoles]);
 
-
   const addRole = async (role: Omit<UserRoleType, 'id'>) => {
+    // Security check: Only Super Admins can manage roles
+    if (!currentUser || !(await canManageRoles(currentUser.id))) {
+      logSecurityEvent('Unauthorized role creation attempt', {
+        userId: currentUser?.id,
+        roleName: role.name
+      });
+      showError("You are not authorized to create roles.");
+      return;
+    }
+    
     const { error } = await supabase
       .from('roles')
       .insert({
@@ -105,7 +124,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         description: role.description,
         menu_privileges: role.menuPrivileges,
       });
-
+      
     if (error) {
       console.error("Error adding role:", error);
       showError("Failed to add new role.");
@@ -115,6 +134,17 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   const updateRole = async (updatedRole: UserRoleType) => {
+    // Security check: Only Super Admins can manage roles
+    if (!currentUser || !(await canManageRoles(currentUser.id))) {
+      logSecurityEvent('Unauthorized role update attempt', {
+        userId: currentUser?.id,
+        roleId: updatedRole.id,
+        roleName: updatedRole.name
+      });
+      showError("You are not authorized to update roles.");
+      return;
+    }
+    
     const { error } = await supabase
       .from('roles')
       .update({
@@ -123,7 +153,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         menu_privileges: updatedRole.menuPrivileges,
       })
       .eq('id', updatedRole.id);
-
+      
     if (error) {
       console.error("Error updating role:", error);
       showError("Failed to update role.");
@@ -133,28 +163,38 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   const deleteRole = async (roleId: string) => {
+    // Security check: Only Super Admins can manage roles
+    if (!currentUser || !(await canManageRoles(currentUser.id))) {
+      logSecurityEvent('Unauthorized role deletion attempt', {
+        userId: currentUser?.id,
+        roleId: roleId
+      });
+      showError("You are not authorized to delete roles.");
+      return;
+    }
+    
     // Before deleting a role, check if any users are assigned to it
     const { count, error: countError } = await supabase
       .from('profiles')
       .select('id', { count: 'exact' })
       .eq('role', userRoles.find(r => r.id === roleId)?.name);
-
+      
     if (countError) {
       console.error("Error checking users in role:", countError);
       showError("Failed to check if users are assigned to this role.");
       return;
     }
-
+    
     if (count && count > 0) {
       showError(`Cannot delete role: ${count} users are currently assigned to it. Please reassign them first.`);
       return;
     }
-
+    
     const { error } = await supabase
       .from('roles')
       .delete()
       .eq('id', roleId);
-
+      
     if (error) {
       console.error("Error deleting role:", error);
       showError("Failed to delete role.");

@@ -1,14 +1,6 @@
 "use client";
-
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +9,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
+import { fileUploadSchema } from "@/utils/security";
 
 interface UploadThumbnailDialogProps {
   projectId: string;
@@ -33,11 +26,12 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-
+  
   const { canManageProjects } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
       return { canManageProjects: false };
     }
+    
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageProjects = currentUserPrivileges.includes("Manage Projects");
@@ -63,25 +57,43 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      // Validate file before processing
+      try {
+        fileUploadSchema.parse(file);
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        event.target.value = ""; // Reset the input
+        return;
+      }
     } else {
       setSelectedFile(null);
       setPreviewUrl(currentThumbnailUrl || null);
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!selectedFile) {
       showError("Please select an image to upload.");
       return;
     }
-
+    
+    // Validate file before upload
+    try {
+      fileUploadSchema.parse(selectedFile);
+    } catch (error) {
+      console.error("File validation error:", error);
+      showError("Invalid file. Please upload an image file less than 5MB.");
+      return;
+    }
+    
     // Simulate file upload to a backend/storage and get a URL
     // In a real application, you would send `selectedFile` to your backend
     // and receive a public URL for the uploaded image.
     const simulatedUploadUrl = URL.createObjectURL(selectedFile); // Using blob URL for immediate preview
-
+    
     onThumbnailUpload(projectId, simulatedUploadUrl);
     showSuccess(`Thumbnail for '${projectName}' updated successfully!`);
     setIsOpen(false);
@@ -105,15 +117,27 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
         <div className="grid gap-4 py-4">
           <div className="flex flex-col items-center gap-4">
             {previewUrl ? (
-              <img src={previewUrl} alt="Thumbnail Preview" className="w-48 h-48 object-cover rounded-md border" />
+              <img
+                src={previewUrl}
+                alt="Thumbnail Preview"
+                className="w-48 h-48 object-cover rounded-md border"
+              />
             ) : (
               <div className="w-48 h-48 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />
               </div>
             )}
             <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="thumbnail-upload" className="text-center">Select Image</Label>
-              <Input id="thumbnail-upload" type="file" accept="image/*" onChange={handleFileChange} disabled={!canManageProjects} />
+              <Label htmlFor="thumbnail-upload" className="text-center">
+                Select Image
+              </Label>
+              <Input
+                id="thumbnail-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                disabled={!canManageProjects}
+              />
             </div>
           </div>
         </div>

@@ -1,14 +1,6 @@
 "use client";
-
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,15 +10,8 @@ import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon a
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client"; // Import supabase client
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,} from "@/components/ui/select";
+import { fileUploadSchema } from "@/utils/security";
 
 interface AddMemberDialogProps {
   onAddMember: () => void; // Changed to trigger a re-fetch in parent
@@ -35,11 +20,12 @@ interface AddMemberDialogProps {
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-
+  
   const { canManageMembers } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
       return { canManageMembers: false };
     }
+    
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageMembers = currentUserPrivileges.includes("Manage Members");
@@ -74,8 +60,17 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file)); // Create a URL for immediate preview
+      // Validate file before processing
+      try {
+        fileUploadSchema.parse(file);
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file)); // Create a URL for immediate preview
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        event.target.value = ""; // Reset the input
+        return;
+      }
     } else {
       setSelectedFile(null);
       setPreviewUrl(null);
@@ -87,22 +82,32 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       showError("Name and Email are required.");
       return;
     }
+    
     if (enableLogin && !defaultPassword) {
       showError("Default password is required if login is enabled.");
       return;
     }
+    
     if (!selectedRole) {
       showError("A role must be selected for the new member.");
       return;
     }
-
+    
     let memberImageUrl: string | undefined = undefined;
     if (selectedFile) {
-      // In a real app, this is where you'd upload the file to a storage service
-      // and get a permanent URL. For now, we use the preview URL.
-      memberImageUrl = previewUrl || undefined;
+      // Validate file before upload
+      try {
+        fileUploadSchema.parse(selectedFile);
+        // In a real app, this is where you'd upload the file to a storage service
+        // and get a permanent URL. For now, we use the preview URL.
+        memberImageUrl = previewUrl || undefined;
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        return;
+      }
     }
-
+    
     // Create user in Supabase Auth using admin API
     const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
       email: email,
@@ -113,13 +118,13 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
         avatar_url: memberImageUrl,
       },
     });
-
+    
     if (createUserError) {
       console.error("Error creating new member in Auth:", createUserError);
       showError(`Failed to add new member: ${createUserError.message}`);
       return;
     }
-
+    
     if (userData.user) {
       // Update public.profiles table with role, status, and enable_login
       const { error: profileUpdateError } = await supabase
@@ -133,17 +138,18 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
           image_url: memberImageUrl,
         })
         .eq('id', userData.user.id);
-
+        
       if (profileUpdateError) {
         console.error("Error updating new member's profile:", profileUpdateError);
         showError("Failed to set new member's role and status.");
         return;
       }
     }
-
+    
     onAddMember(); // Trigger parent to re-fetch members
     showSuccess("Member added successfully!");
     setIsOpen(false);
+    
     // Reset form states
     setName("");
     setEmail("");
@@ -195,14 +201,20 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
             {previewUrl ? (
-              <img src={previewUrl} alt="Member Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
+              <img
+                src={previewUrl}
+                alt="Member Avatar Preview"
+                className="w-24 h-24 object-cover rounded-full border"
+              />
             ) : (
               <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />
               </div>
             )}
             <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="member-image-upload" className="text-center">Upload Image</Label>
+              <Label htmlFor="member-image-upload" className="text-center">
+                Upload Image
+              </Label>
               <Input
                 id="member-image-upload"
                 type="file"
@@ -280,7 +292,10 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
           )}
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!name || !email || (enableLogin && !defaultPassword) || !canManageMembers || !selectedRole}>
+          <Button
+            onClick={handleSubmit}
+            disabled={!name || !email || (enableLogin && !defaultPassword) || !canManageMembers || !selectedRole}
+          >
             <Upload className="mr-2 h-4 w-4" /> Save Member
           </Button>
         </div>

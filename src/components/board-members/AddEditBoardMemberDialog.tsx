@@ -1,13 +1,6 @@
 "use client";
-
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +10,7 @@ import { Save, Image as ImageIcon, Upload } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
+import { fileUploadSchema } from "@/utils/security";
 
 export interface BoardMember {
   id: string;
@@ -44,11 +38,12 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-
+  
   const { canManageBoardMembers } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
       return { canManageBoardMembers: false };
     }
+    
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageBoardMembers = currentUserPrivileges.includes("Manage Board Members");
@@ -85,8 +80,17 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file)); // Create a URL for immediate preview
+      // Validate file before processing
+      try {
+        fileUploadSchema.parse(file);
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file)); // Create a URL for immediate preview
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        event.target.value = ""; // Reset the input
+        return;
+      }
     } else {
       setSelectedFile(null);
       setPreviewUrl(initialData?.image_url || null);
@@ -98,17 +102,25 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       showError("Name, Role, Email, and Phone are required.");
       return;
     }
-
+    
     let memberImageUrl: string | undefined = initialData?.image_url;
-    if (selectedFile && previewUrl) {
-      // In a real app, this is where you'd upload the file to a storage service
-      // and get a permanent URL. For now, we use the preview URL.
-      memberImageUrl = previewUrl;
+    if (selectedFile) {
+      // Validate file before upload
+      try {
+        fileUploadSchema.parse(selectedFile);
+        // In a real app, this is where you'd upload the file to a storage service
+        // and get a permanent URL. For now, we use the preview URL.
+        memberImageUrl = previewUrl;
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        return;
+      }
     } else if (!selectedFile && !initialData?.image_url) {
       // If no new file and no existing image, ensure imageUrl is undefined
       memberImageUrl = undefined;
     }
-
+    
     const memberData: Omit<BoardMember, 'id'> & { id?: string } = {
       name,
       role,
@@ -118,11 +130,11 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       notes: notes || undefined,
       image_url: memberImageUrl, // Use image_url
     };
-
+    
     if (initialData?.id) {
       memberData.id = initialData.id;
     }
-
+    
     onSave(memberData); // Call the parent's onSave for local state update (if still used)
     showSuccess(`Board member ${initialData ? "updated" : "added"} successfully!`);
     setIsOpen(false);
@@ -140,14 +152,20 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
         <div className="grid gap-4 py-4">
           <div className="flex flex-col items-center gap-4 col-span-full">
             {previewUrl ? (
-              <img src={previewUrl} alt="Board Member Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
+              <img
+                src={previewUrl}
+                alt="Board Member Avatar Preview"
+                className="w-24 h-24 object-cover rounded-full border"
+              />
             ) : (
               <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />
               </div>
             )}
             <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="member-image-upload" className="text-center">Upload Image</Label>
+              <Label htmlFor="member-image-upload" className="text-center">
+                Upload Image
+              </Label>
               <Input
                 id="member-image-upload"
                 type="file"
