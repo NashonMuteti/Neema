@@ -1,41 +1,29 @@
 "use client";
-
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Search, PlusCircle, Edit, Trash2, Users as UsersIcon } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, } from "@/components/ui/alert-dialog";
 import { showSuccess, showError } from "@/utils/toast";
 import AddEditUserRoleDialog, { UserRole } from "./AddEditUserRoleDialog";
 import { useUserRoles } from "@/context/UserRolesContext";
-import { useAuth, User } from "@/context/AuthContext"; // Import User interface
+import { useAuth, User } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const UserRolesSettings = () => {
   const { currentUser } = useAuth();
   const { userRoles, addRole, updateRole, deleteRole, fetchRoles } = useUserRoles();
-
+  
+  // Check if user is Super Admin
+  const isSuperAdmin = currentUser?.role === "Super Admin";
+  
   const currentUserRoleDefinition = userRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-  const canManageUserRoles = currentUserPrivileges.includes("Manage User Roles");
+  
+  // Super Admin can manage user roles
+  const canManageUserRoles = isSuperAdmin || currentUserPrivileges.includes("Manage User Roles");
 
   const [isAddEditRoleDialogOpen, setIsAddEditRoleDialogOpen] = React.useState(false);
   const [editingRole, setEditingRole] = React.useState<UserRole | undefined>(undefined);
@@ -52,7 +40,7 @@ const UserRolesSettings = () => {
       .from('profiles')
       .select('id, name, email, role')
       .order('name', { ascending: true });
-
+      
     if (error) {
       console.error("Error fetching all users:", error);
       showError("Failed to load users for role assignment.");
@@ -63,22 +51,24 @@ const UserRolesSettings = () => {
         name: p.name || p.email || "Unknown",
         email: p.email || "N/A",
         role: p.role || "Contributor",
-        status: "Active", // Default, as status is not directly used here
-        enableLogin: true, // Default
+        status: "Active",
+        enableLogin: true,
       })));
     }
+    
     setLoadingUsers(false);
   }, []);
 
   const fetchRoleMemberCounts = useCallback(async () => {
     setLoadingCounts(true);
     const counts: Record<string, number> = {};
+    
     for (const role of userRoles) {
       const { count, error } = await supabase
         .from('profiles')
         .select('id', { count: 'exact' })
         .eq('role', role.name);
-
+        
       if (error) {
         console.error(`Error fetching count for role ${role.name}:`, error);
         counts[role.name] = 0;
@@ -86,6 +76,7 @@ const UserRolesSettings = () => {
         counts[role.name] = count || 0;
       }
     }
+    
     setRoleMemberCounts(counts);
     setLoadingCounts(false);
   }, [userRoles]);
@@ -100,7 +91,7 @@ const UserRolesSettings = () => {
     }
   }, [userRoles, fetchRoleMemberCounts]);
 
-  const filteredRoles = userRoles.filter(role =>
+  const filteredRoles = userRoles.filter(role => 
     role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     role.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -113,15 +104,16 @@ const UserRolesSettings = () => {
       await addRole(roleData);
       showSuccess("User role added successfully!");
     }
+    
     setIsAddEditRoleDialogOpen(false);
-    fetchRoles(); // Re-fetch roles after save
+    fetchRoles();
   };
 
   const handleDeleteRole = async () => {
     if (deletingRoleId) {
       await deleteRole(deletingRoleId);
       setDeletingRoleId(undefined);
-      fetchRoles(); // Re-fetch roles after delete
+      fetchRoles();
     }
   };
 
@@ -141,18 +133,22 @@ const UserRolesSettings = () => {
           <CardTitle className="text-xl font-semibold">Manage User Roles</CardTitle>
           <div className="flex items-center gap-4">
             <div className="relative flex items-center">
-              <Input
-                type="text"
-                placeholder="Search roles..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8"
+              <Input 
+                type="text" 
+                placeholder="Search roles..." 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                className="pl-8" 
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
             {canManageUserRoles && (
-              <Button onClick={() => { setEditingRole(undefined); setIsAddEditRoleDialogOpen(true); }}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Role
+              <Button onClick={() => {
+                setEditingRole(undefined);
+                setIsAddEditRoleDialogOpen(true);
+              }}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add New Role
               </Button>
             )}
           </div>
@@ -200,7 +196,7 @@ const UserRolesSettings = () => {
           )}
         </CardContent>
       </Card>
-
+      
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
           <CardTitle className="text-xl font-semibold">Assign Users to Roles</CardTitle>
@@ -238,26 +234,28 @@ const UserRolesSettings = () => {
           </p>
         </CardContent>
       </Card>
-
-      <AddEditUserRoleDialog
-        isOpen={isAddEditRoleDialogOpen}
-        setIsOpen={setIsAddEditRoleDialogOpen}
-        initialData={editingRole}
-        onSave={handleSaveRole}
+      
+      <AddEditUserRoleDialog 
+        isOpen={isAddEditRoleDialogOpen} 
+        setIsOpen={setIsAddEditRoleDialogOpen} 
+        initialData={editingRole} 
+        onSave={handleSaveRole} 
       />
-
+      
       <AlertDialog open={!!deletingRoleId} onOpenChange={(open) => !open && setDeletingRoleId(undefined)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the user role.
-              If there are users assigned to this role, you must reassign them first.
+              This action cannot be undone. This will permanently delete the user role. If there are users assigned to this role, you must reassign them first.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteRole} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction 
+              onClick={handleDeleteRole} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

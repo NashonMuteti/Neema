@@ -1,54 +1,46 @@
 "use client";
-
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Search, Edit, Trash2, User as UserIcon, Eye, PlusCircle } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, } from "@/components/ui/alert-dialog";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth, User } from "@/context/AuthContext";
 import AddEditUserDialog from "./AddEditUserDialog";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
+import { supabase } from "@/integrations/supabase/client";
 
 const UserProfileSettingsAdmin = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-
+  
+  // Check if user is Super Admin
+  const isSuperAdmin = currentUser?.role === "Super Admin";
+  
   const { canManageUserProfiles } = useMemo(() => {
     if (!currentUser || !definedRoles) {
       return { canManageUserProfiles: false };
     }
+    
+    // Super Admin can manage user profiles
+    if (isSuperAdmin) {
+      return { canManageUserProfiles: true };
+    }
+    
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
+    
     return { canManageUserProfiles };
-  }, [currentUser, definedRoles]);
+  }, [currentUser, definedRoles, isSuperAdmin]);
 
   const [users, setUsers] = React.useState<User[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [deletingUserId, setDeletingUserId] = React.useState<string | undefined>(undefined);
-
   const [isAddEditUserDialogOpen, setIsAddEditUserDialogOpen] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<User | undefined>(undefined);
   const [loading, setLoading] = React.useState(true);
@@ -57,15 +49,15 @@ const UserProfileSettingsAdmin = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
-
+    
     let query = supabase.from('profiles').select('*');
-
+    
     if (searchQuery) {
       query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,status.ilike.%${searchQuery}%`);
     }
-
+    
     const { data, error } = await query.order('name', { ascending: true });
-
+    
     if (error) {
       console.error("Error fetching users:", error);
       setError("Failed to load users.");
@@ -82,6 +74,7 @@ const UserProfileSettingsAdmin = () => {
         imageUrl: p.image_url || undefined,
       })));
     }
+    
     setLoading(false);
   }, [searchQuery]);
 
@@ -119,7 +112,7 @@ const UserProfileSettingsAdmin = () => {
   const handleDeleteUser = async () => {
     if (deletingUserId) {
       const { error } = await supabase.rpc('delete_user_by_id', { user_id_to_delete: deletingUserId });
-
+      
       if (error) {
         console.error("Error deleting user from Supabase Auth:", error);
         showError(`Failed to delete user: ${error.message}`);
@@ -159,18 +152,19 @@ const UserProfileSettingsAdmin = () => {
         <CardTitle className="text-xl font-semibold">User Management</CardTitle>
         <div className="flex items-center gap-4">
           <div className="relative flex items-center">
-            <Input
-              type="text"
-              placeholder="Search users..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
+            <Input 
+              type="text" 
+              placeholder="Search users..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              className="pl-8" 
             />
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
           </div>
           {canManageUserProfiles && (
             <Button onClick={handleAddUser}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add User
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add User
             </Button>
           )}
         </div>
@@ -231,7 +225,8 @@ const UserProfileSettingsAdmin = () => {
                   <TableCell className="text-center">
                     <Link to={`/members/${user.id}/contributions`}>
                       <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4 mr-2" /> View
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
                       </Button>
                     </Link>
                   </TableCell>
@@ -243,14 +238,16 @@ const UserProfileSettingsAdmin = () => {
           <p className="text-muted-foreground text-center mt-4">No users found matching your search.</p>
         )}
       </CardContent>
+      
       {/* Add/Edit User Dialog */}
-      <AddEditUserDialog
-        isOpen={isAddEditUserDialogOpen}
-        setIsOpen={setIsAddEditUserDialogOpen}
-        initialData={editingUser}
+      <AddEditUserDialog 
+        isOpen={isAddEditUserDialogOpen} 
+        setIsOpen={setIsAddEditUserDialogOpen} 
+        initialData={editingUser} 
         onSave={handleSaveUser}
         availableRoles={definedRoles}
       />
+      
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingUserId} onOpenChange={(open) => !open && setDeletingUserId(undefined)}>
         <AlertDialogContent>
@@ -262,7 +259,10 @@ const UserProfileSettingsAdmin = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction 
+              onClick={handleDeleteUser} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
