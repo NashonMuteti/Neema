@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SecuritySettings from "@/components/admin/SecuritySettings";
@@ -23,18 +22,29 @@ const AdminSettings = () => {
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   
   // Check specific privileges
-  const canAccessAdminSettings = currentUserPrivileges.includes("Access Admin Settings");
-  const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles");
-  const canManageUserRoles = currentUserPrivileges.includes("Manage User Roles");
-  const canManageAppCustomization = currentUserPrivileges.includes("Manage App Customization");
-  const canManageSystemCurrency = currentUserPrivileges.includes("Manage System Currency");
-  const canManageMemberFields = currentUserPrivileges.includes("Manage Member Fields");
-  const canManageReportsTemplates = currentUserPrivileges.includes("Manage Reports Templates");
-  const canManageSecurity = currentUserPrivileges.includes("Perform Admin Actions");
-  const canManageDatabaseMaintenance = currentUserPrivileges.includes("Manage Database Maintenance");
-  const canManageDefaultPassword = currentUserPrivileges.includes("Manage Default Password");
-  const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances");
-
+  const canAccessAdminSettings = currentUserPrivileges.includes("Access Admin Settings") || 
+                                currentUser?.role === "Super Admin";
+  const canManageUserProfiles = currentUserPrivileges.includes("Manage User Profiles") || 
+                               currentUser?.role === "Super Admin";
+  const canManageUserRoles = currentUserPrivileges.includes("Manage User Roles") || 
+                            currentUser?.role === "Super Admin";
+  const canManageAppCustomization = currentUserPrivileges.includes("Manage App Customization") || 
+                                   currentUser?.role === "Super Admin";
+  const canManageSystemCurrency = currentUserPrivileges.includes("Manage System Currency") || 
+                                 currentUser?.role === "Super Admin";
+  const canManageMemberFields = currentUserPrivileges.includes("Manage Member Fields") || 
+                                currentUser?.role === "Super Admin";
+  const canManageReportsTemplates = currentUserPrivileges.includes("Manage Reports Templates") || 
+                                    currentUser?.role === "Super Admin";
+  const canManageSecurity = currentUserPrivileges.includes("Perform Admin Actions") || 
+                           currentUser?.role === "Super Admin";
+  const canManageDatabaseMaintenance = currentUserPrivileges.includes("Manage Database Maintenance") || 
+                                      currentUser?.role === "Super Admin";
+  const canManageDefaultPassword = currentUserPrivileges.includes("Manage Default Password") || 
+                                  currentUser?.role === "Super Admin";
+  const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances") || 
+                               currentUser?.role === "Super Admin";
+  
   // If user doesn't have access to admin settings, show a message
   if (!canAccessAdminSettings) {
     return (
@@ -46,42 +56,34 @@ const AdminSettings = () => {
       </div>
     );
   }
-
+  
   // Determine which tabs to show based on privileges
   const tabsToShow = [];
-  
   if (canManageAppCustomization || canManageSystemCurrency || canManageDefaultPassword) {
     tabsToShow.push({ value: "general", label: "General" });
   }
-  
   if (canManageSecurity || canManageDefaultPassword) {
     tabsToShow.push({ value: "security", label: "Security" });
   }
-  
   if (canManageAppCustomization) {
     tabsToShow.push({ value: "app-customization", label: "App Customization" });
   }
-  
   if (canManageMemberFields) {
     tabsToShow.push({ value: "member-fields", label: "Member Fields" });
   }
-  
   if (canManageUserProfiles) {
     tabsToShow.push({ value: "user-profiles", label: "User Management" });
   }
-  
   if (canManageUserRoles) {
     tabsToShow.push({ value: "user-roles", label: "User Roles" });
   }
-  
   if (canManageReportsTemplates) {
     tabsToShow.push({ value: "reports-templates", label: "Reports Templates" });
   }
-  
   if (canManageDatabaseMaintenance || canInitializeBalances) {
     tabsToShow.push({ value: "maintenance", label: "Maintenance" });
   }
-
+  
   // If no tabs are available, show a message
   if (tabsToShow.length === 0) {
     return (
@@ -108,7 +110,6 @@ const AdminSettings = () => {
             </TabsTrigger>
           ))}
         </TabsList>
-        
         {tabsToShow.map((tab) => (
           <TabsContent key={tab.value} value={tab.value} className="space-y-6">
             {tab.value === "general" && (

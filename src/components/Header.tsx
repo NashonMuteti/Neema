@@ -1,17 +1,9 @@
 "use client";
-
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, User, Shield } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSelector } from "./LanguageSelector";
@@ -28,9 +20,6 @@ const Header = () => {
   // Determine if the current user is an admin based on their role
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
   
-  console.log("Header: currentUser.role", currentUser?.role);
-  console.log("Header: isAdmin", isAdmin);
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     // The onAuthStateChange listener in AuthContext will handle state update and redirection
@@ -88,8 +77,7 @@ const Header = () => {
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                      {currentUser.name.charAt(0).toUpperCase() + 
-                        (currentUser.name.split(' ')[1]?.charAt(0).toUpperCase() || '')}
+                      {currentUser.name.charAt(0).toUpperCase() + (currentUser.name.split(' ')[1]?.charAt(0).toUpperCase() || '')}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
