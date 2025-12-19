@@ -1,13 +1,6 @@
 "use client";
-
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,10 +25,10 @@ interface AddEditUserRoleDialogProps {
   onSave: (role: Omit<UserRole, 'id'> & { id?: string }) => void;
 }
 
-const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
-  isOpen,
-  setIsOpen,
-  initialData,
+const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({ 
+  isOpen, 
+  setIsOpen, 
+  initialData, 
   onSave,
 }) => {
   const [name, setName] = React.useState(initialData?.name || "");
@@ -51,8 +44,10 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
   }, [isOpen, initialData]);
 
   const handlePrivilegeChange = (itemName: string, checked: boolean) => {
-    setSelectedMenuPrivileges((prev) =>
-      checked ? [...prev, itemName] : prev.filter((name) => name !== itemName)
+    setSelectedMenuPrivileges((prev) => 
+      checked 
+        ? [...prev, itemName] 
+        : prev.filter((name) => name !== itemName)
     );
   };
 
@@ -61,18 +56,18 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
       showError("Role Name is required.");
       return;
     }
-
+    
     const roleData: Omit<UserRole, 'id'> & { id?: string } = {
       name: name.trim(),
       description: description.trim(),
       memberUserIds: initialData?.memberUserIds || [], // Preserve existing members or start empty
       menuPrivileges: selectedMenuPrivileges, // Include selected privileges
     };
-
+    
     if (initialData?.id) {
       roleData.id = initialData.id;
     }
-
+    
     onSave(roleData);
     showSuccess(`User role ${initialData ? "updated" : "added"} successfully!`);
     setIsOpen(false);
@@ -92,26 +87,25 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
             <Label htmlFor="role-name" className="text-right">
               Role Name
             </Label>
-            <Input
-              id="role-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="col-span-3"
+            <Input 
+              id="role-name" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
+              className="col-span-3" 
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="role-description" className="text-right">
               Description
             </Label>
-            <Textarea
-              id="role-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="col-span-3"
+            <Textarea 
+              id="role-description" 
+              value={description} 
+              onChange={(e) => setDescription(e.target.value)} 
+              className="col-span-3" 
               placeholder="Briefly describe the purpose or permissions of this role."
             />
           </div>
-
           <div className="col-span-full mt-4">
             <h3 className="text-lg font-semibold mb-2">Menu Privileges</h3>
             <p className="text-sm text-muted-foreground mb-4">
@@ -120,12 +114,15 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               {allPrivilegeNames.map((privilegeName) => (
                 <div key={privilegeName} className="flex items-center space-x-2">
-                  <Checkbox
+                  <Checkbox 
                     id={`privilege-${privilegeName}`}
                     checked={selectedMenuPrivileges.includes(privilegeName)}
                     onCheckedChange={(checked) => handlePrivilegeChange(privilegeName, checked as boolean)}
                   />
-                  <Label htmlFor={`privilege-${privilegeName}`} className="text-sm font-normal cursor-pointer">
+                  <Label 
+                    htmlFor={`privilege-${privilegeName}`} 
+                    className="text-sm font-normal cursor-pointer"
+                  >
                     {privilegeName}
                   </Label>
                 </div>
@@ -135,7 +132,8 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
         </div>
         <div className="flex justify-end">
           <Button onClick={handleSubmit}>
-            <Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add Role"}
+            <Save className="mr-2 h-4 w-4" />
+            {initialData ? "Save Changes" : "Add Role"}
           </Button>
         </div>
       </DialogContent>

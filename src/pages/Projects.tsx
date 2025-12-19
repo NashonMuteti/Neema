@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect, useCallback, useMemo } from "react"; // Ensure useMemo is imported
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,14 +8,7 @@ import CollectionsDialog from "@/components/projects/CollectionsDialog";
 import ProjectPledgesDialog from "@/components/projects/ProjectPledgesDialog";
 import UploadThumbnailDialog from "@/components/projects/UploadThumbnailDialog";
 import { showSuccess, showError } from "@/utils/toast";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { Image as ImageIcon, CalendarIcon, DollarSign, Handshake, Search } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
@@ -40,14 +32,22 @@ interface Project {
 const Projects = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  
   // Calculate canManageProjects using useMemo for stability
   const { canManageProjects } = useMemo(() => {
     if (!currentUser || !definedRoles) {
       return { canManageProjects: false };
     }
+    
+    // Super Admin can manage projects
+    if (currentUser.role === "Super Admin") {
+      return { canManageProjects: true };
+    }
+    
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+    
     return { canManageProjects };
   }, [currentUser, definedRoles]);
 
@@ -58,14 +58,16 @@ const Projects = () => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [projectFinancialSummaries, setProjectFinancialSummaries] = useState<Map<string, { totalCollections: number; totalPledged: number }>>(new Map());
-  const [loadingFinancials, setLoadingFinancials] = useState(false); // New useEffect to fetch active members count
+  const [loadingFinancials, setLoadingFinancials] = useState(false);
 
+  // New useEffect to fetch active members count
   useEffect(() => {
     const fetchActiveMembersCount = async () => {
       const { count, error } = await supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'Active');
+        
       if (error) {
         console.error("Error fetching active members count:", error);
         // Handle error, maybe set count to 0
@@ -73,23 +75,29 @@ const Projects = () => {
         setActiveMembersCount(count || 0);
       }
     };
+    
     fetchActiveMembersCount();
   }, []); // Run once on mount
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError(null);
+    
     let query = supabase.from('projects').select('*');
+    
     if (filterStatus !== "All") {
       query = query.eq('status', filterStatus);
     } else {
       // Exclude 'Deleted' projects from 'All' view
       query = query.neq('status', 'Deleted');
     }
+    
     if (searchQuery) {
       query = query.ilike('name', `%${searchQuery}%`);
     }
+    
     const { data, error } = await query.order('created_at', { ascending: false });
+    
     if (error) {
       console.error("Error fetching projects:", error);
       setError("Failed to load projects.");
@@ -107,6 +115,7 @@ const Projects = () => {
         user_id: p.user_id,
       })));
     }
+    
     setLoading(false);
   }, [filterStatus, searchQuery]);
 
@@ -118,6 +127,7 @@ const Projects = () => {
     const fetchAllProjectFinancials = async () => {
       setLoadingFinancials(true);
       const newSummaries = new Map<string, { totalCollections: number; totalPledged: number }>();
+      
       for (const project of projects) {
         try {
           const summary = await getProjectFinancialSummary(project.id);
@@ -127,12 +137,17 @@ const Projects = () => {
           });
         } catch (err) {
           console.error(`Failed to fetch financial summary for project ${project.name}:`, err);
-          newSummaries.set(project.id, { totalCollections: 0, totalPledged: 0 }); // Provide defaults on error
+          newSummaries.set(project.id, {
+            totalCollections: 0,
+            totalPledged: 0
+          }); // Provide defaults on error
         }
       }
+      
       setProjectFinancialSummaries(newSummaries);
       setLoadingFinancials(false);
     };
+    
     if (projects.length > 0) {
       fetchAllProjectFinancials();
     } else {
@@ -140,11 +155,18 @@ const Projects = () => {
     }
   }, [projects]); // Re-run when the list of projects changes
 
-  const handleAddProject = async (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => {
+  const handleAddProject = async (projectData: { 
+    name: string; 
+    description: string; 
+    thumbnailUrl?: string; 
+    dueDate?: Date; 
+    memberContributionAmount?: number 
+  }) => {
     if (!currentUser) {
       showError("You must be logged in to add a project.");
       return;
     }
+    
     const { data, error } = await supabase
       .from('projects')
       .insert({
@@ -158,6 +180,7 @@ const Projects = () => {
       })
       .select()
       .single();
+      
     if (error) {
       console.error("Error adding project:", error);
       showError("Failed to add project.");
@@ -172,6 +195,7 @@ const Projects = () => {
       showError("You do not have permission to edit this project.");
       return;
     }
+    
     const { error } = await supabase
       .from('projects')
       .update({
@@ -183,6 +207,7 @@ const Projects = () => {
         member_contribution_amount: updatedProject.memberContributionAmount,
       })
       .eq('id', updatedProject.id);
+      
     if (error) {
       console.error("Error updating project:", error);
       showError("Failed to update project.");
@@ -194,10 +219,12 @@ const Projects = () => {
 
   const handleToggleProjectStatus = async (projectId: string, currentStatus: Project['status']) => {
     const projectToUpdate = projects.find(p => p.id === projectId);
+    
     if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
       showError("You do not have permission to change the status of this project.");
       return;
     }
+    
     let newStatus: Project['status'];
     if (currentStatus === "Open") {
       newStatus = "Suspended";
@@ -208,10 +235,12 @@ const Projects = () => {
     } else {
       newStatus = "Open"; // Default if status is 'Deleted' or unknown
     }
+    
     const { error } = await supabase
       .from('projects')
       .update({ status: newStatus })
       .eq('id', projectId);
+      
     if (error) {
       console.error("Error updating project status:", error);
       showError("Failed to update project status.");
@@ -223,14 +252,17 @@ const Projects = () => {
 
   const handleDeleteProject = async (projectId: string, projectName: string) => {
     const projectToUpdate = projects.find(p => p.id === projectId);
+    
     if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
       showError("You do not have permission to delete this project.");
       return;
     }
+    
     const { error } = await supabase
       .from('projects')
       .update({ status: "Deleted" })
       .eq('id', projectId);
+      
     if (error) {
       console.error("Error deleting project:", error);
       showError("Failed to delete project.");
@@ -247,16 +279,19 @@ const Projects = () => {
 
   const handleThumbnailUpload = async (projectId: string, newUrl: string) => {
     const projectToUpdate = projects.find(p => p.id === projectId);
+    
     if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
       showError("You do not have permission to upload a thumbnail for this project.");
       return;
     }
+    
     // In a real app, you'd upload the file to Supabase Storage here
     // For now, we're using a blob URL for preview.
     const { error } = await supabase
       .from('projects')
       .update({ thumbnail_url: newUrl })
       .eq('id', projectId);
+      
     if (error) {
       console.error("Error updating project thumbnail:", error);
       showError("Failed to update project thumbnail.");
@@ -293,7 +328,10 @@ const Projects = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
         <div className="flex flex-wrap items-center gap-4">
           <h2 className="text-xl font-semibold">Projects</h2>
-          <Select value={filterStatus} onValueChange={(value: "Open" | "Closed" | "Suspended" | "All") => setFilterStatus(value)}>
+          <Select 
+            value={filterStatus} 
+            onValueChange={(value: "Open" | "Closed" | "Suspended" | "All") => setFilterStatus(value)}
+          >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
@@ -307,7 +345,13 @@ const Projects = () => {
             </SelectContent>
           </Select>
           <div className="relative flex items-center">
-            <Input type="text" placeholder="Search projects..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8" />
+            <Input 
+              type="text" 
+              placeholder="Search projects..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              className="pl-8" 
+            />
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
           </div>
         </div>
@@ -323,6 +367,7 @@ const Projects = () => {
             const totalCollections = projectSummary?.totalCollections || 0;
             // Fix: Use totalPledged instead of totalPledges
             const totalPledges = projectSummary?.totalPledged || 0;
+            
             return (
               <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">
                 <CardHeader>
@@ -337,7 +382,9 @@ const Projects = () => {
                     )}
                   </div>
                   <p className="text-muted-foreground text-sm">{project.description}</p>
-                  <p className="text-sm">Status: <span className="font-medium">{project.status}</span></p>
+                  <p className="text-sm">
+                    Status: <span className="font-medium">{project.status}</span>
+                  </p>
                   {project.dueDate && (
                     <p className="text-sm flex items-center gap-1">
                       <CalendarIcon className="h-4 w-4 text-muted-foreground" />
@@ -355,14 +402,14 @@ const Projects = () => {
                   <div className="flex items-center justify-between text-sm">
                     <p className="flex items-center gap-1">
                       <DollarSign className="h-4 w-4 text-green-600" />
-                      Collected:
+                      Collected: 
                     </p>
                     <span className="font-medium text-green-600">${totalCollections.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <p className="flex items-center gap-1">
                       <Handshake className="h-4 w-4 text-blue-600" />
-                      Pledged:
+                      Pledged: 
                     </p>
                     <span className="font-medium text-blue-600">${totalPledges.toFixed(2)}</span>
                   </div>
@@ -374,13 +421,32 @@ const Projects = () => {
                           View Financials
                         </Button>
                       </Link>
-                      <CollectionsDialog projectId={project.id} projectName={project.name} onCollectionAdded={fetchProjects} />
-                      <ProjectPledgesDialog projectId={project.id} projectName={project.name} onPledgesUpdated={fetchProjects} />
-                      <EditProjectDialog project={project} onEditProject={handleEditProject} />
-                      <Button variant="outline" size="sm" onClick={() => handleToggleProjectStatus(project.id, project.status)}>
+                      <CollectionsDialog 
+                        projectId={project.id} 
+                        projectName={project.name} 
+                        onCollectionAdded={fetchProjects} 
+                      />
+                      <ProjectPledgesDialog 
+                        projectId={project.id} 
+                        projectName={project.name} 
+                        onPledgesUpdated={fetchProjects} 
+                      />
+                      <EditProjectDialog 
+                        project={project} 
+                        onEditProject={handleEditProject} 
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleToggleProjectStatus(project.id, project.status)}
+                      >
                         {project.status === "Open" ? "Suspend" : project.status === "Suspended" ? "Close" : "Reopen"}
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleDeleteProject(project.id, project.name)}>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => handleDeleteProject(project.id, project.name)}
+                      >
                         Delete
                       </Button>
                     </div>

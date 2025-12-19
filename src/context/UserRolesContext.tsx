@@ -20,7 +20,7 @@ const UserRolesContext = createContext<UserRolesContextType | undefined>(undefin
 export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser, isLoading: authLoading } = useAuth(); // Get authLoading from useAuth
   const [userRoles, setUserRoles] = useState<UserRoleType[]>([]);
-
+  
   const fetchRoles = useCallback(async () => {
     const { data, error } = await supabase
       .from('roles')
