@@ -108,12 +108,29 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       // Validate file before upload
       try {
         fileUploadSchema.parse(selectedFile);
-        // In a real app, this is where you'd upload the file to a storage service
-        // and get a permanent URL. For now, we use the preview URL.
+        // --- START SUPABASE STORAGE UPLOAD LOGIC ---
+        // In a real app, you'd upload the file to Supabase Storage here.
+        // Example:
+        // const { data: uploadData, error: uploadError } = await supabase.storage
+        //   .from('board-member-images') // Your storage bucket name
+        //   .upload(`${initialData?.id || 'new_member'}/${selectedFile.name}`, selectedFile, {
+        //     cacheControl: '3600',
+        //     upsert: true, // Use upsert to replace existing image
+        //   });
+        // if (uploadError) {
+        //   console.error("Error uploading image to storage:", uploadError);
+        //   showError("Failed to upload image.");
+        //   return;
+        // }
+        // const { data: publicUrlData } = supabase.storage.from('board-member-images').getPublicUrl(uploadData.path);
+        // memberImageUrl = publicUrlData.publicUrl;
+        // --- END SUPABASE STORAGE UPLOAD LOGIC ---
+        
+        // For now, using the preview URL as a placeholder for the uploaded URL
         memberImageUrl = previewUrl;
       } catch (error) {
-        console.error("File validation error:", error);
-        showError("Invalid file. Please upload an image file less than 5MB.");
+        console.error("File validation error or upload failed:", error);
+        showError("Invalid file or failed to upload image. Please upload an image file less than 5MB.");
         return;
       }
     } else if (!selectedFile && !initialData?.image_url) {
@@ -259,7 +276,8 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Image storage and serving require backend integration.
+          Note: Image storage and serving require backend integration (e.g., Supabase Storage with RLS).
+          Client-side image validation is present, but server-side validation is also crucial.
         </p>
       </DialogContent>
     </Dialog>

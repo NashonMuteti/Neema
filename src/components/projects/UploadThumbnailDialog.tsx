@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,12 +89,29 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
       return;
     }
     
-    // Simulate file upload to a backend/storage and get a URL
+    // --- START SUPABASE STORAGE UPLOAD LOGIC ---
     // In a real application, you would send `selectedFile` to your backend
     // and receive a public URL for the uploaded image.
-    const simulatedUploadUrl = URL.createObjectURL(selectedFile); // Using blob URL for immediate preview
+    // Example:
+    // const { data: uploadData, error: uploadError } = await supabase.storage
+    //   .from('project-thumbnails') // Your storage bucket name
+    //   .upload(`${projectId}/${Date.now()}_${selectedFile.name}`, selectedFile, {
+    //     cacheControl: '3600',
+    //     upsert: true, // Use upsert to replace existing thumbnail
+    //   });
+    // if (uploadError) {
+    //   console.error("Error uploading thumbnail to storage:", uploadError);
+    //   showError("Failed to upload thumbnail.");
+    //   return;
+    // }
+    // const { data: publicUrlData } = supabase.storage.from('project-thumbnails').getPublicUrl(uploadData.path);
+    // const newThumbnailUrl = publicUrlData.publicUrl;
+    // --- END SUPABASE STORAGE UPLOAD LOGIC ---
     
-    onThumbnailUpload(projectId, simulatedUploadUrl);
+    // For now, using the preview URL as a placeholder for the uploaded URL
+    const newThumbnailUrl = previewUrl || ""; 
+    
+    onThumbnailUpload(projectId, newThumbnailUrl);
     showSuccess(`Thumbnail for '${projectName}' updated successfully!`);
     setIsOpen(false);
   };
@@ -147,7 +164,8 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Actual image storage and serving require backend integration.
+          Note: Actual image storage and serving require backend integration (e.g., Supabase Storage with RLS).
+          Client-side image validation is present, but server-side validation is also crucial.
         </p>
       </DialogContent>
     </Dialog>

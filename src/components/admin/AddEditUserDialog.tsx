@@ -13,6 +13,7 @@ import { User } from '@/context/AuthContext';
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
+import { fileUploadSchema } from "@/utils/security";
 
 interface AddEditUserDialogProps {
   isOpen: boolean;
@@ -21,6 +22,16 @@ interface AddEditUserDialogProps {
   onSave: () => void;
   availableRoles: UserRoleType[];
 }
+
+// Function to generate a strong random password
+const generateRandomPassword = (length = 12) => {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+};
 
 const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({ 
   isOpen, 
@@ -57,7 +68,8 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [role, setRole] = React.useState<string>(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : ""));
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(initialData?.status || "Active");
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
-  const [defaultPassword, setDefaultPassword] = React.useState("");
+  const [password, setPassword] = React.useState(""); // Changed from defaultPassword to password
+  const [generatedPassword, setGeneratedPassword] = React.useState<string | null>(null); // To display generated password
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
 
@@ -68,7 +80,8 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       setRole(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : ""));
       setStatus(initialData?.status || "Active");
       setEnableLogin(initialData?.enableLogin || false);
-      setDefaultPassword("");
+      setPassword(""); // Clear password field on open
+      setGeneratedPassword(null);
       setSelectedFile(null);
       setPreviewUrl(initialData?.imageUrl || null);
     }
@@ -83,8 +96,17 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      // Validate file before processing
+      try {
+        fileUploadSchema.parse(file);
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        event.target.value = ""; // Reset the input
+        return;
+      }
     } else {
       setSelectedFile(null);
       setPreviewUrl(initialData?.imageUrl || null);
@@ -97,8 +119,17 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       return;
     }
     
-    if (enableLogin && !initialData && !defaultPassword) {
-      showError("Default password is required if login is enabled for a new user.");
+    let finalPassword = password;
+    if (enableLogin && !initialData && !password) {
+      // If creating a new user, login is enabled, and no password provided, generate one
+      finalPassword = generateRandomPassword();
+      setGeneratedPassword(finalPassword); // Store to display to admin
+    } else if (!enableLogin) {
+      finalPassword = ""; // Ensure no password is sent if login is disabled
+    }
+    
+    if (enableLogin && !finalPassword && !initialData) { // For new users, password is mandatory if login enabled
+      showError("Password is required if login is enabled for a new user.");
       return;
     }
     
@@ -108,8 +139,31 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     }
     
     let userImageUrl: string | undefined = initialData?.imageUrl;
-    if (selectedFile && previewUrl) {
-      userImageUrl = previewUrl;
+    if (selectedFile) {
+      // Validate file before upload
+      try {
+        fileUploadSchema.parse(selectedFile);
+        // --- START SUPABASE STORAGE UPLOAD LOGIC ---
+        // In a real app, you'd upload the file to Supabase Storage here.
+        // Example:
+        // const { data: uploadData, error: uploadError } = await supabase.storage
+        //   .from('avatars') // Your storage bucket name
+        //   .upload(`${initialData?.id || 'new_user'}/${selectedFile.name}`, selectedFile, {
+        //     cacheControl: '3600',
+        //     upsert: false,
+        //   });
+        // if (uploadError) throw uploadError;
+        // const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(uploadData.path);
+        // userImageUrl = publicUrlData.publicUrl;
+        // --- END SUPABASE STORAGE UPLOAD LOGIC ---
+        
+        // For now, using the preview URL as a placeholder for the uploaded URL
+        userImageUrl = previewUrl;
+      } catch (error) {
+        console.error("File validation error or upload failed:", error);
+        showError("Invalid file or failed to upload image. Please upload an image file less than 5MB.");
+        return;
+      }
     } else if (!selectedFile && !initialData?.imageUrl) {
       userImageUrl = undefined;
     }
@@ -118,11 +172,8 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       // Editing existing user in Supabase Auth and profiles table
       const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
         email: email,
-        password: defaultPassword || undefined, // Only update password if provided
-        user_metadata: {
-          full_name: name,
-          avatar_url: userImageUrl,
-        },
+        password: finalPassword || undefined, // Only update password if provided
+        data: { full_name: name, avatar_url: userImageUrl },
       });
       
       if (authUpdateError) {
@@ -152,7 +203,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       // Add new user to Supabase Auth and profiles table
       const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
         email: email,
-        password: defaultPassword, // Password is required for admin.createUser
+        password: finalPassword, // Password is required for admin.createUser
         email_confirm: true, // Automatically confirm email for admin-created users
         user_metadata: {
           full_name: name,
@@ -176,6 +227,9 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     
     onSave();
     showSuccess(`User ${initialData ? "updated" : "added"} successfully!`);
+    if (generatedPassword) {
+      showSuccess(`Generated password for ${name}: ${generatedPassword}. Please communicate this securely.`);
+    }
     setIsOpen(false);
   };
 
@@ -287,39 +341,52 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             <Checkbox 
               id="enableLogin" 
               checked={enableLogin} 
-              onCheckedChange={(checked) => setEnableLogin(checked as boolean)} 
+              onCheckedChange={(checked) => {
+                setEnableLogin(checked as boolean);
+                if (!checked) {
+                  setPassword(""); // Clear password if login is disabled
+                  setGeneratedPassword(null);
+                }
+              }} 
               className="col-span-3" 
               disabled={!canManageUserProfiles}
             />
           </div>
           {enableLogin && (
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="defaultPassword" className="text-right">
-                {initialData ? "Reset Password" : "Default Password"}
+              <Label htmlFor="password" className="text-right">
+                {initialData ? "Reset Password" : "Password"}
               </Label>
               <Input 
-                id="defaultPassword" 
+                id="password" 
                 type="password" 
-                value={defaultPassword} 
-                onChange={(e) => setDefaultPassword(e.target.value)} 
-                placeholder={initialData ? "Leave blank to keep current" : "Enter default password"} 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                placeholder={initialData ? "Leave blank to keep current" : "Leave blank to auto-generate"} 
                 className="col-span-3" 
                 disabled={!canManageUserProfiles}
               />
+            </div>
+          )}
+          {generatedPassword && (
+            <div className="col-span-full text-sm text-green-600 bg-green-50 p-2 rounded-md border border-green-200">
+              Generated Password: <span className="font-mono font-semibold">{generatedPassword}</span>
+              <p className="text-xs text-muted-foreground mt-1">Please communicate this securely to the user.</p>
             </div>
           )}
         </div>
         <div className="flex justify-end">
           <Button 
             onClick={handleSubmit} 
-            disabled={!canManageUserProfiles || (enableLogin && !defaultPassword && !initialData)}
+            disabled={!canManageUserProfiles || (enableLogin && !password && !generatedPassword && !initialData)}
           >
             <Save className="mr-2 h-4 w-4" />
             {initialData ? "Save Changes" : "Add User"}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Image storage and serving, along with backend authentication for login, require backend integration (e.g., Supabase).
+          Note: Image storage and serving require backend integration (e.g., Supabase Storage with RLS).
+          Client-side image validation is present, but server-side validation is also crucial.
         </p>
       </DialogContent>
     </Dialog>
