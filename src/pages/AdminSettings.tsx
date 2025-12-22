@@ -6,7 +6,7 @@ import AppCustomization from "@/components/admin/AppCustomization";
 import ReportsTemplateCustomization from "@/components/admin/ReportsTemplateCustomization";
 import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmin";
 import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings";
-import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization";
+import MemberFieldCustomization from "@/components/admin/MemberFieldFieldCustomization";
 import UserRolesSettings from "@/components/admin/UserRolesSettings";
 import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings";
 import DefaultPasswordSettings from "@/components/admin/DefaultPasswordSettings";
@@ -45,6 +45,23 @@ const AdminSettings = () => {
   const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances") || 
                                currentUser?.role === "Super Admin";
   
+  // --- START DEBUG LOGS ---
+  console.log("AdminSettings Debug:");
+  console.log("  currentUser.role:", currentUser?.role);
+  console.log("  currentUserPrivileges (from role definition):", currentUserPrivileges);
+  console.log("  canAccessAdminSettings:", canAccessAdminSettings);
+  console.log("  canManageUserProfiles:", canManageUserProfiles);
+  console.log("  canManageUserRoles:", canManageUserRoles);
+  console.log("  canManageAppCustomization:", canManageAppCustomization);
+  console.log("  canManageSystemCurrency:", canManageSystemCurrency);
+  console.log("  canManageMemberFields:", canManageMemberFields);
+  console.log("  canManageReportsTemplates:", canManageReportsTemplates);
+  console.log("  canManageSecurity:", canManageSecurity);
+  console.log("  canManageDatabaseMaintenance:", canManageDatabaseMaintenance);
+  console.log("  canManageDefaultPassword:", canManageDefaultPassword);
+  console.log("  canInitializeBalances:", canInitializeBalances);
+  // --- END DEBUG LOGS ---
+
   // If user doesn't have access to admin settings, show a message
   if (!canAccessAdminSettings) {
     return (
