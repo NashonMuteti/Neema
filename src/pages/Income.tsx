@@ -204,7 +204,7 @@ const Income = () => {
   };
 
   const handleEditTransaction = (id: string) => {
-    // In a real app, this would open an edit dialog pre-filled with transaction data
+    // TODO: Implement an edit dialog for income transactions to modify date, amount, source, etc.
     console.log("Editing income transaction:", id);
     showError("Edit functionality is not yet implemented for income transactions.");
   };

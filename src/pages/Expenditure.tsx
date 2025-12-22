@@ -212,7 +212,7 @@ const Expenditure = () => {
   };
 
   const handleEditTransaction = (id: string) => {
-    // In a real app, this would open an edit dialog pre-filled with transaction data
+    // TODO: Implement an edit dialog for expenditure transactions to modify date, amount, purpose, etc.
     console.log("Editing expenditure transaction:", id);
     showError("Edit functionality is not yet implemented for expenditure transactions.");
   };

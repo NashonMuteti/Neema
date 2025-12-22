@@ -78,6 +78,8 @@ const Projects = () => {
     
     fetchActiveMembersCount();
   }, []); // Run once on mount
+  // TODO: If activeMembersCount needs to be reactive to changes in the 'members' table,
+  // a real-time subscription or a more frequent re-fetch mechanism would be required.
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);

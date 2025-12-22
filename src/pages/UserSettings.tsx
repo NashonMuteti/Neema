@@ -71,7 +71,11 @@ const UserSettings = () => {
     // Update public.profiles table (for name, and other profile-specific settings like notifications)
     const { error: profileUpdateError } = await supabase
       .from('profiles')
-      .update({ name: data.name /* Add receive_notifications here when column exists */ })
+      .update({ 
+        name: data.name,
+        // TODO: Add 'receive_notifications' column to public.profiles table
+        // and update its value here: receive_notifications: data.receiveNotifications
+      })
       .eq('id', currentUser.id);
 
     if (profileUpdateError) {
@@ -98,7 +102,7 @@ const UserSettings = () => {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">My Settings</h1>
-        <p className="text-lg text-destructive">User not found. Please log in.</p>
+        <p className="text-lg text-destructive">User not logged in. Please log in.</p>
       </div>
     );
   }

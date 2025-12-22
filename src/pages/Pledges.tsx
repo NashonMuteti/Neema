@@ -250,7 +250,7 @@ const Pledges = () => {
   };
 
   const handleEditPledge = (id: string) => {
-    // In a real app, this would open an edit dialog pre-filled with pledge data
+    // TODO: Implement an edit dialog for pledges to modify amount, due date, etc.
     console.log("Editing pledge:", id);
     showError(`Edit functionality for pledge ${id} is not yet implemented.`);
   };
