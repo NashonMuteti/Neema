@@ -99,9 +99,10 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       memberImageUrl = undefined;
     }
 
-    // Update Supabase auth user metadata (for name and avatar)
-    const { error: authUpdateError } = await supabase.auth.updateUser({
-      email: email, // Can update email if needed, but usually handled by Supabase Auth UI
+    // Update Supabase auth user metadata (for full_name and avatar_url)
+    const { error: authUpdateError } = await supabase.auth.admin.updateUserById(member.id, {
+      email: email,
+      password: defaultPassword || undefined, // Only update password if provided
       data: { full_name: name, avatar_url: memberImageUrl },
     });
 
@@ -121,17 +122,6 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       console.error("Error updating member profile:", profileUpdateError);
       showError("Failed to update member profile details.");
       return;
-    }
-
-    if (defaultPassword) {
-      const { error: passwordResetError } = await supabase.auth.updateUser({
-        password: defaultPassword,
-      });
-      if (passwordResetError) {
-        console.error("Error resetting password:", passwordResetError);
-        showError("Failed to reset member password.");
-        return;
-      }
     }
 
     onEditMember(); // Trigger parent to re-fetch members

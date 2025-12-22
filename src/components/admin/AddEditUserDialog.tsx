@@ -118,7 +118,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       // Editing existing user in Supabase Auth and profiles table
       const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
         email: email,
-        password: defaultPassword || undefined,
+        password: defaultPassword || undefined, // Only update password if provided
         user_metadata: {
           full_name: name,
           avatar_url: userImageUrl,
@@ -150,40 +150,28 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       }
     } else {
       // Add new user to Supabase Auth and profiles table
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
         email: email,
-        password: defaultPassword || "default_secure_password",
-        options: {
-          data: {
-            full_name: name,
-            avatar_url: userImageUrl,
-          },
+        password: defaultPassword, // Password is required for admin.createUser
+        email_confirm: true, // Automatically confirm email for admin-created users
+        user_metadata: {
+          full_name: name,
+          avatar_url: userImageUrl,
+          role: role, // Pass role to metadata for handle_new_user trigger
+          status: status, // Pass status to metadata for handle_new_user trigger
+          enable_login: enableLogin, // Pass enable_login to metadata for handle_new_user trigger
         },
       });
       
-      if (signUpError) {
-        console.error("Error signing up new user:", signUpError);
-        showError(`Failed to add new user: ${signUpError.message}`);
+      if (createUserError) {
+        console.error("Error creating new user in Auth:", createUserError);
+        showError(`Failed to add new user: ${createUserError.message}`);
         return;
       }
       
-      if (signUpData.user) {
-        // Update the profile with the selected role and status
-        const { error: profileUpdateError } = await supabase
-          .from('profiles')
-          .update({
-            role,
-            status,
-            enable_login: enableLogin
-          })
-          .eq('id', signUpData.user.id);
-          
-        if (profileUpdateError) {
-          console.error("Error updating new user's profile with role/status:", profileUpdateError);
-          showError("Failed to set new user's role and status.");
-          return;
-        }
-      }
+      // The handle_new_user trigger should handle the initial profile creation.
+      // If additional updates are needed beyond what the trigger handles, they would go here.
+      // For now, assuming handle_new_user handles role, status, enable_login.
     }
     
     onSave();
@@ -324,7 +312,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         <div className="flex justify-end">
           <Button 
             onClick={handleSubmit} 
-            disabled={!canManageUserProfiles}
+            disabled={!canManageUserProfiles || (enableLogin && !defaultPassword && !initialData)}
           >
             <Save className="mr-2 h-4 w-4" />
             {initialData ? "Save Changes" : "Add User"}
