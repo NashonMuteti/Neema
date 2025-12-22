@@ -173,7 +173,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
         email: email,
         password: finalPassword || undefined, // Only update password if provided
-        data: { full_name: name, avatar_url: userImageUrl },
+        user_metadata: { full_name: name, avatar_url: userImageUrl },
       });
       
       if (authUpdateError) {
