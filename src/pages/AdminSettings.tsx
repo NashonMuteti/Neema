@@ -6,7 +6,7 @@ import AppCustomization from "@/components/admin/AppCustomization";
 import ReportsTemplateCustomization from "@/components/admin/ReportsTemplateCustomization";
 import UserProfileSettingsAdmin from "@/components/admin/UserProfileSettingsAdmin";
 import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings";
-import MemberFieldCustomization from "@/components/admin/MemberFieldFieldCustomization";
+import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization";
 import UserRolesSettings from "@/components/admin/UserRolesSettings";
 import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings";
 import DefaultPasswordSettings from "@/components/admin/DefaultPasswordSettings";

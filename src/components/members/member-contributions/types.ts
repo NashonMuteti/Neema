@@ -1,4 +1,5 @@
-import { BadgeVariant } from "@/components/ui/badge";
+import { type VariantProps } from "class-variance-authority";
+import { badgeVariants } from "@/components/ui/badge";
 
 export interface MemberContribution {
   id: string;
@@ -36,6 +37,8 @@ export interface PettyCashTxRow {
   purpose: string;
   financial_accounts: FinancialAccountName | null;
 }
+
+type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
 export const getContributionStatus = (type: MemberContribution['type']): { text: string; variant: BadgeVariant } => {
   if (type === 'income') {
