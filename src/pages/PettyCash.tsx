@@ -1,258 +1,36 @@
 "use client";
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,} from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { format, getMonth, getYear, parseISO } from "date-fns";
-import { CalendarIcon, Edit, Trash2, Search } from "lucide-react";
-import { showSuccess, showError } from "@/utils/toast";
-import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
-import { useAuth } from "@/context/AuthContext";
-import { useUserRoles } from "@/context/UserRolesContext";
-import { supabase } from "@/integrations/supabase/client";
-import { validateFinancialTransaction } from "@/utils/security";
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
-}
-
-interface PettyCashTransaction {
-  id: string;
-  date: Date;
-  amount: number;
-  account_id: string;
-  purpose: string;
-  user_id: string;
-}
+import PettyCashForm from "@/components/petty-cash/PettyCashForm";
+import PettyCashTable from "@/components/petty-cash/PettyCashTable";
+import { usePettyCashManagement } from "@/hooks/use-petty-cash-management";
 
 const PettyCash = () => {
-  const { currentUser } = useAuth();
-  const { userRoles: definedRoles } = useUserRoles();
-  
-  const { canManagePettyCash } = React.useMemo(() => {
-    if (!currentUser || !definedRoles) {
-      return { canManagePettyCash: false };
-    }
-    
-    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
-    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-    const canManagePettyCash = currentUserPrivileges.includes("Manage Petty Cash");
-    return { canManagePettyCash };
-  }, [currentUser, definedRoles]);
-
-  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
-  const [transactions, setTransactions] = React.useState<PettyCashTransaction[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  
-  // Form State
-  const [expenseDate, setExpenseDate] = React.useState<Date | undefined>(new Date());
-  const [expenseAmount, setExpenseAmount] = React.useState("");
-  const [expenseAccount, setExpenseAccount] = React.useState<string | undefined>(undefined);
-  const [expensePurpose, setExpensePurpose] = React.useState("");
-  
-  // Filter State
-  const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date()); // 0-indexed
-  const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
-  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  const [searchQuery, setSearchQuery] = React.useState("");
-
-  const months = Array.from({ length: 12 }, (_, i) => ({
-    value: i.toString(),
-    label: format(new Date(0, i), "MMMM"),
-  }));
-
-  const years = Array.from({ length: 5 }, (_, i) => ({
-    value: (currentYear - 2 + i).toString(),
-    label: (currentYear - 2 + i).toString(),
-  }));
-
-  const fetchFinancialAccounts = React.useCallback(async () => {
-    const { data, error } = await supabase
-      .from('financial_accounts')
-      .select('id, name, current_balance');
-      
-    if (error) {
-      console.error("Error fetching financial accounts:", error);
-      showError("Failed to load financial accounts.");
-    } else {
-      setFinancialAccounts(data || []);
-      if (!expenseAccount && data && data.length > 0) {
-        setExpenseAccount(data[0].id); // Set default account if none selected
-      }
-    }
-  }, [expenseAccount]);
-
-  const fetchPettyCashTransactions = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
-    
-    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
-    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
-    
-    let query = supabase
-      .from('petty_cash_transactions')
-      .select('*, financial_accounts(name)')
-      .eq('user_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString());
-      
-    if (searchQuery) {
-      query = query.ilike('purpose', `%${searchQuery}%`);
-    }
-    
-    const { data, error } = await query.order('date', { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching petty cash transactions:", error);
-      setError("Failed to load petty cash transactions.");
-      showError("Failed to load petty cash transactions.");
-      setTransactions([]);
-    } else {
-      setTransactions(data.map(tx => ({
-        id: tx.id,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        account_id: tx.account_id,
-        purpose: tx.purpose,
-        user_id: tx.user_id,
-        account_name: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
-      })));
-    }
-    
-    setLoading(false);
-  }, [currentUser, filterMonth, filterYear, searchQuery]);
-
-  React.useEffect(() => {
-    fetchFinancialAccounts();
-    fetchPettyCashTransactions();
-  }, [fetchFinancialAccounts, fetchPettyCashTransactions]);
-
-  const handlePostExpense = async () => {
-    if (!currentUser) {
-      showError("You must be logged in to post petty cash expense.");
-      return;
-    }
-    
-    if (!expenseDate || !expenseAmount || !expenseAccount || !expensePurpose) {
-      showError("All petty cash fields are required.");
-      return;
-    }
-    
-    const amount = parseFloat(expenseAmount);
-    
-    // Server-side validation
-    const validation = validateFinancialTransaction(amount, expenseAccount, currentUser.id);
-    if (!validation.isValid) {
-      showError(validation.error || "Invalid expense amount.");
-      return;
-    }
-    
-    const currentAccount = financialAccounts.find(acc => acc.id === expenseAccount);
-    if (!currentAccount) {
-      showError("Selected account not found.");
-      return;
-    }
-    
-    if (currentAccount.current_balance < amount) {
-      showError("Insufficient balance in the selected account.");
-      return;
-    }
-    
-    const { error: insertError } = await supabase
-      .from('petty_cash_transactions')
-      .insert({
-        date: expenseDate.toISOString(),
-        amount,
-        account_id: expenseAccount,
-        purpose: expensePurpose,
-        user_id: currentUser.id,
-      });
-      
-    if (insertError) {
-      console.error("Error posting petty cash expense:", insertError);
-      showError("Failed to post petty cash expense.");
-    } else {
-      // Update account balance
-      const newBalance = currentAccount.current_balance - amount;
-      const { error: updateBalanceError } = await supabase
-        .from('financial_accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', expenseAccount);
-        
-      if (updateBalanceError) {
-        console.error("Error updating account balance:", updateBalanceError);
-        showError("Petty cash expense posted, but failed to update account balance.");
-      }
-      
-      showSuccess("Petty cash expense posted successfully!");
-      fetchPettyCashTransactions();
-      fetchFinancialAccounts(); // Re-fetch accounts to update balances
-      
-      // Reset form
-      setExpenseDate(new Date());
-      setExpenseAmount("");
-      setExpenseAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
-      setExpensePurpose("");
-    }
-  };
-
-  const handleEditTransaction = (id: string) => {
-    // TODO: Implement an edit dialog for petty cash transactions to modify date, amount, purpose, etc.
-    console.log("Editing petty cash transaction:", id);
-    showError("Edit functionality is not yet implemented for petty cash transactions.");
-  };
-
-  const handleDeleteTransaction = async (id: string, amount: number, accountId: string) => {
-    if (!currentUser) {
-      showError("You must be logged in to delete petty cash expense.");
-      return;
-    }
-    
-    const { error: deleteError } = await supabase
-      .from('petty_cash_transactions')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', currentUser.id); // Ensure only owner can delete
-      
-    if (deleteError) {
-      console.error("Error deleting petty cash transaction:", deleteError);
-      showError("Failed to delete petty cash transaction.");
-    } else {
-      // Revert account balance
-      const currentAccount = financialAccounts.find(acc => acc.id === accountId);
-      if (currentAccount) {
-        const newBalance = currentAccount.current_balance + amount;
-        const { error: updateBalanceError } = await supabase
-          .from('financial_accounts')
-          .update({ current_balance: newBalance })
-          .eq('id', accountId);
-          
-        if (updateBalanceError) {
-          console.error("Error reverting account balance:", updateBalanceError);
-          showError("Petty cash transaction deleted, but failed to revert account balance.");
-        }
-      }
-      
-      showSuccess("Petty cash transaction deleted successfully!");
-      fetchPettyCashTransactions();
-      fetchFinancialAccounts(); // Re-fetch accounts to update balances
-    }
-  };
+  const {
+    financialAccounts,
+    transactions,
+    loading,
+    error,
+    canManagePettyCash,
+    expenseDate,
+    setExpenseDate,
+    expenseAmount,
+    setExpenseAmount,
+    expenseAccount,
+    setExpenseAccount,
+    expensePurpose,
+    setExpensePurpose,
+    filterMonth,
+    setFilterMonth,
+    filterYear,
+    setFilterYear,
+    searchQuery,
+    setSearchQuery,
+    months,
+    years,
+    handlePostExpense,
+    handleEditTransaction,
+    handleDeleteTransaction,
+  } = usePettyCashManagement();
 
   if (loading) {
     return (
@@ -280,176 +58,34 @@ const PettyCash = () => {
       </p>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Record Petty Cash Card */}
-        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-          <CardHeader>
-            <CardTitle>Record New Petty Cash Expense</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="expense-date">Date of Expense</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !expenseDate && "text-muted-foreground"
-                    )}
-                    disabled={!canManagePettyCash}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {expenseDate ? format(expenseDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={expenseDate}
-                    onSelect={setExpenseDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            
-            <div className="grid gap-1.5">
-              <Label htmlFor="expense-amount">Amount</Label>
-              <Input
-                id="expense-amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={expenseAmount}
-                onChange={(e) => setExpenseAmount(e.target.value)}
-                disabled={!canManagePettyCash}
-              />
-            </div>
-            
-            <div className="grid gap-1.5">
-              <Label htmlFor="expense-account">Debited From Account</Label>
-              <Select value={expenseAccount} onValueChange={setExpenseAccount} disabled={!canManagePettyCash}>
-                <SelectTrigger id="expense-account">
-                  <SelectValue placeholder="Select an account" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Financial Accounts</SelectLabel>
-                    {financialAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} (Balance: ${account.current_balance.toFixed(2)})
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-1.5">
-              <Label htmlFor="expense-purpose">Purpose/Description</Label>
-              <Textarea
-                id="expense-purpose"
-                placeholder="e.g., Office supplies, Snacks, Transportation"
-                value={expensePurpose}
-                onChange={(e) => setExpensePurpose(e.target.value)}
-                disabled={!canManagePettyCash}
-              />
-            </div>
-            
-            <Button onClick={handlePostExpense} className="w-full" disabled={!canManagePettyCash}>
-              Post Expense
-            </Button>
-          </CardContent>
-        </Card>
+        <PettyCashForm
+          financialAccounts={financialAccounts}
+          expenseDate={expenseDate}
+          setExpenseDate={setExpenseDate}
+          expenseAmount={expenseAmount}
+          setExpenseAmount={setExpenseAmount}
+          expenseAccount={expenseAccount}
+          setExpenseAccount={setExpenseAccount}
+          expensePurpose={expensePurpose}
+          setExpensePurpose={setExpensePurpose}
+          handlePostExpense={handlePostExpense}
+          canManagePettyCash={canManagePettyCash}
+        />
         
-        {/* Recent Petty Cash Transactions Card */}
-        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-          <CardHeader>
-            <CardTitle>Recent Petty Cash Transactions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-4 mb-4">
-              <div className="grid gap-1.5 flex-1 min-w-[120px]">
-                <Label htmlFor="filter-month">Month</Label>
-                <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger id="filter-month">
-                    <SelectValue placeholder="Select month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {months.map((month) => (
-                      <SelectItem key={month.value} value={month.value}>
-                        {month.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-1.5 flex-1 min-w-[100px]">
-                <Label htmlFor="filter-year">Year</Label>
-                <Select value={filterYear} onValueChange={setFilterYear}>
-                  <SelectTrigger id="filter-year">
-                    <SelectValue placeholder="Select year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.map((year) => (
-                      <SelectItem key={year.value} value={year.value}>
-                        {year.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="relative flex items-center flex-1 min-w-[180px]">
-                <Input
-                  type="text"
-                  placeholder="Search purpose..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
-                />
-                <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-            
-            {transactions.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Purpose</TableHead>
-                    <TableHead>Account</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    {canManagePettyCash && <TableHead className="text-center">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{format(tx.date, "MMM dd, yyyy")}</TableCell>
-                      <TableCell>{tx.purpose}</TableCell>
-                      <TableCell>{(tx as any).account_name}</TableCell>
-                      <TableCell className="text-right">${tx.amount.toFixed(2)}</TableCell>
-                      {canManagePettyCash && (
-                        <TableCell className="text-center">
-                          <div className="flex justify-center space-x-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEditTransaction(tx.id)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx.id, tx.amount, tx.account_id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-muted-foreground">No petty cash transactions found for the selected period or matching your search.</p>
-            )}
-          </CardContent>
-        </Card>
+        <PettyCashTable
+          transactions={transactions}
+          filterMonth={filterMonth}
+          setFilterMonth={setFilterMonth}
+          filterYear={filterYear}
+          setFilterYear={setFilterYear}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          months={months}
+          years={years}
+          handleEditTransaction={handleEditTransaction}
+          handleDeleteTransaction={handleDeleteTransaction}
+          canManagePettyCash={canManagePettyCash}
+        />
       </div>
     </div>
   );
