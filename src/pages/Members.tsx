@@ -26,143 +26,48 @@ import {
 import { Input } from "@/components/ui/input";
 import { exportMembersToPdf, exportMembersToExcel } from "@/utils/reportUtils";
 import { Link } from "react-router-dom";
-import { useAuth, User } from "@/context/AuthContext"; // Import useAuth and User interface
-import { useBranding } from "@/context/BrandingContext"; // Import useBranding
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
-import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
+import { useAuth, User } from "@/context/AuthContext";
+import { useBranding } from "@/context/BrandingContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useMemberManagement } from "@/hooks/use-member-management"; // Import the new hook
+import { getStatusBadgeClasses } from "@/utils/memberUtils"; // Import the utility function
 
 const Members = () => {
-  const { currentUser } = useAuth(); // Use the auth context to get current user
-  const { userRoles: definedRoles } = useUserRoles(); // Get all defined roles
+  const { currentUser } = useAuth(); // Still need currentUser for privilege checks in dialogs
+  const { userRoles: definedRoles } = useUserRoles(); // Still need definedRoles for privilege checks in dialogs
 
-  // Determine if the current user has the "Manage Members" privilege
-  const { canManageMembers, canExportPdf, canExportExcel } = useMemo(() => {
-    if (!currentUser || !definedRoles) {
-      return { canManageMembers: false, canExportPdf: false, canExportExcel: false };
-    }
-    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
-    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-    const canManageMembers = currentUserPrivileges.includes("Manage Members"); // Check for the specific privilege
-    const canExportPdf = currentUserPrivileges.includes("Export Member List PDF"); // New privilege check
-    const canExportExcel = currentUserPrivileges.includes("Export Member List Excel"); // New privilege check
-    return { canManageMembers, canExportPdf, canExportExcel };
-  }, [currentUser, definedRoles]);
+  const {
+    members,
+    loading,
+    error,
+    filterStatus,
+    setFilterStatus,
+    searchQuery,
+    setSearchQuery,
+    canManageMembers,
+    canExportPdf,
+    canExportExcel,
+    handleToggleMemberStatus,
+    refreshMembers, // Use the refresh function from the hook
+  } = useMemberManagement();
 
-  const { brandLogoUrl, tagline } = useBranding(); // Use the branding context
-
-  const [members, setMembers] = React.useState<User[]>([]); // Use the centralized User interface
-  const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Inactive" | "Suspended">("All");
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const fetchMembers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    let query = supabase.from('profiles').select('*');
-
-    if (filterStatus !== "All") {
-      query = query.eq('status', filterStatus);
-    }
-
-    if (searchQuery) {
-      query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
-    }
-
-    const { data, error } = await query.order('name', { ascending: true });
-
-    if (error) {
-      console.error("Error fetching members:", error);
-      setError("Failed to load members.");
-      showError("Failed to load members.");
-      setMembers([]);
-    } else {
-      setMembers(data.map(p => ({
-        id: p.id,
-        name: p.name || p.email || "Unknown",
-        email: p.email || "N/A",
-        enableLogin: p.enable_login ?? false,
-        imageUrl: p.image_url || undefined,
-        status: p.status as "Active" | "Inactive" | "Suspended",
-        role: p.role || "Contributor", // Default role if not set
-      })));
-    }
-    setLoading(false);
-  }, [filterStatus, searchQuery]);
-
-  useEffect(() => {
-    fetchMembers();
-  }, [fetchMembers]);
-
-  const handleAddMember = () => {
-    fetchMembers(); // Re-fetch members after adding
-  };
-
-  const handleEditMember = () => {
-    fetchMembers(); // Re-fetch members after editing
-  };
-
-  const handleDeleteMember = () => {
-    fetchMembers(); // Re-fetch members after deleting
-  };
-
-  const handleToggleMemberStatus = async (memberId: string, currentStatus: User['status']) => {
-    if (!canManageMembers) {
-      showError("You do not have permission to change member status.");
-      return;
-    }
-
-    let newStatus: User['status'];
-    if (currentStatus === "Active") {
-      newStatus = "Inactive";
-    } else if (currentStatus === "Inactive") {
-      newStatus = "Active";
-    } else {
-      newStatus = "Active"; // If suspended, reactivate
-    }
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: newStatus })
-      .eq('id', memberId);
-
-    if (error) {
-      console.error("Error updating member status:", error);
-      showError("Failed to update member status.");
-    } else {
-      showSuccess(`Member status updated to '${newStatus}'!`);
-      fetchMembers(); // Re-fetch to update UI
-    }
-  };
+  const { brandLogoUrl, tagline } = useBranding();
 
   const reportOptions = {
     reportName: "Member List Report",
-    brandLogoUrl: brandLogoUrl, // Pass dynamic logo URL
-    tagline: tagline,           // Pass dynamic tagline
+    brandLogoUrl: brandLogoUrl,
+    tagline: tagline,
   };
 
   const handlePrintPdf = () => {
-    exportMembersToPdf(members, reportOptions); // Use fetched members
+    exportMembersToPdf(members, reportOptions);
     showSuccess("Generating PDF report...");
   };
 
   const handleExportExcel = () => {
-    exportMembersToExcel(members, reportOptions); // Use fetched members
+    exportMembersToExcel(members, reportOptions);
     showSuccess("Generating Excel report...");
-  };
-
-  const getStatusBadgeClasses = (status: User['status']) => {
-    switch (status) {
-      case "Active":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Inactive":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      case "Suspended":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-    }
   };
 
   if (loading) {
@@ -229,7 +134,7 @@ const Members = () => {
               </Button>
             )}
             {canManageMembers && (
-              <AddMemberDialog onAddMember={handleAddMember} />
+              <AddMemberDialog onAddMember={refreshMembers} />
             )}
           </div>
         </div>
@@ -269,7 +174,7 @@ const Members = () => {
                 </TableCell>
                 {canManageMembers && (
                   <TableCell className="flex justify-center space-x-2">
-                    <EditMemberDialog member={member} onEditMember={handleEditMember} />
+                    <EditMemberDialog member={member} onEditMember={refreshMembers} />
                     {member.status !== "Suspended" && (
                       <Button
                         variant="outline"
@@ -279,7 +184,7 @@ const Members = () => {
                         {member.status === "Active" ? "Deactivate" : "Activate"}
                       </Button>
                     )}
-                    <DeleteMemberDialog member={member} onDeleteMember={handleDeleteMember} />
+                    <DeleteMemberDialog member={member} onDeleteMember={refreshMembers} />
                   </TableCell>
                 )}
                 <TableCell className="text-center">
