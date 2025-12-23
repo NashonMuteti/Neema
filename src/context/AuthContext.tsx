@@ -12,6 +12,7 @@ export interface User {
   status: "Active" | "Inactive" | "Suspended";
   enableLogin: boolean;
   imageUrl?: string;
+  receiveNotifications: boolean; // Added receiveNotifications
 }
 
 interface AuthContextType {
@@ -67,6 +68,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             status: "Active",
             enableLogin: true,
             imageUrl: user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`,
+            receiveNotifications: true, // Default to true if profile fetch fails
           });
           return;
         }
@@ -80,6 +82,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             status: profile.status || "Active",
             enableLogin: profile.enable_login ?? true,
             imageUrl: profile.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${profile.name || user.email}`,
+            receiveNotifications: profile.receive_notifications ?? true, // Use fetched value or default
           });
         } else {
           // Fallback for new users
@@ -91,6 +94,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             status: "Active",
             enableLogin: true,
             imageUrl: user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`,
+            receiveNotifications: true, // Default for new users
           });
         }
       } catch (error) {

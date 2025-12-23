@@ -23,7 +23,7 @@ const userSettingsSchema = z.object({
 type UserSettingsFormValues = z.infer<typeof userSettingsSchema>;
 
 const UserSettings = () => {
-  const { currentUser, supabaseUser, isLoading } = useAuth();
+  const { currentUser, supabaseUser, isLoading, refreshSession } = useAuth(); // Added refreshSession
 
   const {
     register,
@@ -36,7 +36,7 @@ const UserSettings = () => {
     defaultValues: {
       name: currentUser?.name || "",
       email: currentUser?.email || "",
-      receiveNotifications: true, // Default to true, will be loaded from profile later
+      receiveNotifications: currentUser?.receiveNotifications ?? true, // Use actual value or default
     },
   });
 
@@ -45,7 +45,7 @@ const UserSettings = () => {
       reset({
         name: currentUser.name,
         email: currentUser.email,
-        receiveNotifications: true, // Placeholder, needs to come from profile
+        receiveNotifications: currentUser.receiveNotifications,
       });
     }
   }, [currentUser, reset]);
@@ -71,7 +71,10 @@ const UserSettings = () => {
     // Update public.profiles table (for name, and other profile-specific settings like notifications)
     const { error: profileUpdateError } = await supabase
       .from('profiles')
-      .update({ name: data.name /* Add receive_notifications here when column exists */ })
+      .update({ 
+        name: data.name, 
+        receive_notifications: data.receiveNotifications 
+      })
       .eq('id', currentUser.id);
 
     if (profileUpdateError) {
@@ -81,8 +84,7 @@ const UserSettings = () => {
     }
 
     showSuccess("Settings saved successfully!");
-    // A full refresh of AuthContext might be needed to reflect changes immediately
-    // For now, the next page load or manual refresh will pick up changes.
+    refreshSession(); // Refresh session to update currentUser in context
   };
 
   if (isLoading) {
