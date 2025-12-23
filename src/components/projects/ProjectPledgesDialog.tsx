@@ -106,7 +106,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
   const fetchPledges = React.useCallback(async () => {
     setLoadingPledges(true);
     setError(null);
-    const { data, error } = await supabase
+    const { data, error } = (await supabase
       .from('project_pledges')
       .select(`
         id,
@@ -116,8 +116,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         status,
         profiles ( name )
       `)
-      .eq('project_id', projectId) // Filter by current project
-      as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
+      .eq('project_id', projectId)) as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null };
 
     if (error) {
       console.error("Error fetching pledges:", error);

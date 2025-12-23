@@ -86,34 +86,34 @@ const MemberContributions = () => {
       let totalExpected = 0;
 
       // Fetch income transactions for this member
-      const { data: incomeData, error: incomeError } = await supabase
+      const { data: incomeData, error: incomeError } = (await supabase
         .from('income_transactions')
         .select('amount')
         .eq('user_id', profile.id)
         .gte('date', startOfMonth.toISOString())
-        .lte('date', endOfMonth.toISOString());
+        .lte('date', endOfMonth.toISOString())) as { data: { amount: number }[] | null, error: PostgrestError | null };
 
       if (incomeError) console.error(`Error fetching income for ${profile.name}:`, incomeError);
       else totalContributed += (incomeData || []).reduce((sum, tx) => sum + tx.amount, 0);
 
       // Fetch project collections (actual contributions to projects)
-      const { data: collectionsData, error: collectionsError } = await supabase
+      const { data: collectionsData, error: collectionsError } = (await supabase
         .from('project_collections')
         .select('amount')
         .eq('member_id', profile.id)
         .gte('date', startOfMonth.toISOString())
-        .lte('date', endOfMonth.toISOString());
+        .lte('date', endOfMonth.toISOString())) as { data: { amount: number }[] | null, error: PostgrestError | null };
 
       if (collectionsError) console.error(`Error fetching collections for ${profile.name}:`, collectionsError);
       else totalContributed += (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
 
       // Fetch project pledges (expected contributions)
-      const { data: pledgesData, error: pledgesError } = await supabase
+      const { data: pledgesData, error: pledgesError } = (await supabase
         .from('project_pledges')
         .select('amount, status')
         .eq('member_id', profile.id)
         .gte('due_date', startOfMonth.toISOString())
-        .lte('due_date', endOfMonth.toISOString());
+        .lte('due_date', endOfMonth.toISOString())) as { data: { amount: number; status: string }[] | null, error: PostgrestError | null };
 
       if (pledgesError) console.error(`Error fetching pledges for ${profile.name}:`, pledgesError);
       else {

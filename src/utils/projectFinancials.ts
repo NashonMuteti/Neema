@@ -66,7 +66,7 @@ interface PledgeRowWithProfile {
 
 export const getProjectFinancialSummary = async (projectId: string): Promise<ProjectFinancialSummary> => {
   // Fetch collections
-  const { data: collectionsData, error: collectionsError } = await supabase
+  const { data: collectionsData, error: collectionsError } = (await supabase
     .from('project_collections')
     .select(`
       id,
@@ -77,8 +77,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
       payment_method,
       profiles ( name )
     `)
-    .eq('project_id', projectId) // Filter by project_id
-    as { data: CollectionRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
+    .eq('project_id', projectId)) as { data: CollectionRowWithProfile[] | null, error: PostgrestError | null };
 
   if (collectionsError) {
     console.error("Error fetching project collections:", collectionsError);
@@ -96,7 +95,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
   }));
 
   // Fetch pledges
-  const { data: pledgesData, error: pledgesError } = await supabase
+  const { data: pledgesData, error: pledgesError } = (await supabase
     .from('project_pledges')
     .select(`
       id,
@@ -107,8 +106,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
       status,
       profiles ( name )
     `)
-    .eq('project_id', projectId) // Filter by project_id
-    as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
+    .eq('project_id', projectId)) as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null };
 
   if (pledgesError) {
     console.error("Error fetching project pledges:", pledgesError);
