@@ -14,7 +14,6 @@ export interface UserRole {
   id: string;
   name: string;
   description: string;
-  memberUserIds: string[]; // IDs of users belonging to this role
   menuPrivileges: string[]; // New: Names of menu items this role has access to
 }
 
@@ -60,7 +59,6 @@ const AddEditUserRoleDialog: React.FC<AddEditUserRoleDialogProps> = ({
     const roleData: Omit<UserRole, 'id'> & { id?: string } = {
       name: name.trim(),
       description: description.trim(),
-      memberUserIds: initialData?.memberUserIds || [], // Preserve existing members or start empty
       menuPrivileges: selectedMenuPrivileges, // Include selected privileges
     };
     

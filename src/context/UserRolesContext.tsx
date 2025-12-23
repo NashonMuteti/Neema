@@ -32,19 +32,43 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       showError("Failed to load user roles.");
       setUserRoles([]);
     } else {
-      // Map Supabase data to our UserRoleType interface
-      const fetchedRoles: UserRoleType[] = data.map(role => ({
+      let fetchedRoles: UserRoleType[] = data.map(role => ({
         id: role.id,
         name: role.name,
         description: role.description || '',
-        memberUserIds: [], // This will be populated dynamically in UserRolesSettings
         menuPrivileges: role.menu_privileges || [],
       }));
-      
+
+      // Inject Super Admin privileges if current user is Super Admin
+      if (currentUser?.role === "Super Admin") {
+        fetchedRoles = fetchedRoles.map(role => {
+          if (role.name === "Super Admin") {
+            const currentPrivilegesSet = new Set(role.menuPrivileges);
+            const allPrivilegesSet = new Set(allPrivilegeNames);
+
+            // Check if current privileges are already a superset of allPrivilegeNames
+            const needsUpdate = allPrivilegeNames.some(p => !currentPrivilegesSet.has(p)) ||
+                                currentPrivilegesSet.size !== allPrivilegesSet.size; 
+
+            if (needsUpdate) {
+              const updatedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames])).sort();
+              // Only update if the sorted array of privileges is actually different
+              if (JSON.stringify(updatedPrivileges) !== JSON.stringify(role.menuPrivileges.sort())) {
+                return {
+                  ...role,
+                  menuPrivileges: updatedPrivileges
+                };
+              }
+            }
+          }
+          return role;
+        });
+      }
+
       setUserRoles(fetchedRoles);
       console.log("UserRolesContext: fetchedRoles", fetchedRoles); // Log fetched roles
     }
-  }, []);
+  }, [currentUser]); // Now fetchRoles depends on currentUser
 
   useEffect(() => {
     // Fetch roles only when auth is not loading and currentUser is available
@@ -52,59 +76,6 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       fetchRoles();
     }
   }, [fetchRoles, currentUser, authLoading]); // Add currentUser and authLoading to dependencies
-
-  // Effect to dynamically assign the current user's ID to their corresponding role
-  // This is now handled by the `profiles` table directly, so this logic is less critical here
-  // but can be used to ensure the `currentUser`'s role is always in the `userRoles` list.
-  useEffect(() => {
-    if (currentUser && userRoles.length > 0) {
-      setUserRoles(prevRoles => {
-        const updatedRoles = prevRoles.map(role => {
-          // If this is the current user's role, ensure their ID is conceptually associated
-          // (though not stored in the roles table itself)
-          if (role.name === currentUser.role) {
-            // For display purposes, we can add the current user's ID if it's not there
-            if (!role.memberUserIds.includes(currentUser.id)) {
-              return {
-                ...role,
-                memberUserIds: [...role.memberUserIds, currentUser.id]
-              };
-            }
-          } else {
-            // Ensure current user's ID is removed from other roles if they changed roles
-            return {
-              ...role,
-              memberUserIds: role.memberUserIds.filter(id => id !== currentUser.id)
-            };
-          }
-          return role;
-        });
-        return updatedRoles;
-      });
-    }
-  }, [currentUser, userRoles]);
-
-  // New effect to ensure Super Admin always has all privileges
-  useEffect(() => {
-    if (currentUser?.role === "Super Admin" && userRoles.length > 0) {
-      setUserRoles(prevRoles => {
-        const updatedRoles = prevRoles.map(role => {
-          if (role.name === "Super Admin") {
-            // Ensure Super Admin role has ALL privileges defined in allPrivilegeNames
-            const updatedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames]));
-            const newRole = {
-              ...role,
-              menuPrivileges: updatedPrivileges
-            };
-            console.log("UserRolesContext: Super Admin role after privilege injection", newRole); // Added log
-            return newRole;
-          }
-          return role;
-        });
-        return updatedRoles;
-      });
-    }
-  }, [currentUser, userRoles]);
 
   const addRole = async (role: Omit<UserRoleType, 'id'>) => {
     // Security check: Only Super Admins can manage roles
