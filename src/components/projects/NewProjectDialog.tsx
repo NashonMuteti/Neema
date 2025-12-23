@@ -109,34 +109,19 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
       projectThumbnailUrl = previewUrl;
     }
 
-    const { error } = await supabase
-      .from('projects')
-      .insert({
-        name: data.name,
-        description: data.description || "",
-        thumbnail_url: projectThumbnailUrl,
-        due_date: data.dueDate?.toISOString(),
-        member_contribution_amount: data.memberContributionAmount,
-        user_id: currentUser.id, // Assign current user as creator
-      });
-
-    if (error) {
-      console.error("Error adding project:", error);
-      showError("Failed to add project.");
-    } else {
-      onAddProject({
-        name: data.name,
-        description: data.description || "",
-        thumbnailUrl: projectThumbnailUrl,
-        dueDate: data.dueDate || undefined,
-        memberContributionAmount: data.memberContributionAmount || undefined,
-      });
-      showSuccess("Project added successfully!");
-      setIsOpen(false);
-      reset(); // Reset form fields
-      setSelectedFile(null);
-      setPreviewUrl(null);
-    }
+    // Call the parent's onAddProject function with the collected data
+    onAddProject({
+      name: data.name,
+      description: data.description || "",
+      thumbnailUrl: projectThumbnailUrl,
+      dueDate: data.dueDate || undefined,
+      memberContributionAmount: data.memberContributionAmount || undefined,
+    });
+    
+    setIsOpen(false);
+    reset(); // Reset form fields
+    setSelectedFile(null);
+    setPreviewUrl(null);
   };
 
   return (
