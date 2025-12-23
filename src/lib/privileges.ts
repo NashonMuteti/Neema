@@ -43,4 +43,5 @@ export const allPrivilegeNames = [
   "Manage System Currency",
   "Manage Member Fields",
   "Manage Database Maintenance",
+  "Manage Financial Accounts",
 ];

@@ -1,0 +1,371 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PlusCircle, Edit, Trash2, Wallet } from "lucide-react";
+import { showSuccess, showError } from "@/utils/toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
+
+interface FinancialAccount {
+  id: string;
+  name: string;
+  initial_balance: number;
+  current_balance: number;
+}
+
+const FinancialAccountsSettings = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const { canManageFinancialAccounts } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageFinancialAccounts: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageFinancialAccounts = currentUserPrivileges.includes("Manage Financial Accounts");
+    return { canManageFinancialAccounts };
+  }, [currentUser, definedRoles]);
+
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [newAccountName, setNewAccountName] = useState("");
+  const [newAccountInitialBalance, setNewAccountInitialBalance] = useState("0");
+
+  const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
+  const [editAccountName, setEditAccountName] = useState("");
+  const [editAccountInitialBalance, setEditAccountInitialBalance] = useState("");
+
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
+
+  const fetchAccounts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('financial_accounts')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching financial accounts:", error);
+      setError("Failed to load financial accounts.");
+      showError("Failed to load financial accounts.");
+      setAccounts([]);
+    } else {
+      setAccounts(data || []);
+    }
+    setLoading(false);
+  }, [currentUser]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  const handleAddAccount = async () => {
+    if (!currentUser) {
+      showError("You must be logged in to add an account.");
+      return;
+    }
+    if (!newAccountName.trim()) {
+      showError("Account name cannot be empty.");
+      return;
+    }
+    const initialBalance = parseFloat(newAccountInitialBalance);
+    if (isNaN(initialBalance) || initialBalance < 0) {
+      showError("Initial balance must be a non-negative number.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('financial_accounts')
+      .insert({
+        user_id: currentUser.id,
+        name: newAccountName.trim(),
+        initial_balance: initialBalance,
+        current_balance: initialBalance, // Current balance starts as initial balance
+      });
+
+    if (error) {
+      console.error("Error adding account:", error);
+      showError("Failed to add financial account.");
+    } else {
+      showSuccess("Financial account added successfully!");
+      setNewAccountName("");
+      setNewAccountInitialBalance("0");
+      fetchAccounts();
+    }
+  };
+
+  const handleEditAccount = async () => {
+    if (!editingAccount || !currentUser) {
+      showError("No account selected for editing or user not logged in.");
+      return;
+    }
+    if (!editAccountName.trim()) {
+      showError("Account name cannot be empty.");
+      return;
+    }
+    const initialBalance = parseFloat(editAccountInitialBalance);
+    if (isNaN(initialBalance) || initialBalance < 0) {
+      showError("Initial balance must be a non-negative number.");
+      return;
+    }
+
+    // Note: Updating initial_balance might imply a recalculation of current_balance
+    // For simplicity, we'll just update initial_balance and name.
+    // A more complex system might require a separate "adjust balance" function.
+    const { error } = await supabase
+      .from('financial_accounts')
+      .update({
+        name: editAccountName.trim(),
+        initial_balance: initialBalance,
+        // current_balance is not directly editable here, it's transaction-driven
+      })
+      .eq('id', editingAccount.id)
+      .eq('user_id', currentUser.id); // Ensure user owns the account
+
+    if (error) {
+      console.error("Error updating account:", error);
+      showError("Failed to update financial account.");
+    } else {
+      showSuccess("Financial account updated successfully!");
+      setEditingAccount(null);
+      fetchAccounts();
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletingAccountId || !currentUser) {
+      showError("No account selected for deletion or user not logged in.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('financial_accounts')
+      .delete()
+      .eq('id', deletingAccountId)
+      .eq('user_id', currentUser.id); // Ensure user owns the account
+
+    if (error) {
+      console.error("Error deleting account:", error);
+      showError("Failed to delete financial account.");
+    } else {
+      showSuccess("Financial account deleted successfully!");
+      setDeletingAccountId(null);
+      fetchAccounts();
+    }
+  };
+
+  const openEditDialog = (account: FinancialAccount) => {
+    setEditingAccount(account);
+    setEditAccountName(account.name);
+    setEditAccountInitialBalance(account.initial_balance.toString());
+  };
+
+  const openDeleteDialog = (accountId: string) => {
+    setDeletingAccountId(accountId);
+  };
+
+  if (loading) {
+    return (
+      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+        <CardHeader>
+          <CardTitle>Financial Accounts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">Loading financial accounts...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+        <CardHeader>
+          <CardTitle>Financial Accounts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-destructive">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-xl font-semibold flex items-center gap-2">
+          <Wallet className="h-5 w-5" /> Financial Accounts
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <p className="text-muted-foreground">
+          Manage the financial accounts used for tracking income, expenditure, and petty cash.
+        </p>
+
+        {/* Add New Account Section */}
+        <div className="border p-4 rounded-lg space-y-4">
+          <h3 className="text-lg font-semibold flex items-center">
+            <PlusCircle className="mr-2 h-5 w-5" /> Add New Account
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid gap-1.5 md:col-span-2">
+              <Label htmlFor="new-account-name">Account Name</Label>
+              <Input
+                id="new-account-name"
+                placeholder="e.g., Main Bank Account, Petty Cash"
+                value={newAccountName}
+                onChange={(e) => setNewAccountName(e.target.value)}
+                disabled={!canManageFinancialAccounts}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="new-account-balance">Initial Balance</Label>
+              <Input
+                id="new-account-balance"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={newAccountInitialBalance}
+                onChange={(e) => setNewAccountInitialBalance(e.target.value)}
+                disabled={!canManageFinancialAccounts}
+              />
+            </div>
+          </div>
+          <Button onClick={handleAddAccount} className="w-full" disabled={!canManageFinancialAccounts || !newAccountName.trim()}>
+            Add Account
+          </Button>
+        </div>
+
+        {/* Existing Accounts Table */}
+        <h3 className="text-lg font-semibold">Existing Accounts</h3>
+        {accounts.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px] border-collapse">
+              <thead>
+                <tr className="border-b">
+                  <th className="py-2 px-4 text-left text-sm font-medium text-muted-foreground">Account Name</th>
+                  <th className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Initial Balance</th>
+                  <th className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Current Balance</th>
+                  {canManageFinancialAccounts && <th className="py-2 px-4 text-center text-sm font-medium text-muted-foreground w-[120px]">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((account) => (
+                  <tr key={account.id} className="border-b last:border-b-0 hover:bg-muted/50">
+                    <td className="py-2 px-4 font-medium">{account.name}</td>
+                    <td className="py-2 px-4 text-right">${account.initial_balance.toFixed(2)}</td>
+                    <td className="py-2 px-4 text-right">${account.current_balance.toFixed(2)}</td>
+                    {canManageFinancialAccounts && (
+                      <td className="py-2 px-4 text-center">
+                        <div className="flex justify-center space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => openEditDialog(account)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(account.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-center mt-4">No financial accounts found. Add one above!</p>
+        )}
+      </CardContent>
+
+      {/* Edit Account Dialog */}
+      <AlertDialog open={!!editingAccount} onOpenChange={(open) => !open && setEditingAccount(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit Financial Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Make changes to the account details. Note: Changing initial balance will not automatically adjust current balance.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-account-name">Account Name</Label>
+              <Input
+                id="edit-account-name"
+                value={editAccountName}
+                onChange={(e) => setEditAccountName(e.target.value)}
+                disabled={!canManageFinancialAccounts}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-account-initial-balance">Initial Balance</Label>
+              <Input
+                id="edit-account-initial-balance"
+                type="number"
+                step="0.01"
+                value={editAccountInitialBalance}
+                onChange={(e) => setEditAccountInitialBalance(e.target.value)}
+                disabled={!canManageFinancialAccounts}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Current Balance</Label>
+              <Input value={editingAccount?.current_balance.toFixed(2) || "0.00"} disabled />
+              <p className="text-sm text-muted-foreground">Current balance is updated by transactions, not directly editable here.</p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleEditAccount} disabled={!canManageFinancialAccounts || !editAccountName.trim()}>
+              Save Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Account Dialog */}
+      <AlertDialog open={!!deletingAccountId} onOpenChange={(open) => !open && setDeletingAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the financial account and all associated transactions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={!canManageFinancialAccounts}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+};
+
+export default FinancialAccountsSettings;
