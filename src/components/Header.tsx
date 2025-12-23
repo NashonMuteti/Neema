@@ -17,6 +17,8 @@ const Header = () => {
   const { brandLogoUrl } = useBranding();
   const { viewingMemberName } = useViewingMember();
   
+  console.log("Header: Rendering. isLoading:", isLoading, "currentUser:", !!currentUser);
+  
   // Determine if the current user is an admin based on their role
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
   

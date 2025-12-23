@@ -199,6 +199,8 @@ const Sidebar = () => {
   const { currentUser, isLoading } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
+  console.log("Sidebar: Rendering. isLoading:", isLoading, "currentUser:", !!currentUser, "definedRoles count:", definedRoles.length);
+
   // These hooks must be called unconditionally at the top level of the component
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
