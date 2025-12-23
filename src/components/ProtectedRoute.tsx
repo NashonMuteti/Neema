@@ -12,10 +12,9 @@ interface ProtectedRouteProps {
 // Changed from React.FC to explicit props
 const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
   const { session, isLoading, currentUser } = useAuth();
-  console.log("ProtectedRoute: Rendering. isLoading:", isLoading, "session:", !!session, "currentUser:", !!currentUser);
 
   if (isLoading) {
-    console.log("ProtectedRoute: Still loading auth state.");
+    // Still checking auth state, render a loading indicator or null
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-muted-foreground">Loading...</p>
@@ -24,17 +23,17 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
   }
 
   if (!session) {
-    console.log("ProtectedRoute: No session found, redirecting to /login.");
+    // Not authenticated, redirect to login
     return <Navigate to="/login" replace />;
   }
 
   // If allowedRoles are specified, check if the user has one of them
   if (allowedRoles && currentUser && !allowedRoles.includes(currentUser.role)) {
-    console.log("ProtectedRoute: User authenticated but unauthorized role, redirecting to /.");
+    // User is authenticated but doesn't have the required role, redirect to a forbidden page or dashboard
     return <Navigate to="/" replace />; // Redirect to dashboard for unauthorized roles
   }
 
-  console.log("ProtectedRoute: User authenticated and authorized, rendering children/outlet.");
+  // Authenticated and authorized, render the children if provided, otherwise render nested routes via Outlet
   return children ? <>{children}</> : <Outlet />;
 };
 

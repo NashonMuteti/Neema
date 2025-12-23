@@ -17,16 +17,6 @@ interface AddMemberDialogProps {
   onAddMember: () => void; // Changed to trigger a re-fetch in parent
 }
 
-// Function to generate a strong random password
-const generateRandomPassword = (length = 12) => {
-  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return password;
-};
-
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
@@ -47,8 +37,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // State for the uploaded file
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null); // State for image preview
   const [enableLogin, setEnableLogin] = React.useState(false);
-  const [password, setPassword] = React.useState(""); // Changed from defaultPassword to password
-  const [generatedPassword, setGeneratedPassword] = React.useState<string | null>(null); // To display generated password
+  const [defaultPassword, setDefaultPassword] = React.useState("");
   const [selectedRole, setSelectedRole] = React.useState<string>(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Active");
   const [isOpen, setIsOpen] = React.useState(false);
@@ -94,17 +83,8 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       return;
     }
     
-    let finalPassword = password;
-    if (enableLogin && !password) {
-      // If login is enabled but no password provided, generate one
-      finalPassword = generateRandomPassword();
-      setGeneratedPassword(finalPassword); // Store to display to admin
-    } else if (!enableLogin) {
-      finalPassword = ""; // Ensure no password is sent if login is disabled
-    }
-    
-    if (enableLogin && !finalPassword) {
-      showError("Password is required if login is enabled.");
+    if (enableLogin && !defaultPassword) {
+      showError("Default password is required if login is enabled.");
       return;
     }
     
@@ -118,25 +98,12 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       // Validate file before upload
       try {
         fileUploadSchema.parse(selectedFile);
-        // --- START SUPABASE STORAGE UPLOAD LOGIC ---
-        // In a real app, you'd upload the file to Supabase Storage here.
-        // Example:
-        // const { data: uploadData, error: uploadError } = await supabase.storage
-        //   .from('avatars') // Your storage bucket name
-        //   .upload(`${userData.user.id}/${selectedFile.name}`, selectedFile, {
-        //     cacheControl: '3600',
-        //     upsert: false,
-        //   });
-        // if (uploadError) throw uploadError;
-        // const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(uploadData.path);
-        // memberImageUrl = publicUrlData.publicUrl;
-        // --- END SUPABASE STORAGE UPLOAD LOGIC ---
-        
-        // For now, using the preview URL as a placeholder for the uploaded URL
-        memberImageUrl = previewUrl || undefined; 
+        // In a real app, this is where you'd upload the file to a storage service
+        // and get a permanent URL. For now, we use the preview URL.
+        memberImageUrl = previewUrl || undefined;
       } catch (error) {
-        console.error("File validation error or upload failed:", error);
-        showError("Invalid file or failed to upload image. Please upload an image file less than 5MB.");
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
         return;
       }
     }
@@ -144,15 +111,11 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     // Create user in Supabase Auth using admin API
     const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
       email: email,
-      password: enableLogin ? finalPassword : undefined, // Only set password if login is enabled
+      password: enableLogin ? defaultPassword : undefined, // Only set password if login is enabled
       email_confirm: true, // Automatically confirm email for admin-created users
       user_metadata: {
         full_name: name,
         avatar_url: memberImageUrl,
-        // Pass role, status, enable_login to metadata for handle_new_user trigger
-        role: selectedRole, 
-        status: status, 
-        enable_login: enableLogin,
       },
     });
     
@@ -162,14 +125,29 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       return;
     }
     
-    // The handle_new_user trigger should handle the initial profile creation in public.profiles.
-    // If additional updates are needed beyond what the trigger handles, they would go here.
+    if (userData.user) {
+      // Update public.profiles table with role, status, and enable_login
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({
+          name: name,
+          email: email,
+          role: selectedRole,
+          status: status,
+          enable_login: enableLogin,
+          image_url: memberImageUrl,
+        })
+        .eq('id', userData.user.id);
+        
+      if (profileUpdateError) {
+        console.error("Error updating new member's profile:", profileUpdateError);
+        showError("Failed to set new member's role and status.");
+        return;
+      }
+    }
     
     onAddMember(); // Trigger parent to re-fetch members
     showSuccess("Member added successfully!");
-    if (generatedPassword) {
-      showSuccess(`Generated password for ${name}: ${generatedPassword}. Please communicate this securely.`);
-    }
     setIsOpen(false);
     
     // Reset form states
@@ -178,8 +156,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     setSelectedFile(null);
     setPreviewUrl(null);
     setEnableLogin(false);
-    setPassword("");
-    setGeneratedPassword(null);
+    setDefaultPassword("");
     setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
     setStatus("Active");
   };
@@ -293,51 +270,37 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
             <Checkbox
               id="enableLogin"
               checked={enableLogin}
-              onCheckedChange={(checked) => {
-                setEnableLogin(checked as boolean);
-                if (!checked) {
-                  setPassword(""); // Clear password if login is disabled
-                  setGeneratedPassword(null);
-                }
-              }}
+              onCheckedChange={(checked) => setEnableLogin(checked as boolean)}
               className="col-span-3"
               disabled={!canManageMembers}
             />
           </div>
           {enableLogin && (
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="password" className="text-right">
-                Password
+              <Label htmlFor="defaultPassword" className="text-right">
+                Default Password
               </Label>
               <Input
-                id="password"
+                id="defaultPassword"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Leave blank to auto-generate"
+                value={defaultPassword}
+                onChange={(e) => setDefaultPassword(e.target.value)}
                 className="col-span-3"
                 disabled={!canManageMembers}
               />
-            </div>
-          )}
-          {generatedPassword && (
-            <div className="col-span-full text-sm text-green-600 bg-green-50 p-2 rounded-md border border-green-200">
-              Generated Password: <span className="font-mono font-semibold">{generatedPassword}</span>
-              <p className="text-xs text-muted-foreground mt-1">Please communicate this securely to the user.</p>
             </div>
           )}
         </div>
         <div className="flex justify-end">
           <Button
             onClick={handleSubmit}
-            disabled={!name || !email || !canManageMembers || !selectedRole || (enableLogin && !password && !generatedPassword)}
+            disabled={!name || !email || (enableLogin && !defaultPassword) || !canManageMembers || !selectedRole}
           >
             <Upload className="mr-2 h-4 w-4" /> Save Member
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Image storage and serving require backend integration (e.g., Supabase Storage with RLS).
-          Client-side image validation is present, but server-side validation is also crucial.
+          Note: Image storage and serving, along with backend authentication for login, require backend integration (e.g., Supabase).
         </p>
       </DialogContent>
     </Dialog>

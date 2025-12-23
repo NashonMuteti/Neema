@@ -37,7 +37,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         id: role.id,
         name: role.name,
         description: role.description || '',
-        // Removed: memberUserIds: [], // This will be populated dynamically in UserRolesSettings
+        memberUserIds: [], // This will be populated dynamically in UserRolesSettings
         menuPrivileges: role.menu_privileges || [],
       }));
       
@@ -53,46 +53,58 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [fetchRoles, currentUser, authLoading]); // Add currentUser and authLoading to dependencies
 
-  // Removed: Effect to dynamically assign the current user's ID to their corresponding role
-  // This logic was causing an infinite loop and is not needed as member counts are fetched separately.
+  // Effect to dynamically assign the current user's ID to their corresponding role
+  // This is now handled by the `profiles` table directly, so this logic is less critical here
+  // but can be used to ensure the `currentUser`'s role is always in the `userRoles` list.
+  useEffect(() => {
+    if (currentUser && userRoles.length > 0) {
+      setUserRoles(prevRoles => {
+        const updatedRoles = prevRoles.map(role => {
+          // If this is the current user's role, ensure their ID is conceptually associated
+          // (though not stored in the roles table itself)
+          if (role.name === currentUser.role) {
+            // For display purposes, we can add the current user's ID if it's not there
+            if (!role.memberUserIds.includes(currentUser.id)) {
+              return {
+                ...role,
+                memberUserIds: [...role.memberUserIds, currentUser.id]
+              };
+            }
+          } else {
+            // Ensure current user's ID is removed from other roles if they changed roles
+            return {
+              ...role,
+              memberUserIds: role.memberUserIds.filter(id => id !== currentUser.id)
+            };
+          }
+          return role;
+        });
+        return updatedRoles;
+      });
+    }
+  }, [currentUser, userRoles]);
 
-  // New effect to ensure Super Admin always has all privileges, optimized to prevent infinite loops
+  // New effect to ensure Super Admin always has all privileges
   useEffect(() => {
     if (currentUser?.role === "Super Admin" && userRoles.length > 0) {
       setUserRoles(prevRoles => {
-        let rolesChanged = false;
         const updatedRoles = prevRoles.map(role => {
           if (role.name === "Super Admin") {
-            const currentPrivilegesSet = new Set(role.menuPrivileges);
-            const allPrivilegesSet = new Set(allPrivilegeNames);
-            
-            // Check if current privileges already include allPrivilegeNames
-            const hasAllPrivileges = allPrivilegesSet.size === currentPrivilegesSet.size &&
-                                     Array.from(allPrivilegesSet).every(priv => currentPrivilegesSet.has(priv));
-
-            if (!hasAllPrivileges) {
-              // Only update if privileges are actually missing
-              const mergedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames]));
-              rolesChanged = true; // Mark that a change occurred
-              const newRole = {
-                ...role,
-                menuPrivileges: mergedPrivileges
-              };
-              console.log("UserRolesContext: Super Admin role privileges updated.", newRole);
-              return newRole;
-            }
+            // Ensure Super Admin role has ALL privileges defined in allPrivilegeNames
+            const updatedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames]));
+            const newRole = {
+              ...role,
+              menuPrivileges: updatedPrivileges
+            };
+            console.log("UserRolesContext: Super Admin role after privilege injection", newRole); // Added log
+            return newRole;
           }
-          return role; // Return original role if no change needed
+          return role;
         });
-        
-        // Only update state if any role object in the array actually changed
-        if (rolesChanged) {
-          return updatedRoles;
-        }
-        return prevRoles; // No actual changes, return previous state
+        return updatedRoles;
       });
     }
-  }, [currentUser, userRoles]); // `userRoles` is a dependency here, but the internal check prevents infinite loop
+  }, [currentUser, userRoles]);
 
   const addRole = async (role: Omit<UserRoleType, 'id'>) => {
     // Security check: Only Super Admins can manage roles

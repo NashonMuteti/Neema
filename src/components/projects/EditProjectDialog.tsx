@@ -31,7 +31,6 @@ import { format } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
-import { fileUploadSchema } from "@/utils/security";
 
 interface Project {
   id: string;
@@ -94,17 +93,8 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validate file before processing
-      try {
-        fileUploadSchema.parse(file);
-        setSelectedFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
-      } catch (error) {
-        console.error("File validation error:", error);
-        showError("Invalid file. Please upload an image file less than 5MB.");
-        event.target.value = ""; // Reset the input
-        return;
-      }
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
     } else {
       setSelectedFile(null);
       setPreviewUrl(project.thumbnailUrl || null);
@@ -128,31 +118,9 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
     }
 
     let projectThumbnailUrl: string | undefined = project.thumbnailUrl;
-    if (selectedFile) {
-      // Validate file before upload
-      try {
-        fileUploadSchema.parse(selectedFile);
-        // --- START SUPABASE STORAGE UPLOAD LOGIC ---
-        // In a real app, you'd upload the file to Supabase Storage here.
-        // Example:
-        // const { data: uploadData, error: uploadError } = await supabase.storage
-        //   .from('project-thumbnails') // Your storage bucket name
-        //   .upload(`${project.id}/${Date.now()}_${selectedFile.name}`, selectedFile, {
-        //     cacheControl: '3600',
-        //     upsert: true, // Use upsert to replace existing thumbnail
-        //   });
-        // if (uploadError) throw uploadError;
-        // const { data: publicUrlData } = supabase.storage.from('project-thumbnails').getPublicUrl(uploadData.path);
-        // projectThumbnailUrl = publicUrlData.publicUrl;
-        // --- END SUPABASE STORAGE UPLOAD LOGIC ---
-        
-        // For now, using the preview URL as a placeholder for the uploaded URL
-        projectThumbnailUrl = previewUrl;
-      } catch (error) {
-        console.error("File validation error or upload failed:", error);
-        showError("Invalid file or failed to upload image. Please upload an image file less than 5MB.");
-        return;
-      }
+    if (selectedFile && previewUrl) {
+      projectThumbnailUrl = previewUrl;
+      // In a real app, you'd upload the file to Supabase Storage here
     } else if (!selectedFile && !project.thumbnailUrl) {
       projectThumbnailUrl = undefined;
     }
@@ -189,6 +157,9 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" disabled={!canManageProjects}>Edit</Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Project</DialogTitle>
@@ -308,8 +279,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
           <Button onClick={handleSubmit} disabled={!canManageProjects}>Save Changes</Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Image storage and serving require backend integration (e.g., Supabase Storage with RLS).
-          Client-side image validation is present, but server-side validation is also crucial.
+          Note: Image storage and serving require backend integration.
         </p>
       </DialogContent>
     </Dialog>

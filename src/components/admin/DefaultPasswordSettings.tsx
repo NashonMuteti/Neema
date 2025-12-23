@@ -19,7 +19,7 @@ const DefaultPasswordSettings = () => {
   const canManageDefaultPassword = currentUserPrivileges.includes("Manage Default Password");
 
   // In a real application, this would be fetched from a backend setting
-  const [defaultPassword, setDefaultPassword] = React.useState(""); // Start empty, as it's a configurable setting
+  const [defaultPassword, setDefaultPassword] = React.useState("admin.123$"); // Initial default password
 
   const handleSaveDefaultPassword = () => {
     if (!defaultPassword.trim()) {
@@ -27,7 +27,6 @@ const DefaultPasswordSettings = () => {
       return;
     }
     // In a real app, this would send the defaultPassword to the backend
-    // to be stored securely (e.g., in Supabase secrets or a configuration table).
     console.log("Saving system default password:", defaultPassword);
     showSuccess("System default password saved successfully!");
   };
@@ -39,8 +38,7 @@ const DefaultPasswordSettings = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-muted-foreground">
-          Set a default password that can be used when creating new user accounts with login enabled,
-          if no specific password is provided.
+          Set a default password that can be used when creating new user accounts with login enabled.
         </p>
         <div className="grid w-full max-w-sm items-center gap-1.5">
           <Label htmlFor="default-password">System Default Password</Label>
