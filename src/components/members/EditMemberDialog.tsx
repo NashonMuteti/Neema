@@ -53,7 +53,6 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(member.imageUrl || null); // New state for image preview
   const [enableLogin, setEnableLogin] = React.useState(member.enableLogin);
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(member.status);
-  const [defaultPassword, setDefaultPassword] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -64,7 +63,6 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       setPreviewUrl(member.imageUrl || null); // Reset preview to current image
       setEnableLogin(member.enableLogin);
       setStatus(member.status);
-      setDefaultPassword("");
     }
     // Cleanup object URL when component unmounts or dialog closes
     return () => {
@@ -99,14 +97,14 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       memberImageUrl = undefined;
     }
 
-    // Update Supabase auth user metadata (for name and avatar)
+    // Update Supabase auth user metadata (for full_name)
     const { error: authUpdateError } = await supabase.auth.updateUser({
       email: email, // Can update email if needed, but usually handled by Supabase Auth UI
       data: { full_name: name, avatar_url: memberImageUrl },
     });
 
     if (authUpdateError) {
-      console.error("Error updating Supabase Auth user:", authUpdateError);
+      console.error("Error updating user metadata:", authUpdateError);
       showError("Failed to update member authentication details.");
       return;
     }
@@ -121,17 +119,6 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       console.error("Error updating member profile:", profileUpdateError);
       showError("Failed to update member profile details.");
       return;
-    }
-
-    if (defaultPassword) {
-      const { error: passwordResetError } = await supabase.auth.updateUser({
-        password: defaultPassword,
-      });
-      if (passwordResetError) {
-        console.error("Error resetting password:", passwordResetError);
-        showError("Failed to reset member password.");
-        return;
-      }
     }
 
     onEditMember(); // Trigger parent to re-fetch members
@@ -209,22 +196,6 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               disabled={!canManageMembers}
             />
           </div>
-          {enableLogin && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="defaultPassword" className="text-right">
-                Reset Password
-              </Label>
-              <Input
-                id="defaultPassword"
-                type="password"
-                value={defaultPassword}
-                onChange={(e) => setDefaultPassword(e.target.value)}
-                placeholder="Leave blank to keep current password"
-                className="col-span-3"
-                disabled={!canManageMembers}
-              />
-            </div>
-          )}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="status" className="text-right">
               Status
@@ -248,7 +219,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
           <Button onClick={handleSubmit} disabled={!canManageMembers}>Save Changes</Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Image storage and serving, along with backend authentication for login, require backend integration (e.g., Supabase).
+          Note: Password resets must be initiated separately. Image storage and serving require backend integration (e.g., Supabase).
         </p>
       </DialogContent>
     </Dialog>

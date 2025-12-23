@@ -37,7 +37,6 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // State for the uploaded file
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null); // State for image preview
   const [enableLogin, setEnableLogin] = React.useState(false);
-  const [defaultPassword, setDefaultPassword] = React.useState("");
   const [selectedRole, setSelectedRole] = React.useState<string>(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Active");
   const [isOpen, setIsOpen] = React.useState(false);
@@ -83,11 +82,6 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       return;
     }
     
-    if (enableLogin && !defaultPassword) {
-      showError("Default password is required if login is enabled.");
-      return;
-    }
-    
     if (!selectedRole) {
       showError("A role must be selected for the new member.");
       return;
@@ -111,12 +105,13 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     // Create user in Supabase Auth using admin API
     const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
       email: email,
-      password: enableLogin ? defaultPassword : undefined, // Only set password if login is enabled
+      // No password set here. User will use "Forgot Password" or email verification flow.
       email_confirm: true, // Automatically confirm email for admin-created users
       user_metadata: {
         full_name: name,
         avatar_url: memberImageUrl,
       },
+      emailRedirectTo: window.location.origin + '/login', // Redirect to login after email verification
     });
     
     if (createUserError) {
@@ -156,7 +151,6 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     setSelectedFile(null);
     setPreviewUrl(null);
     setEnableLogin(false);
-    setDefaultPassword("");
     setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
     setStatus("Active");
   };
@@ -275,32 +269,17 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               disabled={!canManageMembers}
             />
           </div>
-          {enableLogin && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="defaultPassword" className="text-right">
-                Default Password
-              </Label>
-              <Input
-                id="defaultPassword"
-                type="password"
-                value={defaultPassword}
-                onChange={(e) => setDefaultPassword(e.target.value)}
-                className="col-span-3"
-                disabled={!canManageMembers}
-              />
-            </div>
-          )}
         </div>
         <div className="flex justify-end">
           <Button
             onClick={handleSubmit}
-            disabled={!name || !email || (enableLogin && !defaultPassword) || !canManageMembers || !selectedRole}
+            disabled={!name || !email || !canManageMembers || !selectedRole}
           >
             <Upload className="mr-2 h-4 w-4" /> Save Member
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Image storage and serving, along with backend authentication for login, require backend integration (e.g., Supabase).
+          Note: For new members, an email will be sent to set their password. Image storage and serving require backend integration (e.g., Supabase).
         </p>
       </DialogContent>
     </Dialog>

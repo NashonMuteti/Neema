@@ -57,7 +57,6 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [role, setRole] = React.useState<string>(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : ""));
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(initialData?.status || "Active");
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
-  const [defaultPassword, setDefaultPassword] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
 
@@ -68,7 +67,6 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       setRole(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : ""));
       setStatus(initialData?.status || "Active");
       setEnableLogin(initialData?.enableLogin || false);
-      setDefaultPassword("");
       setSelectedFile(null);
       setPreviewUrl(initialData?.imageUrl || null);
     }
@@ -97,11 +95,6 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       return;
     }
     
-    if (enableLogin && !initialData && !defaultPassword) {
-      showError("Default password is required if login is enabled for a new user.");
-      return;
-    }
-    
     if (!role) {
       showError("User Role is required.");
       return;
@@ -118,7 +111,6 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       // Editing existing user in Supabase Auth and profiles table
       const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
         email: email,
-        password: defaultPassword || undefined,
         user_metadata: {
           full_name: name,
           avatar_url: userImageUrl,
@@ -152,12 +144,13 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       // Add new user to Supabase Auth and profiles table
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: email,
-        password: defaultPassword || "default_secure_password",
+        // No password set here. User will use "Forgot Password" or email verification flow.
         options: {
           data: {
             full_name: name,
             avatar_url: userImageUrl,
           },
+          emailRedirectTo: window.location.origin + '/login', // Redirect to login after email verification
         },
       });
       
@@ -304,22 +297,6 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               disabled={!canManageUserProfiles}
             />
           </div>
-          {enableLogin && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="defaultPassword" className="text-right">
-                {initialData ? "Reset Password" : "Default Password"}
-              </Label>
-              <Input 
-                id="defaultPassword" 
-                type="password" 
-                value={defaultPassword} 
-                onChange={(e) => setDefaultPassword(e.target.value)} 
-                placeholder={initialData ? "Leave blank to keep current" : "Enter default password"} 
-                className="col-span-3" 
-                disabled={!canManageUserProfiles}
-              />
-            </div>
-          )}
         </div>
         <div className="flex justify-end">
           <Button 
@@ -331,7 +308,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: Image storage and serving, along with backend authentication for login, require backend integration (e.g., Supabase).
+          Note: For new users, an email will be sent to set their password. For existing users, password resets must be initiated separately.
         </p>
       </DialogContent>
     </Dialog>

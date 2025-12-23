@@ -113,9 +113,9 @@ const AdminSettings = () => {
         Manage application-wide settings, security, customization, and user profiles.
       </p>
       <Tabs defaultValue={tabsToShow[0]?.value} className="w-full">
-        <TabsList className="grid w-full grid-cols-4"> {/* Adjusted grid-cols based on expected tabs */}
+        <TabsList className="flex flex-wrap h-auto p-1 gap-1"> {/* Adjusted for responsiveness */}
           {tabsToShow.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
+            <TabsTrigger key={tab.value} value={tab.value} className="flex-grow">
               {tab.label}
             </TabsTrigger>
           ))}
