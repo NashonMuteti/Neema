@@ -189,9 +189,6 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={!canManageProjects}>Edit</Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Project</DialogTitle>

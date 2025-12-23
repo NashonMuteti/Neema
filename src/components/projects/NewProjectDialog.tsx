@@ -172,9 +172,6 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button disabled={!canManageProjects}>New Project</Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>

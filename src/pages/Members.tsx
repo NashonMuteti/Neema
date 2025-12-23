@@ -30,7 +30,7 @@ import { useAuth, User } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemberManagement } from "@/hooks/use-member-management"; // Import the new hook
+import { useMemberManagement } => "@/hooks/use-member-management"; // Import the new hook
 import { getStatusBadgeClasses } from "@/utils/memberUtils"; // Import the utility function
 
 const Members = () => {

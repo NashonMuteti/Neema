@@ -143,7 +143,7 @@ export const useMemberContributions = ({ userId, isDetailPage = false }: UseMemb
 
     if (incomeError || expenditureError || pettyCashError) {
       console.error("Error fetching contributions:", incomeError || expenditureError || pettyCashError);
-      setError("Failed to load member's contributions.");
+      showError("Failed to load member's contributions.");
       setMemberContributions([]);
     } else {
       const allContributions: MemberContribution[] = [];

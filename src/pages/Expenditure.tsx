@@ -67,7 +67,7 @@ const Expenditure = () => {
           expenditureAccount={expenditureAccount}
           setExpenditureAccount={setExpenditureAccount}
           expenditurePurpose={expenditurePurpose}
-          setExpenditurePurpose={setExpenditurePurpose}
+          setExpenditurePurpose={expenditurePurpose}
           handlePostExpenditure={handlePostExpenditure}
           canManageExpenditure={canManageExpenditure}
         />

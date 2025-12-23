@@ -99,7 +99,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       memberImageUrl = undefined;
     }
 
-    // Update Supabase auth user metadata (for full_name and avatar_url)
+    // Update Supabase auth user metadata (for full_name)
     const { error: authUpdateError } = await supabase.auth.admin.updateUserById(member.id, {
       email: email,
       password: defaultPassword || undefined, // Only update password if provided
