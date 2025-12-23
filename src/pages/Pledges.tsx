@@ -37,7 +37,6 @@ import { PostgrestError } from "@supabase/supabase-js";
 interface Member {
   id: string;
   name: string;
-  email: string;
 }
 
 interface Project {

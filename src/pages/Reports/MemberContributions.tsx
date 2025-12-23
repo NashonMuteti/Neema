@@ -17,7 +17,6 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -182,12 +181,18 @@ const MemberContributions = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectLabel>Month</SelectLabel>
-                      {months.map((month) => (
-                        <SelectItem key={month.value} value={month.value}>
-                          {month.label}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="0">January</SelectItem>
+                      <SelectItem value="1">February</SelectItem>
+                      <SelectItem value="2">March</SelectItem>
+                      <SelectItem value="3">April</SelectItem>
+                      <SelectItem value="4">May</SelectItem>
+                      <SelectItem value="5">June</SelectItem>
+                      <SelectItem value="6">July</SelectItem>
+                      <SelectItem value="7">August</SelectItem>
+                      <SelectItem value="8">September</SelectItem>
+                      <SelectItem value="9">October</SelectItem>
+                      <SelectItem value="10">November</SelectItem>
+                      <SelectItem value="11">December</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -199,12 +204,11 @@ const MemberContributions = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectLabel>Year</SelectLabel>
-                      {years.map((year) => (
-                        <SelectItem key={year.value} value={year.value}>
-                          {year.label}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value={(currentYear - 2).toString()}>{(currentYear - 2)}</SelectItem>
+                      <SelectItem value={(currentYear - 1).toString()}>{(currentYear - 1)}</SelectItem>
+                      <SelectItem value={currentYear.toString()}>{currentYear}</SelectItem>
+                      <SelectItem value={(currentYear + 1).toString()}>{(currentYear + 1)}</SelectItem>
+                      <SelectItem value={(currentYear + 2).toString()}>{(currentYear + 2)}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>

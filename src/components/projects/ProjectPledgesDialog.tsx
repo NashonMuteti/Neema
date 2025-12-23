@@ -115,7 +115,9 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         due_date,
         status,
         profiles ( name )
-      `) as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
+      `)
+      .eq('project_id', projectId) // Filter by current project
+      as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
 
     if (error) {
       console.error("Error fetching pledges:", error);

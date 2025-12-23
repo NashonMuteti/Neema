@@ -53,7 +53,7 @@ interface CollectionRowWithProfile {
   profiles: { name: string } | null; // Joined profile data
 }
 
-// Define the expected structure of a pledge row with joined profile data
+// Define the expected structure of a pledge row with joined profile and project data
 interface PledgeRowWithProfile {
   id: string;
   project_id: string;
@@ -76,7 +76,9 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
       date,
       payment_method,
       profiles ( name )
-    `) as { data: CollectionRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
+    `)
+    .eq('project_id', projectId) // Filter by project_id
+    as { data: CollectionRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
 
   if (collectionsError) {
     console.error("Error fetching project collections:", collectionsError);
@@ -104,7 +106,9 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
       due_date,
       status,
       profiles ( name )
-    `) as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
+    `)
+    .eq('project_id', projectId) // Filter by project_id
+    as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null }; // Explicitly cast the result
 
   if (pledgesError) {
     console.error("Error fetching project pledges:", pledgesError);
@@ -124,11 +128,11 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
   // Fetch project budget (assuming projects table exists and has budget)
   const { data: projectData, error: projectError } = await supabase
     .from('projects')
-    .select('budget')
+    .select('member_contribution_amount') // Changed to member_contribution_amount as budget is not directly available
     .eq('id', projectId)
     .single();
 
-  const totalBudget = projectData?.budget || 0;
+  const totalBudget = projectData?.member_contribution_amount || 0; // Use member_contribution_amount as a proxy for budget
 
   const totalCollections = collections.reduce((sum, c) => sum + c.amount, 0);
   const totalPledged = pledges.reduce((sum, p) => sum + p.amount, 0); // Corrected from totalPledges

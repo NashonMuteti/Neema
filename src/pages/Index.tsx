@@ -212,10 +212,23 @@ const Index = () => {
 
         const actual = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
 
+        // Fetch pledges for the project
+        const { data: pledgesData, error: pledgesError } = await supabase
+          .from('project_pledges')
+          .select('amount')
+          .eq('project_id', project.id)
+          .eq('status', 'Paid'); // Only count paid pledges as actual contributions
+
+        if (pledgesError) {
+          console.error(`Error fetching pledges for project ${project.name}:`, pledgesError);
+        }
+
+        const actualPledges = (pledgesData || []).reduce((sum, p) => sum + p.amount, 0);
+
         projectContributions.push({
           name: project.name,
           expected: expected,
-          actual: actual,
+          actual: actual + actualPledges, // Sum collections and paid pledges for actual
         });
       }
       setContributionsProgressData(projectContributions);
