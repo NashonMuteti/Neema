@@ -197,43 +197,7 @@ const UserRolesSettings = () => {
         </CardContent>
       </Card>
       
-      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold">Assign Users to Roles</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground mb-4">
-            View which users belong to which roles. User roles can be changed in the "User Management" section.
-          </p>
-          {loadingUsers ? (
-            <p className="text-muted-foreground text-center">Loading users...</p>
-          ) : allUsers.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Assigned Role</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allUsers.map(user => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.role}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-muted-foreground text-center mt-4">No users found.</p>
-          )}
-          <p className="text-sm text-muted-foreground mt-4">
-            To change a user's role, navigate to the "User Management" tab.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Removed the "Assign Users to Roles" card as requested */}
       
       <AddEditUserRoleDialog 
         isOpen={isAddEditRoleDialogOpen} 

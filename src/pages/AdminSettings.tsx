@@ -9,7 +9,6 @@ import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings";
 import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization";
 import UserRolesSettings from "@/components/admin/UserRolesSettings";
 import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings";
-import DefaultPasswordSettings from "@/components/admin/DefaultPasswordSettings";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 
@@ -40,8 +39,6 @@ const AdminSettings = () => {
                            currentUser?.role === "Super Admin";
   const canManageDatabaseMaintenance = currentUserPrivileges.includes("Manage Database Maintenance") || 
                                       currentUser?.role === "Super Admin";
-  const canManageDefaultPassword = currentUserPrivileges.includes("Manage Default Password") || 
-                                  currentUser?.role === "Super Admin";
   const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances") || 
                                currentUser?.role === "Super Admin";
   
@@ -58,7 +55,6 @@ const AdminSettings = () => {
   console.log("  canManageReportsTemplates:", canManageReportsTemplates);
   console.log("  canManageSecurity:", canManageSecurity);
   console.log("  canManageDatabaseMaintenance:", canManageDatabaseMaintenance);
-  console.log("  canManageDefaultPassword:", canManageDefaultPassword);
   console.log("  canInitializeBalances:", canInitializeBalances);
   // --- END DEBUG LOGS ---
 
@@ -76,20 +72,17 @@ const AdminSettings = () => {
   
   // Determine which tabs to show based on privileges
   const tabsToShow = [];
-  if (canManageAppCustomization || canManageSystemCurrency || canManageDefaultPassword) {
+  if (canManageAppCustomization || canManageSystemCurrency) {
     tabsToShow.push({ value: "general", label: "General" });
   }
-  if (canManageSecurity || canManageDefaultPassword) {
+  if (canManageSecurity) {
     tabsToShow.push({ value: "security", label: "Security" });
-  }
-  if (canManageAppCustomization) {
-    tabsToShow.push({ value: "app-customization", label: "App Customization" });
   }
   if (canManageMemberFields) {
     tabsToShow.push({ value: "member-fields", label: "Member Fields" });
   }
   if (canManageUserProfiles) {
-    tabsToShow.push({ value: "user-profiles", label: "User Management" });
+    tabsToShow.push({ value: "user-management", label: "User Management" });
   }
   if (canManageUserRoles) {
     tabsToShow.push({ value: "user-roles", label: "User Roles" });
@@ -120,7 +113,7 @@ const AdminSettings = () => {
         Manage application-wide settings, security, customization, and user profiles.
       </p>
       <Tabs defaultValue={tabsToShow[0]?.value} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-4"> {/* Adjusted grid-cols based on expected tabs */}
           {tabsToShow.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
@@ -131,27 +124,16 @@ const AdminSettings = () => {
           <TabsContent key={tab.value} value={tab.value} className="space-y-6">
             {tab.value === "general" && (
               <>
-                <SystemCurrencySettings />
-                <DefaultPasswordSettings />
+                {canManageAppCustomization && <AppCustomization />}
+                {canManageSystemCurrency && <SystemCurrencySettings />}
               </>
             )}
-            {tab.value === "security" && (
-              <>
-                <SecuritySettings />
-                <DefaultPasswordSettings />
-              </>
-            )}
-            {tab.value === "app-customization" && <AppCustomization />}
+            {tab.value === "security" && <SecuritySettings />}
             {tab.value === "member-fields" && <MemberFieldCustomization />}
-            {tab.value === "user-profiles" && <UserProfileSettingsAdmin />}
+            {tab.value === "user-management" && <UserProfileSettingsAdmin />}
             {tab.value === "user-roles" && <UserRolesSettings />}
             {tab.value === "reports-templates" && <ReportsTemplateCustomization />}
-            {tab.value === "maintenance" && (
-              <>
-                <DatabaseUpdateSettings />
-                {/* InitializeBalances is handled within the InitializeBalances page */}
-              </>
-            )}
+            {tab.value === "maintenance" && <DatabaseUpdateSettings />}
           </TabsContent>
         ))}
       </Tabs>

@@ -43,5 +43,4 @@ export const allPrivilegeNames = [
   "Manage System Currency",
   "Manage Member Fields",
   "Manage Database Maintenance",
-  "Manage Default Password", // New privilege for default password setting
 ];

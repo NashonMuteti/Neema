@@ -24,6 +24,7 @@ const availableCurrencies = [
   { value: "GBP", label: "British Pound (£)" },
   { value: "JPY", label: "Japanese Yen (¥)" },
   { value: "KES", label: "Kenyan Shilling (KSh)" },
+  { value: "TZS", label: "Tanzania Shilling (Tsh)" }, // Added Tanzania Shilling
   { value: "CAD", label: "Canadian Dollar (C$)" },
   { value: "AUD", label: "Australian Dollar (A$)" },
 ];

@@ -22,74 +22,19 @@ const DatabaseUpdateSettings = () => {
     return { canManageDatabaseMaintenance };
   }, [currentUser, definedRoles]);
 
-  const handleCheckAndUpdateDatabase = async () => {
-    const toastId = showLoading("Checking and updating database fields...");
-
-    // Simulate an asynchronous database check and update operation
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network request/processing
-
-      // Simulate success or failure randomly for demonstration
-      const isSuccess = Math.random() > 0.3; // 70% chance of success
-
-      if (isSuccess) {
-        dismissToast(toastId);
-        showSuccess("Database fields checked and updated successfully!");
-        console.log("Database update successful.");
-      } else {
-        dismissToast(toastId);
-        showError("Database update failed: Field mismatch detected. Please review logs.");
-        console.error("Database update failed: Field mismatch detected.");
-      }
-    } catch (error) {
-      dismissToast(toastId);
-      showError("An unexpected error occurred during database update.");
-      console.error("Unexpected error during database update:", error);
-    }
+  const handleCheckAndUpdateDatabase = () => {
+    showError("Database field checks and updates require backend implementation.");
+    console.log("Attempted to check and update database fields (requires backend).");
   };
 
-  const handleBackupDatabase = async () => {
-    const toastId = showLoading("Initiating database backup...");
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2500)); // Simulate backup process
-      const isSuccess = Math.random() > 0.2; // 80% chance of success
-
-      if (isSuccess) {
-        dismissToast(toastId);
-        showSuccess("Database backup completed successfully!");
-        console.log("Database backup successful.");
-      } else {
-        dismissToast(toastId);
-        showError("Database backup failed. Please check server logs.");
-        console.error("Database backup failed.");
-      }
-    } catch (error) {
-      dismissToast(toastId);
-      showError("An unexpected error occurred during database backup.");
-      console.error("Unexpected error during database backup:", error);
-    }
+  const handleBackupDatabase = () => {
+    showError("Database backup functionality requires backend implementation.");
+    console.log("Attempted to initiate database backup (requires backend).");
   };
 
-  const handleRestoreDatabase = async () => {
-    const toastId = showLoading("Initiating database restore...");
-    try {
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate restore process
-      const isSuccess = Math.random() > 0.5; // 50% chance of success
-
-      if (isSuccess) {
-        dismissToast(toastId);
-        showSuccess("Database restored successfully from latest backup!");
-        console.log("Database restore successful.");
-      } else {
-        dismissToast(toastId);
-        showError("Database restore failed. Please check server logs and backup integrity.");
-        console.error("Database restore failed.");
-      }
-    } catch (error) {
-      dismissToast(toastId);
-      showError("An unexpected error occurred during database restore.");
-      console.error("Unexpected error during database restore:", error);
-    }
+  const handleRestoreDatabase = () => {
+    showError("Database restore functionality requires backend implementation.");
+    console.log("Attempted to initiate database restore (requires backend).");
   };
 
   return (
@@ -112,8 +57,8 @@ const DatabaseUpdateSettings = () => {
             <Upload className="mr-2 h-4 w-4" /> Restore Database
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Note: These are simulated operations. Actual database interaction requires backend integration.
+        <p className="text-sm text-destructive-foreground bg-destructive/10 p-3 rounded-md border border-destructive">
+          <span className="font-bold">Note:</span> These operations require secure backend integration (e.g., Supabase Edge Functions or a custom API) and cannot be performed directly from the client-side.
         </p>
       </CardContent>
     </Card>
