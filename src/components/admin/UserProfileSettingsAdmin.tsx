@@ -72,6 +72,7 @@ const UserProfileSettingsAdmin = () => {
         status: p.status as "Active" | "Inactive" | "Suspended",
         enableLogin: p.enable_login ?? false,
         imageUrl: p.image_url || undefined,
+        receiveNotifications: p.receive_notifications ?? true, // Added missing property
       })));
     }
     

@@ -39,10 +39,17 @@ const SystemCurrencySettings = () => {
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   const canManageSystemCurrency = currentUserPrivileges.includes("Manage System Currency");
 
+  // Local state to hold the selected value before saving to context/backend
+  const [localCurrencyCode, setLocalCurrencyCode] = React.useState(currency.code);
+
+  React.useEffect(() => {
+    setLocalCurrencyCode(currency.code);
+  }, [currency.code]);
+
   const handleSaveCurrency = async () => {
-    await setCurrency(currency.code); // Use the code from the context state
-    showSuccess(`System currency set to ${currency.code} successfully!`);
-    console.log("Saving system currency:", currency.code);
+    await setCurrency(localCurrencyCode); // Use the local state value to update context
+    showSuccess(`System currency set to ${localCurrencyCode} successfully!`);
+    console.log("Saving system currency:", localCurrencyCode);
   };
 
   return (
@@ -57,8 +64,8 @@ const SystemCurrencySettings = () => {
         <div className="grid w-full max-w-sm items-center gap-1.5">
           <Label htmlFor="system-currency">Default Currency</Label>
           <Select 
-            value={currency.code} // Use currency.code from context
-            onValueChange={(value) => setCurrencyState({ code: value, symbol: currencyMap[value] || "$" })} // Update local state for immediate feedback
+            value={localCurrencyCode} // Use local state for the controlled component
+            onValueChange={setLocalCurrencyCode} // Update local state on change
             disabled={!canManageSystemCurrency || settingsLoading}
           >
             <SelectTrigger id="system-currency">

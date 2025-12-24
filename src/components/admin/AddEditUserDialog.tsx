@@ -141,26 +141,28 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         return;
       }
     } else {
-      // Add new user to Supabase Auth and profiles table
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // Add new user to Supabase Auth and profiles table using admin.createUser
+      const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
         email: email,
-        // No password set here. User will use "Forgot Password" or email verification flow.
-        options: {
-          data: {
-            full_name: name,
-            avatar_url: userImageUrl,
-          },
-          emailRedirectTo: window.location.origin + '/login', // Redirect to login after email verification
+        email_confirm: true, // Automatically confirm email for admin-created users
+        user_metadata: {
+          full_name: name,
+          avatar_url: userImageUrl,
         },
+        // password is optional for admin.createUser, user can use "Forgot Password" flow
+        // emailRedirectTo is part of options for admin.createUser
+        options: {
+          emailRedirectTo: window.location.origin + '/login',
+        }
       });
       
-      if (signUpError) {
-        console.error("Error signing up new user:", signUpError);
-        showError(`Failed to add new user: ${signUpError.message}`);
+      if (createUserError) {
+        console.error("Error creating new user:", createUserError);
+        showError(`Failed to add new user: ${createUserError.message}`);
         return;
       }
       
-      if (signUpData.user) {
+      if (userData.user) {
         // Update the profile with the selected role and status
         const { error: profileUpdateError } = await supabase
           .from('profiles')
@@ -169,7 +171,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             status,
             enable_login: enableLogin
           })
-          .eq('id', signUpData.user.id);
+          .eq('id', userData.user.id);
           
         if (profileUpdateError) {
           console.error("Error updating new user's profile with role/status:", profileUpdateError);

@@ -38,7 +38,7 @@ const UserRolesSettings = () => {
     setLoadingUsers(true);
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, email, role')
+      .select('id, name, email, role, enable_login, image_url, receive_notifications') // Select all necessary fields
       .order('name', { ascending: true });
       
     if (error) {
@@ -51,8 +51,10 @@ const UserRolesSettings = () => {
         name: p.name || p.email || "Unknown",
         email: p.email || "N/A",
         role: p.role || "Contributor",
-        status: "Active",
-        enableLogin: true,
+        status: p.status as "Active" | "Inactive" | "Suspended", // Ensure status is correctly typed
+        enableLogin: p.enable_login ?? true,
+        imageUrl: p.image_url || undefined,
+        receiveNotifications: p.receive_notifications ?? true, // Added missing property
       })));
     }
     
