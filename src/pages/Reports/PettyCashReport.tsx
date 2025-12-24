@@ -23,6 +23,7 @@ import {
 import { Search } from "lucide-react";
 import { format, getMonth, getYear } from "date-fns";
 import { Label } from "@/components/ui/label";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 // Dummy financial accounts (should ideally come from a backend/admin setup)
 const financialAccounts = [
@@ -53,6 +54,7 @@ const dummyPettyCashTransactions: PettyCashTransaction[] = [
 ];
 
 const PettyCashReport = () => {
+  const { currency } = useSystemSettings(); // Use currency from context
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
 
@@ -160,12 +162,12 @@ const PettyCashReport = () => {
                     <TableCell>{format(tx.date, "MMM dd, yyyy")}</TableCell>
                     <TableCell>{tx.purpose}</TableCell>
                     <TableCell>{financialAccounts.find(acc => acc.id === tx.accountId)?.name}</TableCell>
-                    <TableCell className="text-right">${tx.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{tx.amount.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                   <TableCell colSpan={3}>Total Expenditure</TableCell>
-                  <TableCell className="text-right">${totalExpenditure.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{totalExpenditure.toFixed(2)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

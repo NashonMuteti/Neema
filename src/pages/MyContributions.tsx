@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface UserContribution {
   id: string;
@@ -84,6 +85,7 @@ interface PettyCashTxRow {
 
 const MyContributions: React.FC = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
+  const { currency } = useSystemSettings(); // Use currency from context
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
@@ -300,16 +302,16 @@ const MyContributions: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                   <p className="text-muted-foreground">Total Income:</p>
-                  <p className="text-xl font-bold text-primary">${totalIncome.toFixed(2)}</p>
+                  <p className="text-xl font-bold text-primary">{currency.symbol}{totalIncome.toFixed(2)}</p>
                 </div>
                 <div className="flex justify-between items-center">
                   <p className="text-muted-foreground">Total Expenditure:</p>
-                  <p className="text-xl font-bold text-destructive">${totalExpenditure.toFixed(2)}</p>
+                  <p className="text-xl font-bold text-destructive">{currency.symbol}{totalExpenditure.toFixed(2)}</p>
                 </div>
                 <div className="flex justify-between items-center border-t pt-4">
                   <p className="text-muted-foreground">Net Balance:</p>
                   <p className={cn("text-xl font-bold", netBalance >= 0 ? "text-green-600" : "text-red-600")}>
-                    ${netBalance.toFixed(2)}
+                    {currency.symbol}{netBalance.toFixed(2)}
                   </p>
                 </div>
 
@@ -320,7 +322,7 @@ const MyContributions: React.FC = () => {
                       <div key={c.id} className="flex justify-between items-center text-sm">
                         <span>{c.sourceOrPurpose} ({c.accountName})</span>
                         <Badge variant={getContributionStatus(c.type).variant}>
-                          {c.type === 'income' ? '+' : '-'}${c.amount.toFixed(2)}
+                          {c.type === 'income' ? '+' : '-'}{currency.symbol}{c.amount.toFixed(2)}
                         </Badge>
                       </div>
                     ))}
@@ -413,7 +415,7 @@ const MyContributions: React.FC = () => {
                           <TableCell className="font-medium">{contribution.sourceOrPurpose}</TableCell>
                           <TableCell>{contribution.accountName}</TableCell>
                           <TableCell className="text-right">
-                            {contribution.type === 'income' ? '+' : '-'}${contribution.amount.toFixed(2)}
+                            {contribution.type === 'income' ? '+' : '-'}{currency.symbol}{contribution.amount.toFixed(2)}
                           </TableCell>
                         </TableRow>
                       );

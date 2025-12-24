@@ -7,6 +7,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface FinancialAccount {
   id: string;
@@ -17,6 +18,7 @@ interface FinancialAccount {
 const InitializeBalances = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
 
   const { canInitializeBalances } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {

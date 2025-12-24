@@ -17,6 +17,7 @@ import { getProjectFinancialSummary, ProjectFinancialSummary } from "@/utils/pro
 import { Input } from "@/components/ui/input";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface Project {
   id: string;
@@ -32,6 +33,7 @@ interface Project {
 const Projects = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
   
   // Calculate canManageProjects using useMemo for stability
   const { canManageProjects } = useMemo(() => {
@@ -393,25 +395,25 @@ const Projects = () => {
                   )}
                   {project.memberContributionAmount !== undefined && (
                     <p className="text-sm">
-                      Member Contribution: <span className="font-medium">${project.memberContributionAmount.toFixed(2)}</span>
+                      Member Contribution: <span className="font-medium">{currency.symbol}{project.memberContributionAmount.toFixed(2)}</span>
                     </p>
                   )}
                   <p className="text-sm">
-                    Expected Total (from {activeMembersCount} members): <span className="font-medium">${expectedAmount.toFixed(2)}</span>
+                    Expected Total (from {activeMembersCount} members): <span className="font-medium">{currency.symbol}{expectedAmount.toFixed(2)}</span>
                   </p>
                   <div className="flex items-center justify-between text-sm">
                     <p className="flex items-center gap-1">
                       <DollarSign className="h-4 w-4 text-green-600" />
                       Collected: 
                     </p>
-                    <span className="font-medium text-green-600">${totalCollections.toFixed(2)}</span>
+                    <span className="font-medium text-green-600">{currency.symbol}{totalCollections.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <p className="flex items-center gap-1">
                       <Handshake className="h-4 w-4 text-blue-600" />
                       Pledged: 
                     </p>
-                    <span className="font-medium text-blue-600">${totalPledges.toFixed(2)}</span>
+                    <span className="font-medium text-blue-600">{currency.symbol}{totalPledges.toFixed(2)}</span>
                   </div>
                   {canManageProjects && (
                     <div className="flex flex-wrap gap-2 mt-4">

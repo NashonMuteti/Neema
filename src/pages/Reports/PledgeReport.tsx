@@ -29,6 +29,7 @@ import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 // Add interfaces for fetched data
 interface Member { id: string; name: string; }
@@ -59,6 +60,7 @@ interface PledgeRowWithJoinedData {
 const PledgeReport = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -192,7 +194,7 @@ const PledgeReport = () => {
       console.error("Error marking pledge as paid:", updateError);
       showError("Failed to mark pledge as paid.");
     } else {
-      showSuccess(`Payment initiated for ${memberName}'s pledge of $${amount.toFixed(2)}.`);
+      showSuccess(`Payment initiated for ${memberName}'s pledge of ${currency.symbol}${amount.toFixed(2)}.`);
       fetchReportData(); // Re-fetch all data to update lists
     }
   };
@@ -343,7 +345,7 @@ const PledgeReport = () => {
                     <TableRow key={pledge.id}>
                       <TableCell className="font-medium">{memberName}</TableCell>
                       <TableCell>{projectName}</TableCell>
-                      <TableCell className="text-right">${pledge.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
                       <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClasses(status)}>

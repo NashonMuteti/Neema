@@ -12,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface ProjectContributionData {
   name: string;
@@ -26,6 +27,24 @@ interface ContributionsProgressGraphProps {
 const ContributionsProgressGraph: React.FC<ContributionsProgressGraphProps> = ({
   projectsData,
 }) => {
+  const { currency } = useSystemSettings(); // Use currency from context
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="rounded-lg border bg-popover p-2 text-popover-foreground shadow-md">
+          <p className="text-sm font-semibold">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={`item-${index}`} style={{ color: entry.color }} className="text-sm">
+              {entry.name}: {currency.symbol}{entry.value.toFixed(2)}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
@@ -42,6 +61,7 @@ const ContributionsProgressGraph: React.FC<ContributionsProgressGraphProps> = ({
             <YAxis allowDecimals={false} stroke="hsl(var(--foreground))" />
             <Tooltip
               cursor={{ fill: "hsl(var(--accent))", opacity: 0.2 }}
+              content={<CustomTooltip />} // Use custom tooltip
               contentStyle={{
                 backgroundColor: "hsl(var(--popover))",
                 borderColor: "hsl(var(--border))",

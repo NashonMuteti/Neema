@@ -20,6 +20,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface FinancialAccount {
   id: string;
@@ -31,6 +32,7 @@ interface FinancialAccount {
 const FinancialAccountsSettings = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
 
   const { canManageFinancialAccounts } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -249,7 +251,7 @@ const FinancialAccountsSettings = () => {
                 id="new-account-balance"
                 type="number"
                 step="0.01"
-                placeholder="0.00"
+                placeholder={`${currency.symbol}0.00`}
                 value={newAccountInitialBalance}
                 onChange={(e) => setNewAccountInitialBalance(e.target.value)}
                 disabled={!canManageFinancialAccounts}
@@ -278,8 +280,8 @@ const FinancialAccountsSettings = () => {
                 {accounts.map((account) => (
                   <tr key={account.id} className="border-b last:border-b-0 hover:bg-muted/50">
                     <td className="py-2 px-4 font-medium">{account.name}</td>
-                    <td className="py-2 px-4 text-right">${account.initial_balance.toFixed(2)}</td>
-                    <td className="py-2 px-4 text-right">${account.current_balance.toFixed(2)}</td>
+                    <td className="py-2 px-4 text-right">{currency.symbol}{account.initial_balance.toFixed(2)}</td>
+                    <td className="py-2 px-4 text-right">{currency.symbol}{account.current_balance.toFixed(2)}</td>
                     {canManageFinancialAccounts && (
                       <td className="py-2 px-4 text-center">
                         <div className="flex justify-center space-x-2">
@@ -334,7 +336,7 @@ const FinancialAccountsSettings = () => {
             </div>
             <div className="grid gap-1.5">
               <Label>Current Balance</Label>
-              <Input value={editingAccount?.current_balance.toFixed(2) || "0.00"} disabled />
+              <Input value={`${currency.symbol}${editingAccount?.current_balance.toFixed(2) || "0.00"}`} disabled />
               <p className="text-sm text-muted-foreground">Current balance is updated by transactions, not directly editable here.</p>
             </div>
           </div>

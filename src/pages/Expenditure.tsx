@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface FinancialAccount {
   id: string;
@@ -36,6 +37,7 @@ interface ExpenditureTransaction {
 const Expenditure = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
   
   const { canManageExpenditure } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -337,7 +339,7 @@ const Expenditure = () => {
                     <SelectLabel>Financial Accounts</SelectLabel>
                     {financialAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.name} (Balance: ${account.current_balance.toFixed(2)})
+                        {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -428,7 +430,7 @@ const Expenditure = () => {
                       <TableCell>{format(tx.date, "MMM dd, yyyy")}</TableCell>
                       <TableCell>{tx.purpose}</TableCell>
                       <TableCell>{(tx as any).account_name}</TableCell>
-                      <TableCell className="text-right">${tx.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{tx.amount.toFixed(2)}</TableCell>
                       {canManageExpenditure && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">

@@ -33,6 +33,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface Member {
   id: string;
@@ -70,6 +71,7 @@ interface PledgeRowWithJoinedData {
 const Pledges = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -510,7 +512,7 @@ const Pledges = () => {
                       <TableRow key={pledge.id}>
                         <TableCell className="font-medium">{memberName}</TableCell>
                         <TableCell>{projectName}</TableCell>
-                        <TableCell className="text-right">${pledge.amount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
                         <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                         <TableCell className="text-center">
                           <Badge className={getStatusBadgeClasses(status)}>

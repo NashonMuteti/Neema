@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format, getYear } from "date-fns";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface MonthlyFinancialData {
   year: number; // Added year to the interface
@@ -40,6 +41,7 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
   allFinancialData,
   availableYears,
 }) => {
+  const { currency } = useSystemSettings(); // Use currency from context
   const currentYear = getYear(new Date());
   const [selectedYear, setSelectedYear] = React.useState<string>(
     availableYears.includes(currentYear) ? currentYear.toString() : (availableYears.length > 0 ? availableYears[0].toString() : "")
@@ -70,7 +72,7 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
           <p className="text-sm font-semibold">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={`item-${index}`} style={{ color: entry.color }} className="text-sm">
-              {entry.name}: ${entry.value.toFixed(2)}
+              {entry.name}: {currency.symbol}{entry.value.toFixed(2)}
             </p>
           ))}
         </div>
@@ -115,26 +117,26 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
                 <Bar dataKey="income" fill="hsl(var(--primary))" name="Income">
-                  <LabelList dataKey="income" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `$${value.toFixed(0)}`} />
+                  <LabelList dataKey="income" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `${currency.symbol}${value.toFixed(0)}`} />
                 </Bar>
                 <Bar dataKey="expenditure" fill="hsl(var(--destructive))" name="Expenditure">
-                  <LabelList dataKey="expenditure" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `$${value.toFixed(0)}`} />
+                  <LabelList dataKey="expenditure" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `${currency.symbol}${value.toFixed(0)}`} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-6 grid grid-cols-3 gap-4 text-center">
               <div>
                 <p className="text-sm text-muted-foreground">Total Income ({selectedYear})</p>
-                <p className="text-xl font-bold text-primary">${totalIncome.toFixed(2)}</p>
+                <p className="text-xl font-bold text-primary">{currency.symbol}{totalIncome.toFixed(2)}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Expenditure ({selectedYear})</p>
-                <p className="text-xl font-bold text-destructive">${totalExpenditure.toFixed(2)}</p>
+                <p className="text-xl font-bold text-destructive">{currency.symbol}{totalExpenditure.toFixed(2)}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Net Balance ({selectedYear})</p>
                 <p className={`text-xl font-bold ${netBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  ${netBalance.toFixed(2)}
+                  {currency.symbol}{netBalance.toFixed(2)}
                 </p>
               </div>
             </div>

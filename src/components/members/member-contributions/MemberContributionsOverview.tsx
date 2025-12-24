@@ -7,6 +7,7 @@ import { format, getMonth, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { getContributionStatus, MemberContribution } from "./types";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface MemberContributionsOverviewProps {
   selectedDate: Date | undefined;
@@ -41,6 +42,8 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   netBalance,
   renderDay
 }) => {
+  const { currency } = useSystemSettings(); // Use currency from context
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Calendar and Filters */}
@@ -106,16 +109,16 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
         <CardContent className="space-y-4">
           <div className="flex justify-between items-center">
             <p className="text-muted-foreground">Total Income:</p>
-            <p className="text-xl font-bold text-primary">${totalIncome.toFixed(2)}</p>
+            <p className="text-xl font-bold text-primary">{currency.symbol}{totalIncome.toFixed(2)}</p>
           </div>
           <div className="flex justify-between items-center">
             <p className="text-muted-foreground">Total Expenditure:</p>
-            <p className="text-xl font-bold text-destructive">${totalExpenditure.toFixed(2)}</p>
+            <p className="text-xl font-bold text-destructive">{currency.symbol}{totalExpenditure.toFixed(2)}</p>
           </div>
           <div className="flex justify-between items-center border-t pt-4">
             <p className="text-muted-foreground">Net Balance:</p>
             <p className={cn("text-xl font-bold", netBalance >= 0 ? "text-green-600" : "text-red-600")}>
-              ${netBalance.toFixed(2)}
+              {currency.symbol}{netBalance.toFixed(2)}
             </p>
           </div>
           
@@ -126,7 +129,7 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
                 <div key={c.id} className="flex justify-between items-center text-sm">
                   <span>{c.sourceOrPurpose} ({c.accountName})</span>
                   <Badge variant={getContributionStatus(c.type).variant}>
-                    {c.type === 'income' ? '+' : '-'}${c.amount.toFixed(2)}
+                    {c.type === 'income' ? '+' : '-'}{currency.symbol}{c.amount.toFixed(2)}
                   </Badge>
                 </div>
               ))}

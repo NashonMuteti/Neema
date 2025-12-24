@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { getContributionStatus, MemberContribution } from "./types";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface MemberContributionsDetailedProps {
   memberName: string;
@@ -35,6 +36,8 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
   years,
   memberContributions
 }) => {
+  const { currency } = useSystemSettings(); // Use currency from context
+
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
@@ -113,7 +116,7 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
                     <TableCell className="font-medium">{contribution.sourceOrPurpose}</TableCell>
                     <TableCell>{contribution.accountName}</TableCell>
                     <TableCell className="text-right">
-                      {contribution.type === 'income' ? '+' : '-'}${contribution.amount.toFixed(2)}
+                      {contribution.type === 'income' ? '+' : '-'}{currency.symbol}{contribution.amount.toFixed(2)}
                     </TableCell>
                   </TableRow>
                 );

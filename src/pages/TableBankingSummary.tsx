@@ -42,6 +42,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible components
 import { supabase } from "@/integrations/supabase/client";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface FinancialAccount {
   id: string;
@@ -58,6 +59,7 @@ interface ProjectCollection {
 }
 
 const TableBankingSummary: React.FC = () => {
+  const { currency } = useSystemSettings(); // Use currency from context
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date());
 
@@ -338,7 +340,7 @@ const TableBankingSummary: React.FC = () => {
                     <React.Fragment key={account.id}>
                       <TableRow className="hover:bg-muted/50">
                         <TableCell className="font-medium">{account.name}</TableCell>
-                        <TableCell className="text-right">${total.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{total.toFixed(2)}</TableCell>
                         <TableCell>
                           {accountCollections.length > 0 && (
                             <CollapsibleTrigger asChild>
@@ -367,7 +369,7 @@ const TableBankingSummary: React.FC = () => {
                                     {accountCollections.map(collection => (
                                       <TableRow key={collection.id}>
                                         <TableCell>{format(parseISO(collection.date), "MMM dd, yyyy")}</TableCell>
-                                        <TableCell className="text-right">${collection.amount.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">{currency.symbol}{collection.amount.toFixed(2)}</TableCell>
                                       </TableRow>
                                     ))}
                                   </TableBody>
@@ -382,7 +384,7 @@ const TableBankingSummary: React.FC = () => {
                 })}
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                   <TableCell>Grand Total</TableCell>
-                  <TableCell className="text-right">${grandTotal.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{grandTotal.toFixed(2)}</TableCell>
                   <TableCell></TableCell>
                 </TableRow>
               </TableBody>

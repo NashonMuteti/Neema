@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface FinancialAccount {
   id: string;
@@ -36,6 +37,7 @@ interface IncomeTransaction {
 const Income = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
   
   const { canManageIncome } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -162,6 +164,12 @@ const Income = () => {
       return;
     }
     
+    const currentAccount = financialAccounts.find(acc => acc.id === incomeAccount);
+    if (!currentAccount) {
+      showError("Selected account not found.");
+      return;
+    }
+    
     const { error: insertError } = await supabase
       .from('income_transactions')
       .insert({
@@ -177,18 +185,15 @@ const Income = () => {
       showError("Failed to post income.");
     } else {
       // Update account balance
-      const currentAccount = financialAccounts.find(acc => acc.id === incomeAccount);
-      if (currentAccount) {
-        const newBalance = currentAccount.current_balance + amount;
-        const { error: updateBalanceError } = await supabase
-          .from('financial_accounts')
-          .update({ current_balance: newBalance })
-          .eq('id', incomeAccount);
-          
-        if (updateBalanceError) {
-          console.error("Error updating account balance:", updateBalanceError);
-          showError("Income posted, but failed to update account balance.");
-        }
+      const newBalance = currentAccount.current_balance + amount;
+      const { error: updateBalanceError } = await supabase
+        .from('financial_accounts')
+        .update({ current_balance: newBalance })
+        .eq('id', incomeAccount);
+        
+      if (updateBalanceError) {
+        console.error("Error updating account balance:", updateBalanceError);
+        showError("Income posted, but failed to update account balance.");
       }
       
       showSuccess("Income posted successfully!");
@@ -329,7 +334,7 @@ const Income = () => {
                     <SelectLabel>Financial Accounts</SelectLabel>
                     {financialAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.name} (Balance: ${account.current_balance.toFixed(2)})
+                        {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -420,7 +425,7 @@ const Income = () => {
                       <TableCell>{format(tx.date, "MMM dd, yyyy")}</TableCell>
                       <TableCell>{tx.source}</TableCell>
                       <TableCell>{(tx as any).account_name}</TableCell>
-                      <TableCell className="text-right">${tx.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{tx.amount.toFixed(2)}</TableCell>
                       {canManageIncome && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">

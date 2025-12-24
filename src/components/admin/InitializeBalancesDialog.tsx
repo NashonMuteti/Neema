@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface FinancialAccount {
   id: string;
@@ -30,6 +31,7 @@ interface InitializeBalancesDialogProps {
 const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onInitialize, financialAccounts }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
 
   const { canInitializeBalances } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -107,7 +109,7 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
                   value={newBalances[account.id] || ""}
                   onChange={(e) => handleBalanceChange(account.id, e.target.value)}
                   className="col-span-2"
-                  placeholder="0.00"
+                  placeholder={`${currency.symbol}0.00`}
                   disabled={!canInitializeBalances}
                 />
               </div>

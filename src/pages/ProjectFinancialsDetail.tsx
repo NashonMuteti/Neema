@@ -18,6 +18,7 @@ import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook and types
 import { supabase } from "@/integrations/supabase/client";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface Project {
   id: string;
@@ -59,6 +60,7 @@ const getStatusBadgeClasses = (status: HookProjectPledge['status']) => {
 
 const ProjectFinancialsDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
+  const { currency } = useSystemSettings(); // Use currency from context
   const [projectDetails, setProjectDetails] = useState<Project | null>(null);
   const [loadingProjectDetails, setLoadingProjectDetails] = useState(true);
   const [projectDetailsError, setProjectDetailsError] = useState<string | null>(null);
@@ -169,7 +171,7 @@ const ProjectFinancialsDetail: React.FC = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalCollections.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{currency.symbol}{totalCollections.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
               All recorded contributions for this project.
             </p>
@@ -181,7 +183,7 @@ const ProjectFinancialsDetail: React.FC = () => {
             <Handshake className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalPledged.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{currency.symbol}{totalPledged.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
               Total outstanding and paid pledges.
             </p>
@@ -212,13 +214,13 @@ const ProjectFinancialsDetail: React.FC = () => {
                   <TableRow key={collection.id}>
                     <TableCell>{format(collection.date, "MMM dd, yyyy")}</TableCell>
                     <TableCell>{collection.member_name}</TableCell>
-                    <TableCell className="text-right">${collection.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{collection.amount.toFixed(2)}</TableCell>
                     <TableCell className="capitalize">{collection.payment_method.replace(/-/g, " ")}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                   <TableCell colSpan={2}>Total Collections</TableCell>
-                  <TableCell className="text-right">${totalCollections.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{totalCollections.toFixed(2)}</TableCell>
                   <TableCell></TableCell>
                 </TableRow>
               </TableBody>
@@ -253,7 +255,7 @@ const ProjectFinancialsDetail: React.FC = () => {
                   return (
                     <TableRow key={pledge.id}>
                       <TableCell>{pledge.member_name}</TableCell>
-                      <TableCell className="text-right">${pledge.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
                       <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClasses(status)}>
@@ -265,7 +267,7 @@ const ProjectFinancialsDetail: React.FC = () => {
                 })}
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                   <TableCell colSpan={1}>Total Pledges</TableCell>
-                  <TableCell className="text-right">${totalPledged.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{totalPledged.toFixed(2)}</TableCell>
                   <TableCell colSpan={2}></TableCell>
                 </TableRow>
               </TableBody>

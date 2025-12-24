@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/select";
 import { showSuccess, showError } from "@/utils/toast";
 import { Save } from "lucide-react";
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 const availableCurrencies = [
   { value: "USD", label: "US Dollar ($)" },
@@ -24,7 +25,7 @@ const availableCurrencies = [
   { value: "GBP", label: "British Pound (£)" },
   { value: "JPY", label: "Japanese Yen (¥)" },
   { value: "KES", label: "Kenyan Shilling (KSh)" },
-  { value: "TZS", label: "Tanzania Shilling (Tsh)" }, // Added Tanzania Shilling
+  { value: "TZS", label: "Tanzania Shilling (Tsh)" },
   { value: "CAD", label: "Canadian Dollar (C$)" },
   { value: "AUD", label: "Australian Dollar (A$)" },
 ];
@@ -32,18 +33,16 @@ const availableCurrencies = [
 const SystemCurrencySettings = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency, setCurrency, isLoading: settingsLoading } = useSystemSettings(); // Use currency and setCurrency from context
 
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   const canManageSystemCurrency = currentUserPrivileges.includes("Manage System Currency");
 
-  // In a real app, this would be fetched from a backend setting
-  const [selectedCurrency, setSelectedCurrency] = React.useState("USD");
-
-  const handleSaveCurrency = () => {
-    // In a real app, this would send the selectedCurrency to the backend
-    console.log("Saving system currency:", selectedCurrency);
-    showSuccess(`System currency set to ${selectedCurrency} successfully!`);
+  const handleSaveCurrency = async () => {
+    await setCurrency(currency.code); // Use the code from the context state
+    showSuccess(`System currency set to ${currency.code} successfully!`);
+    console.log("Saving system currency:", currency.code);
   };
 
   return (
@@ -57,23 +56,27 @@ const SystemCurrencySettings = () => {
         </p>
         <div className="grid w-full max-w-sm items-center gap-1.5">
           <Label htmlFor="system-currency">Default Currency</Label>
-          <Select value={selectedCurrency} onValueChange={setSelectedCurrency} disabled={!canManageSystemCurrency}>
+          <Select 
+            value={currency.code} // Use currency.code from context
+            onValueChange={(value) => setCurrencyState({ code: value, symbol: currencyMap[value] || "$" })} // Update local state for immediate feedback
+            disabled={!canManageSystemCurrency || settingsLoading}
+          >
             <SelectTrigger id="system-currency">
               <SelectValue placeholder="Select a currency" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>Currencies</SelectLabel>
-                {availableCurrencies.map((currency) => (
-                  <SelectItem key={currency.value} value={currency.value}>
-                    {currency.label}
+                {availableCurrencies.map((curr) => (
+                  <SelectItem key={curr.value} value={curr.value}>
+                    {curr.label}
                   </SelectItem>
                 ))}
               </SelectGroup>
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleSaveCurrency} disabled={!canManageSystemCurrency}>
+        <Button onClick={handleSaveCurrency} disabled={!canManageSystemCurrency || settingsLoading}>
           <Save className="mr-2 h-4 w-4" /> Save Currency Setting
         </Button>
       </CardContent>
