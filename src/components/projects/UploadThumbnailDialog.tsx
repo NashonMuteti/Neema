@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 import { fileUploadSchema } from "@/utils/security";
+import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
 
 interface UploadThumbnailDialogProps {
   projectId: string;
@@ -41,6 +42,7 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(currentThumbnailUrl || null);
+  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
 
   React.useEffect(() => {
     if (isOpen) {
@@ -89,14 +91,34 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
       return;
     }
     
-    // Simulate file upload to a backend/storage and get a URL
-    // In a real application, you would send `selectedFile` to your backend
-    // and receive a public URL for the uploaded image.
-    const simulatedUploadUrl = URL.createObjectURL(selectedFile); // Using blob URL for immediate preview
-    
-    onThumbnailUpload(projectId, simulatedUploadUrl);
-    showSuccess(`Thumbnail for '${projectName}' updated successfully!`);
-    setIsOpen(false);
+    setIsUploading(true); // Start loading
+    // Upload file to Supabase Storage
+    const filePath = `project-thumbnails/${currentUser?.id || 'unknown'}/${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+    const uploadedUrl = await uploadFileToSupabase('project-thumbnails', selectedFile, filePath);
+
+    if (uploadedUrl) {
+      // Update the project's thumbnail_url in the database
+      const { error: dbUpdateError } = await supabase
+        .from('projects')
+        .update({ thumbnail_url: uploadedUrl })
+        .eq('id', projectId);
+
+      if (dbUpdateError) {
+        console.error("Error updating project thumbnail URL in DB:", dbUpdateError);
+        showError("Failed to update project thumbnail in database.");
+        setIsUploading(false);
+        return;
+      }
+
+      onThumbnailUpload(projectId, uploadedUrl);
+      showSuccess(`Thumbnail for '${projectName}' updated successfully!`);
+      setIsOpen(false);
+    } else {
+      // uploadFileToSupabase already shows an error, so just return
+      setIsUploading(false);
+      return;
+    }
+    setIsUploading(false); // End loading
   };
 
   return (
@@ -136,14 +158,14 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
                 type="file"
                 accept="image/*"
                 onChange={handleFileChange}
-                disabled={!canManageProjects}
+                disabled={!canManageProjects || isUploading}
               />
             </div>
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleUpload} disabled={!selectedFile || !canManageProjects}>
-            <Upload className="mr-2 h-4 w-4" /> Upload
+          <Button onClick={handleUpload} disabled={!selectedFile || !canManageProjects || isUploading}>
+            {isUploading ? "Uploading..." : <><Upload className="mr-2 h-4 w-4" /> Upload</>}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">

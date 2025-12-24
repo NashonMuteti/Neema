@@ -13,6 +13,7 @@ import { User } from '@/context/AuthContext';
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
 
 interface AddEditUserDialogProps {
   isOpen: boolean;
@@ -59,6 +60,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
+  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
 
   React.useEffect(() => {
     if (isOpen) {
@@ -100,10 +102,20 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       return;
     }
     
+    setIsUploading(true); // Start loading
     let userImageUrl: string | undefined = initialData?.imageUrl;
-    if (selectedFile && previewUrl) {
-      userImageUrl = previewUrl;
+    if (selectedFile) {
+      // Upload image to Supabase Storage
+      const filePath = `avatars/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const uploadedUrl = await uploadFileToSupabase('avatars', selectedFile, filePath);
+      if (uploadedUrl) {
+        userImageUrl = uploadedUrl;
+      } else {
+        setIsUploading(false);
+        return; // Stop if upload failed
+      }
     } else if (!selectedFile && !initialData?.imageUrl) {
+      // If no new file and no existing image, ensure imageUrl is undefined
       userImageUrl = undefined;
     }
     
@@ -114,6 +126,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       if (fetchAuthUserError) {
         console.error("Error fetching current auth user:", fetchAuthUserError);
         showError("Failed to verify user's current login status.");
+        setIsUploading(false);
         return;
       }
 
@@ -132,6 +145,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       if (authUpdateError) {
         console.error("Error updating Supabase Auth user:", authUpdateError);
         showError("Failed to update user authentication details.");
+        setIsUploading(false);
         return;
       }
 
@@ -151,6 +165,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       if (profileUpdateError) {
         console.error("Error updating user profile:", profileUpdateError);
         showError("Failed to update user profile details.");
+        setIsUploading(false);
         return;
       }
 
@@ -192,6 +207,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       if (createUserError) {
         console.error("Error creating new user:", createUserError);
         showError(`Failed to add new user: ${createUserError.message}`);
+        setIsUploading(false);
         return;
       }
 
@@ -215,6 +231,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     
     onSave();
     setIsOpen(false);
+    setIsUploading(false); // End loading
   };
 
   return (
@@ -243,7 +260,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
                 accept="image/*" 
                 onChange={handleFileChange} 
                 className="col-span-3" 
-                disabled={!canManageUserProfiles}
+                disabled={!canManageUserProfiles || isUploading}
               />
             </div>
           </div>
@@ -256,7 +273,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               value={name} 
               onChange={(e) => setName(e.target.value)} 
               className="col-span-3" 
-              disabled={!canManageUserProfiles}
+              disabled={!canManageUserProfiles || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -269,7 +286,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               value={email} 
               onChange={(e) => setEmail(e.target.value)} 
               className="col-span-3" 
-              disabled={!canManageUserProfiles}
+              disabled={!canManageUserProfiles || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -279,7 +296,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             <Select 
               value={role} 
               onValueChange={(value: string) => setRole(value)} 
-              disabled={!canManageUserProfiles}
+              disabled={!canManageUserProfiles || isUploading}
             >
               <SelectTrigger id="role" className="col-span-3">
                 <SelectValue placeholder="Select role" />
@@ -303,7 +320,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             <Select 
               value={status} 
               onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} 
-              disabled={!canManageUserProfiles}
+              disabled={!canManageUserProfiles || isUploading}
             >
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
@@ -327,17 +344,16 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               checked={enableLogin} 
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)} 
               className="col-span-3" 
-              disabled={!canManageUserProfiles}
+              disabled={!canManageUserProfiles || isUploading}
             />
           </div>
         </div>
         <div className="flex justify-end">
           <Button 
             onClick={handleSubmit} 
-            disabled={!canManageUserProfiles}
+            disabled={!canManageUserProfiles || isUploading}
           >
-            <Save className="mr-2 h-4 w-4" />
-            {initialData ? "Save Changes" : "Add User"}
+            {isUploading ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add User"}</>}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">

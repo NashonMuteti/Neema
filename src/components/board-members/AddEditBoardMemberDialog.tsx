@@ -11,6 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 import { fileUploadSchema } from "@/utils/security";
+import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
 
 export interface BoardMember {
   id: string;
@@ -58,6 +59,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
   const [notes, setNotes] = React.useState(initialData?.notes || "");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.image_url || null); // Use image_url
+  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
 
   React.useEffect(() => {
     if (isOpen) {
@@ -103,17 +105,25 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       return;
     }
     
+    setIsUploading(true); // Start loading
     let memberImageUrl: string | undefined = initialData?.image_url;
     if (selectedFile) {
       // Validate file before upload
       try {
         fileUploadSchema.parse(selectedFile);
-        // In a real app, this is where you'd upload the file to a storage service
-        // and get a permanent URL. For now, we use the preview URL.
-        memberImageUrl = previewUrl;
+        // Upload image to Supabase Storage
+        const filePath = `board-members/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+        const uploadedUrl = await uploadFileToSupabase('board-members', selectedFile, filePath);
+        if (uploadedUrl) {
+          memberImageUrl = uploadedUrl;
+        } else {
+          setIsUploading(false);
+          return; // Stop if upload failed
+        }
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
+        setIsUploading(false);
         return;
       }
     } else if (!selectedFile && !initialData?.image_url) {
@@ -138,6 +148,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
     onSave(memberData); // Call the parent's onSave for local state update (if still used)
     showSuccess(`Board member ${initialData ? "updated" : "added"} successfully!`);
     setIsOpen(false);
+    setIsUploading(false); // End loading
   };
 
   return (
@@ -172,7 +183,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
-                disabled={!canManageBoardMembers}
+                disabled={!canManageBoardMembers || isUploading}
               />
             </div>
           </div>
@@ -185,7 +196,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
-              disabled={!canManageBoardMembers}
+              disabled={!canManageBoardMembers || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -197,7 +208,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="col-span-3"
-              disabled={!canManageBoardMembers}
+              disabled={!canManageBoardMembers || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -210,7 +221,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="col-span-3"
-              disabled={!canManageBoardMembers}
+              disabled={!canManageBoardMembers || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -223,7 +234,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="col-span-3"
-              disabled={!canManageBoardMembers}
+              disabled={!canManageBoardMembers || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -236,7 +247,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               onChange={(e) => setAddress(e.target.value)}
               className="col-span-3"
               placeholder="Optional address details"
-              disabled={!canManageBoardMembers}
+              disabled={!canManageBoardMembers || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -249,13 +260,13 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
               onChange={(e) => setNotes(e.target.value)}
               className="col-span-3"
               placeholder="Any additional notes"
-              disabled={!canManageBoardMembers}
+              disabled={!canManageBoardMembers || isUploading}
             />
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManageBoardMembers}>
-            <Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add Member"}
+          <Button onClick={handleSubmit} disabled={!canManageBoardMembers || isUploading}>
+            {isUploading ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add Member"}</>}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">

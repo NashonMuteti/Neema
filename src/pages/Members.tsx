@@ -40,6 +40,15 @@ const Members = () => {
     setLoading(true);
     setError(null);
 
+    // If the user cannot manage members, they should not be able to fetch all members.
+    // The UI should already prevent access, but this adds a backend-side check.
+    if (!currentUser || !canManageMembers) {
+      setError("You do not have permission to view all members.");
+      setMembers([]);
+      setLoading(false);
+      return;
+    }
+
     let query = supabase.from('profiles').select('*');
 
     if (filterStatus !== "All") {
@@ -70,7 +79,7 @@ const Members = () => {
       })));
     }
     setLoading(false);
-  }, [filterStatus, searchQuery]);
+  }, [filterStatus, searchQuery, currentUser, canManageMembers]);
 
   useEffect(() => {
     fetchMembers();

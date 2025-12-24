@@ -25,6 +25,8 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
+import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
+import { fileUploadSchema } from "@/utils/security";
 
 interface NewProjectDialogProps {
   onAddProject: (projectData: { name: string; description: string; thumbnailUrl?: string; dueDate?: Date; memberContributionAmount?: number }) => void;
@@ -60,22 +62,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    control,
-    reset,
-    formState: { errors },
-  } = useForm<NewProjectFormValues>({
-    resolver: zodResolver(newProjectSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      dueDate: undefined,
-      memberContributionAmount: undefined,
-    },
-  });
+  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
 
   React.useEffect(() => {
     return () => {
@@ -88,8 +75,16 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      try {
+        fileUploadSchema.parse(file);
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        event.target.value = "";
+        return;
+      }
     } else {
       setSelectedFile(null);
       setPreviewUrl(null);
@@ -102,11 +97,17 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
       return;
     }
 
+    setIsUploading(true); // Start loading
     let projectThumbnailUrl: string | undefined = undefined;
-    if (selectedFile && previewUrl) {
-      // In a real app, you'd upload the file to Supabase Storage here
-      // For now, we're using a blob URL for preview.
-      projectThumbnailUrl = previewUrl;
+    if (selectedFile) {
+      const filePath = `project-thumbnails/${currentUser.id}/${data.name.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const uploadedUrl = await uploadFileToSupabase('project-thumbnails', selectedFile, filePath);
+      if (uploadedUrl) {
+        projectThumbnailUrl = uploadedUrl;
+      } else {
+        setIsUploading(false);
+        return; // Stop if upload failed
+      }
     }
 
     // Call the parent's onAddProject function with the collected data
@@ -122,6 +123,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
     reset(); // Reset form fields
     setSelectedFile(null);
     setPreviewUrl(null);
+    setIsUploading(false); // End loading
   };
 
   return (
@@ -145,7 +147,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               id="name"
               {...register("name")}
               className="col-span-3"
-              disabled={!canManageProjects}
+              disabled={!canManageProjects || isUploading}
             />
             {errors.name && <p className="col-span-4 text-right text-sm text-destructive">{errors.name.message}</p>}
           </div>
@@ -157,7 +159,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               id="description"
               {...register("description")}
               className="col-span-3"
-              disabled={!canManageProjects}
+              disabled={!canManageProjects || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -176,7 +178,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
                         "col-span-3 justify-start text-left font-normal",
                         !field.value && "text-muted-foreground"
                       )}
-                      disabled={!canManageProjects}
+                      disabled={!canManageProjects || isUploading}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
@@ -205,7 +207,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               placeholder="0.00"
               {...register("memberContributionAmount")}
               className="col-span-3"
-              disabled={!canManageProjects}
+              disabled={!canManageProjects || isUploading}
             />
             {errors.memberContributionAmount && <p className="col-span-4 text-right text-sm text-destructive">{errors.memberContributionAmount.message}</p>}
           </div>
@@ -225,12 +227,14 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
-                disabled={!canManageProjects}
+                disabled={!canManageProjects || isUploading}
               />
             </div>
           </div>
           <div className="flex justify-end">
-            <Button type="submit" disabled={!canManageProjects}>Save Project</Button>
+            <Button type="submit" disabled={!canManageProjects || isUploading}>
+              {isUploading ? "Saving..." : "Save Project"}
+            </Button>
           </div>
           <p className="text-sm text-muted-foreground mt-2">
             Note: Image storage and serving require backend integration.
