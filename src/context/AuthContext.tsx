@@ -49,6 +49,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Function to fetch and set the application's currentUser profile
   const fetchUserProfile = async (user: SupabaseUser | null) => {
+    console.log("AuthContext: fetchUserProfile called with user:", user);
     if (user) {
       try {
         const { data: profile, error } = await supabase
@@ -57,51 +58,63 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .eq('id', user.id)
           .single();
 
+        console.log("AuthContext: Profile data from DB:", profile);
+        console.log("AuthContext: Profile error from DB:", error);
+
+        let userRole = "Contributor"; // Default role
+        let userStatus: "Active" | "Inactive" | "Suspended" = "Active";
+        let userEnableLogin = true;
+        let userImageUrl: string | undefined = undefined;
+        let userReceiveNotifications = true;
+        let userName = user.user_metadata?.full_name || user.email || "User";
+        let userEmail = user.email || "";
+
         if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-          console.error("Error fetching user profile:", error);
-          // Create a minimal user object if profile fetch fails
-          setCurrentUser({
-            id: user.id,
-            name: user.user_metadata?.full_name || user.email || "User",
-            email: user.email || "",
-            role: "Contributor",
-            status: "Active",
-            enableLogin: true,
-            imageUrl: user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`,
-            receiveNotifications: true, // Default to true if profile fetch fails
-          });
-          return;
+          console.error("AuthContext: Error fetching user profile from DB, falling back to metadata:", error);
+          // Fallback to user_metadata if DB fetch fails (but not if row simply doesn't exist)
+          userRole = user.user_metadata?.role || "Contributor";
+          userStatus = user.user_metadata?.status || "Active";
+          userEnableLogin = user.user_metadata?.enable_login ?? true;
+          userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
+          userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
+        } else if (profile) {
+          // Use profile data if available
+          userRole = profile.role || user.user_metadata?.role || "Contributor";
+          userStatus = profile.status || "Active";
+          userEnableLogin = profile.enable_login ?? true;
+          userImageUrl = profile.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${profile.name || user.email}`;
+          userReceiveNotifications = profile.receive_notifications ?? true;
+          userName = profile.name || user.user_metadata?.full_name || user.email || "User";
+          userEmail = profile.email || user.email || "";
+        } else {
+          // Profile not found in DB, likely a new user or a user whose profile wasn't created by trigger
+          console.warn("AuthContext: User profile not found in public.profiles, using user_metadata defaults.");
+          userRole = user.user_metadata?.role || "Contributor";
+          userStatus = user.user_metadata?.status || "Active";
+          userEnableLogin = user.user_metadata?.enable_login ?? true;
+          userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
+          userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
         }
 
-        if (profile) {
-          setCurrentUser({
-            id: profile.id,
-            name: profile.name || user.user_metadata?.full_name || user.email || "User",
-            email: profile.email || user.email || "",
-            role: profile.role || "Contributor",
-            status: profile.status || "Active",
-            enableLogin: profile.enable_login ?? true,
-            imageUrl: profile.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${profile.name || user.email}`,
-            receiveNotifications: profile.receive_notifications ?? true, // Use fetched value or default
-          });
-        } else {
-          // Fallback for new users
-          setCurrentUser({
-            id: user.id,
-            name: user.user_metadata?.full_name || user.email || "User",
-            email: user.email || "",
-            role: "Contributor",
-            status: "Active",
-            enableLogin: true,
-            imageUrl: user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`,
-            receiveNotifications: true, // Default for new users
-          });
-        }
+        const finalUser: User = {
+          id: user.id,
+          name: userName,
+          email: userEmail,
+          role: userRole,
+          status: userStatus,
+          enableLogin: userEnableLogin,
+          imageUrl: userImageUrl,
+          receiveNotifications: userReceiveNotifications,
+        };
+        setCurrentUser(finalUser);
+        console.log("AuthContext: Current User set to:", finalUser);
+
       } catch (error) {
-        console.error("Error in fetchUserProfile:", error);
+        console.error("AuthContext: Error in fetchUserProfile:", error);
         setCurrentUser(null);
       }
     } else {
+      console.log("AuthContext: User is null, setting currentUser to null.");
       setCurrentUser(null);
     }
   };
@@ -109,6 +122,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        console.log("AuthContext: onAuthStateChange event:", event);
+        console.log("AuthContext: onAuthStateChange session:", currentSession);
         setSession(currentSession);
         setSupabaseUser(currentSession?.user || null);
         await fetchUserProfile(currentSession?.user || null);
@@ -118,6 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      console.log("AuthContext: Initial session check:", initialSession);
       setSession(initialSession);
       setSupabaseUser(initialSession?.user || null);
       await fetchUserProfile(initialSession?.user || null);
