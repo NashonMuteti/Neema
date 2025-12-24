@@ -102,17 +102,21 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       }
     }
     
-    // Create user in Supabase Auth using admin API
+    // 1. Create user in Supabase Auth. Pass all profile data via user_metadata for the trigger.
     const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
       email: email,
-      // No password set here. User will use "Forgot Password" or email verification flow.
-      email_confirm: true, // Automatically confirm email for admin-created users
+      // Do not set email_confirm: true here to avoid sending an immediate verification email
+      // if login is intended to be disabled initially.
       user_metadata: {
         full_name: name,
         avatar_url: memberImageUrl,
+        role: selectedRole,
+        status: status,
+        enable_login: enableLogin,
       },
-      emailRedirectTo: window.location.origin + '/login', // Redirect to login after email verification
-    } as any); // Cast to any to bypass strict type checking for this specific property
+      // emailRedirectTo is for email verification links, not invite links.
+      // We will use inviteUserByEmail for password setting.
+    });
     
     if (createUserError) {
       console.error("Error creating new member in Auth:", createUserError);
@@ -121,38 +125,34 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     }
     
     if (userData.user) {
-      // Update public.profiles table with role, status, and enable_login
-      const { error: profileUpdateError } = await supabase
-        .from('profiles')
-        .update({
-          name: name,
-          email: email,
-          role: selectedRole,
-          status: status,
-          enable_login: enableLogin,
-          image_url: memberImageUrl,
-        })
-        .eq('id', userData.user.id);
-        
-      if (profileUpdateError) {
-        console.error("Error updating new member's profile:", profileUpdateError);
-        showError("Failed to set new member's role and status.");
-        return;
+      // The handle_new_user trigger should have created the profile with the metadata.
+      // Now, if login is enabled, send an invitation email to set password.
+      if (enableLogin) {
+        const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+          redirectTo: window.location.origin + '/login', // This is the correct redirect for invite
+        });
+        if (inviteError) {
+          console.error("Error sending invitation email:", inviteError);
+          showError(`Member created, but failed to send invitation email: ${inviteError.message}`);
+        } else {
+          showSuccess("Member added and invitation email sent successfully!");
+        }
+      } else {
+        showSuccess("Member added successfully (login disabled).");
       }
+      
+      onAddMember(); // Trigger parent to re-fetch members
+      setIsOpen(false);
+      
+      // Reset form states
+      setName("");
+      setEmail("");
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      setEnableLogin(false);
+      setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
+      setStatus("Active");
     }
-    
-    onAddMember(); // Trigger parent to re-fetch members
-    showSuccess("Member added successfully!");
-    setIsOpen(false);
-    
-    // Reset form states
-    setName("");
-    setEmail("");
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setEnableLogin(false);
-    setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
-    setStatus("Active");
   };
 
   return (
@@ -279,7 +279,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: For new members, an email will be sent to set their password. Image storage and serving require backend integration (e.g., Supabase).
+          Note: If "Enable Login" is checked, an invitation email will be sent to the user to set their password. Image storage and serving require backend integration (e.g., Supabase).
         </p>
       </DialogContent>
     </Dialog>

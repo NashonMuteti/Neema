@@ -108,7 +108,19 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     }
     
     if (initialData?.id) {
-      // Editing existing user in Supabase Auth and profiles table
+      // Editing existing user
+      // Fetch current auth user details to check email_confirmed_at and last_sign_in_at
+      const { data: currentAuthUser, error: fetchAuthUserError } = await supabase.auth.admin.getUserById(initialData.id);
+      if (fetchAuthUserError) {
+        console.error("Error fetching current auth user:", fetchAuthUserError);
+        showError("Failed to verify user's current login status.");
+        return;
+      }
+
+      const oldEnableLogin = initialData.enableLogin;
+      const newEnableLogin = enableLogin;
+
+      // 1. Update user in Supabase Auth
       const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
         email: email,
         user_metadata: {
@@ -116,13 +128,14 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           avatar_url: userImageUrl,
         },
       });
-      
+
       if (authUpdateError) {
         console.error("Error updating Supabase Auth user:", authUpdateError);
         showError("Failed to update user authentication details.");
         return;
       }
-      
+
+      // 2. Update public.profiles table
       const { error: profileUpdateError } = await supabase
         .from('profiles')
         .update({
@@ -130,55 +143,77 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           email,
           role,
           status,
-          enable_login: enableLogin,
+          enable_login: newEnableLogin,
           image_url: userImageUrl
         })
         .eq('id', initialData.id);
-        
+
       if (profileUpdateError) {
         console.error("Error updating user profile:", profileUpdateError);
         showError("Failed to update user profile details.");
         return;
       }
+
+      // 3. Conditional invitation if login is enabled and user hasn't set password
+      if (newEnableLogin && !oldEnableLogin) { // If login was disabled and is now enabled
+        const userAuthData = currentAuthUser.user;
+        // Check if email is not confirmed AND they haven't signed in (implying no password set)
+        if (!userAuthData?.email_confirmed_at && !userAuthData?.last_sign_in_at) {
+          const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+            redirectTo: window.location.origin + '/login',
+          });
+          if (inviteError) {
+            console.error("Error sending invitation email:", inviteError);
+            showError(`User updated, but failed to send invitation email: ${inviteError.message}`);
+          } else {
+            showSuccess("User updated and invitation email sent successfully!");
+          }
+        } else {
+          showSuccess("User updated successfully!");
+        }
+      } else {
+        showSuccess("User updated successfully!");
+      }
+
     } else {
-      // Add new user to Supabase Auth and profiles table using admin.createUser
+      // Adding new user (this path should ideally be handled by AddMemberDialog,
+      // but for completeness, replicating the logic here)
       const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
         email: email,
-        email_confirm: true, // Automatically confirm email for admin-created users
         user_metadata: {
           full_name: name,
           avatar_url: userImageUrl,
+          role: role,
+          status: status,
+          enable_login: enableLogin,
         },
-        emailRedirectTo: window.location.origin + '/login', // emailRedirectTo is a direct property
-      } as any); // Cast to any to bypass strict type checking for this specific property
-      
+      });
+
       if (createUserError) {
         console.error("Error creating new user:", createUserError);
         showError(`Failed to add new user: ${createUserError.message}`);
         return;
       }
-      
+
       if (userData.user) {
-        // Update the profile with the selected role and status
-        const { error: profileUpdateError } = await supabase
-          .from('profiles')
-          .update({
-            role,
-            status,
-            enable_login: enableLogin
-          })
-          .eq('id', userData.user.id);
-          
-        if (profileUpdateError) {
-          console.error("Error updating new user's profile with role/status:", profileUpdateError);
-          showError("Failed to set new user's role and status.");
-          return;
+        // The handle_new_user trigger should have created the profile with the metadata.
+        if (enableLogin) {
+          const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+            redirectTo: window.location.origin + '/login',
+          });
+          if (inviteError) {
+            console.error("Error sending invitation email:", inviteError);
+            showError(`User created, but failed to send invitation email: ${inviteError.message}`);
+          } else {
+            showSuccess("User added and invitation email sent successfully!");
+          }
+        } else {
+          showSuccess("User added successfully (login disabled).");
         }
       }
     }
     
     onSave();
-    showSuccess(`User ${initialData ? "updated" : "added"} successfully!`);
     setIsOpen(false);
   };
 
@@ -306,7 +341,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: For new users, an email will be sent to set their password. For existing users, password resets must be initiated separately.
+          Note: If "Enable Login" is checked, an invitation email will be sent to the user to set their password. For existing users, password resets must be initiated separately.
         </p>
       </DialogContent>
     </Dialog>
