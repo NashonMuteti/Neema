@@ -149,7 +149,9 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           full_name: name,
           avatar_url: userImageUrl,
         },
-        emailRedirectTo: window.location.origin + '/login', // emailRedirectTo is a direct property
+        options: { // emailRedirectTo is part of options for admin.createUser
+          emailRedirectTo: window.location.origin + '/login',
+        }
       });
       
       if (createUserError) {

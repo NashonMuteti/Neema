@@ -111,7 +111,9 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
         full_name: name,
         avatar_url: memberImageUrl,
       },
-      emailRedirectTo: window.location.origin + '/login', // Redirect to login after email verification
+      options: { // emailRedirectTo should be inside options
+        emailRedirectTo: window.location.origin + '/login', // Redirect to login after email verification
+      }
     });
     
     if (createUserError) {
