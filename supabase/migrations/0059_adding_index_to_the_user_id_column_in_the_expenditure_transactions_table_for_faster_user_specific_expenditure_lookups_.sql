@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_expenditure_transactions_user_id ON public.expenditure_transactions (user_id);

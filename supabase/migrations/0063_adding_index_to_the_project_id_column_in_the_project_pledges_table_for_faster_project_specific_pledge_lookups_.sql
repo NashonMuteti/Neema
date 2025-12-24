@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_project_pledges_project_id ON public.project_pledges (project_id);

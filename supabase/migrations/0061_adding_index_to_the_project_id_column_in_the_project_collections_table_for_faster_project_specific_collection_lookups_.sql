@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_project_collections_project_id ON public.project_collections (project_id);

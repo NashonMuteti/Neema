@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_income_transactions_user_id ON public.income_transactions (user_id);

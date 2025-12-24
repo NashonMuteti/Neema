@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_petty_cash_transactions_user_id ON public.petty_cash_transactions (user_id);

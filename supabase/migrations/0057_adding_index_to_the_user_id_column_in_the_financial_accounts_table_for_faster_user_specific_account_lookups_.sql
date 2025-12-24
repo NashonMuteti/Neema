@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_financial_accounts_user_id ON public.financial_accounts (user_id);
