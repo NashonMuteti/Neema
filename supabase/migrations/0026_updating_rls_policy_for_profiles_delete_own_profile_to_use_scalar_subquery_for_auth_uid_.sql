@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Users can delete their own profile" ON public.profiles;
+CREATE POLICY "Users can delete their own profile" ON public.profiles FOR DELETE TO authenticated USING ( (id = (SELECT auth.uid())) );

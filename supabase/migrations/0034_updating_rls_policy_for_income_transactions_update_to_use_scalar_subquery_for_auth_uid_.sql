@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow users to update their own income transactions" ON public.income_transactions;
+CREATE POLICY "Allow users to update their own income transactions" ON public.income_transactions FOR UPDATE TO authenticated USING ( (user_id = (SELECT auth.uid())) );

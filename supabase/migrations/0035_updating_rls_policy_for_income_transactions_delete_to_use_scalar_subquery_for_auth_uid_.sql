@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow users to delete their own income transactions" ON public.income_transactions;
+CREATE POLICY "Allow users to delete their own income transactions" ON public.income_transactions FOR DELETE TO authenticated USING ( (user_id = (SELECT auth.uid())) );

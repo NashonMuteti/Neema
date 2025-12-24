@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow project creators to insert their own projects" ON public.projects;
+CREATE POLICY "Allow project creators to insert their own projects" ON public.projects FOR INSERT TO authenticated WITH CHECK ( (user_id = (SELECT auth.uid())) );

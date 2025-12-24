@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow users to insert their own income transactions" ON public.income_transactions;
+CREATE POLICY "Allow users to insert their own income transactions" ON public.income_transactions FOR INSERT TO authenticated WITH CHECK ( (user_id = (SELECT auth.uid())) );

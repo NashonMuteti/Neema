@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow account creators to delete their own financial accounts" ON public.financial_accounts;
+CREATE POLICY "Allow account creators to delete their own financial accounts" ON public.financial_accounts FOR DELETE TO authenticated USING ( (user_id = (SELECT auth.uid())) );

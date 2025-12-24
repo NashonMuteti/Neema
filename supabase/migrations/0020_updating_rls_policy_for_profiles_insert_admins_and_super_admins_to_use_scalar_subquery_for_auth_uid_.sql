@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Admins and Super Admins can insert profiles" ON public.profiles;
+CREATE POLICY "Admins and Super Admins can insert profiles" ON public.profiles FOR INSERT TO authenticated WITH CHECK ( (EXISTS ( SELECT 1 FROM profiles profiles_1 WHERE ((profiles_1.id = (SELECT auth.uid())) AND (profiles_1.role = ANY (ARRAY['Admin'::text, 'Super Admin'::text]))))) );

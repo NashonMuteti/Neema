@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Users can only view their own financial accounts" ON public.financial_accounts;
+CREATE POLICY "Users can only view their own financial accounts" ON public.financial_accounts FOR SELECT TO authenticated USING ( (user_id = (SELECT auth.uid())) );

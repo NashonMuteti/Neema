@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow privileged users to delete project collections" ON public.project_collections;
+CREATE POLICY "Allow privileged users to delete project collections" ON public.project_collections FOR DELETE TO authenticated USING ( (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = (SELECT auth.uid())) AND (profiles.role = ANY (ARRAY['Admin'::text, 'Super Admin'::text, 'Project Manager'::text]))))) );

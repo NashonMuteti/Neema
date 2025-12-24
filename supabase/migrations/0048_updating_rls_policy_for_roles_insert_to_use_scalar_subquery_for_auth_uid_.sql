@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow privileged users to insert roles" ON public.roles;
+CREATE POLICY "Allow privileged users to insert roles" ON public.roles FOR INSERT TO authenticated WITH CHECK ( (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = (SELECT auth.uid())) AND (profiles.role = ANY (ARRAY['Admin'::text, 'Super Admin'::text]))))) );

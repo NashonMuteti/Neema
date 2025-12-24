@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Users can only view their own expenditure transactions" ON public.expenditure_transactions;
+CREATE POLICY "Users can only view their own expenditure transactions" ON public.expenditure_transactions FOR SELECT TO authenticated USING ( (user_id = (SELECT auth.uid())) );

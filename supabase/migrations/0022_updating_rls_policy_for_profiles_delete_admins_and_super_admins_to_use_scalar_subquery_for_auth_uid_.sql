@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Admins and Super Admins can delete profiles" ON public.profiles;
+CREATE POLICY "Admins and Super Admins can delete profiles" ON public.profiles FOR DELETE TO authenticated USING ( (EXISTS ( SELECT 1 FROM profiles profiles_1 WHERE ((profiles_1.id = (SELECT auth.uid())) AND (profiles_1.role = ANY (ARRAY['Admin'::text, 'Super Admin'::text]))))) );

@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow privileged users to delete board members" ON public.board_members;
+CREATE POLICY "Allow privileged users to delete board members" ON public.board_members FOR DELETE TO authenticated USING ( (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = (SELECT auth.uid())) AND (profiles.role = ANY (ARRAY['Admin'::text, 'Super Admin'::text]))))) );

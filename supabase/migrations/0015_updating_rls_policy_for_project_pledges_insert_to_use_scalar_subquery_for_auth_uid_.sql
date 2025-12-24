@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow privileged users to insert pledges" ON public.project_pledges;
+CREATE POLICY "Allow privileged users to insert pledges" ON public.project_pledges FOR INSERT TO authenticated WITH CHECK ( (EXISTS ( SELECT 1 FROM profiles WHERE ((profiles.id = (SELECT auth.uid())) AND (profiles.role = ANY (ARRAY['Admin'::text, 'Super Admin'::text, 'Project Manager'::text]))))) );

@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow users to update their own petty cash transactions" ON public.petty_cash_transactions;
+CREATE POLICY "Allow users to update their own petty cash transactions" ON public.petty_cash_transactions FOR UPDATE TO authenticated USING ( (user_id = (SELECT auth.uid())) );

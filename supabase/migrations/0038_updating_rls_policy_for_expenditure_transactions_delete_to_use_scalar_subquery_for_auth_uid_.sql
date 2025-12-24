@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow users to delete their own expenditure transactions" ON public.expenditure_transactions;
+CREATE POLICY "Allow users to delete their own expenditure transactions" ON public.expenditure_transactions FOR DELETE TO authenticated USING ( (user_id = (SELECT auth.uid())) );

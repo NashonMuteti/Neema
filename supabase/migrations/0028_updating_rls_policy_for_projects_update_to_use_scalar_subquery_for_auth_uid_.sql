@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow project creators to update their own projects" ON public.projects;
+CREATE POLICY "Allow project creators to update their own projects" ON public.projects FOR UPDATE TO authenticated USING ( (user_id = (SELECT auth.uid())) );

@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow account creators to insert their own financial accounts" ON public.financial_accounts;
+CREATE POLICY "Allow account creators to insert their own financial accounts" ON public.financial_accounts FOR INSERT TO authenticated WITH CHECK ( (user_id = (SELECT auth.uid())) );

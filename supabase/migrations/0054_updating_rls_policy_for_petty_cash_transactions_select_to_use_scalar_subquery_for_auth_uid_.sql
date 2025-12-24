@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Users can only view their own petty cash transactions" ON public.petty_cash_transactions;
+CREATE POLICY "Users can only view their own petty cash transactions" ON public.petty_cash_transactions FOR SELECT TO authenticated USING ( (user_id = (SELECT auth.uid())) );

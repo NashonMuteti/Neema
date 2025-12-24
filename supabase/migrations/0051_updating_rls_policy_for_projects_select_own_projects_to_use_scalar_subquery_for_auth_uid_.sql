@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Users can only view their own projects" ON public.projects;
+CREATE POLICY "Users can only view their own projects" ON public.projects FOR SELECT TO authenticated USING ( (user_id = (SELECT auth.uid())) );

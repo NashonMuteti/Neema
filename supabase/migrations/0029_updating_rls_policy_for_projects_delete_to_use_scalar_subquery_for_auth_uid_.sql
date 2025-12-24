@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow project creators to delete their own projects" ON public.projects;
+CREATE POLICY "Allow project creators to delete their own projects" ON public.projects FOR DELETE TO authenticated USING ( (user_id = (SELECT auth.uid())) );

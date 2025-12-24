@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Allow users to insert their own expenditure transactions" ON public.expenditure_transactions;
+CREATE POLICY "Allow users to insert their own expenditure transactions" ON public.expenditure_transactions FOR INSERT TO authenticated WITH CHECK ( (user_id = (SELECT auth.uid())) );
