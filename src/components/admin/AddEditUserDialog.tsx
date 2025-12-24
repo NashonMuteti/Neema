@@ -148,6 +148,9 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         user_metadata: {
           full_name: name,
           avatar_url: userImageUrl,
+          role: role, // Pass role to user_metadata
+          status: status, // Pass status to user_metadata
+          enable_login: enableLogin, // Pass enableLogin to user_metadata
         },
         emailRedirectTo: window.location.origin + '/login', // emailRedirectTo is a direct property
       } as any); // Cast to any to bypass strict type checking for this specific property
@@ -158,23 +161,9 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         return;
       }
       
-      if (userData.user) {
-        // Update the profile with the selected role and status
-        const { error: profileUpdateError } = await supabase
-          .from('profiles')
-          .update({
-            role,
-            status,
-            enable_login: enableLogin
-          })
-          .eq('id', userData.user.id);
-          
-        if (profileUpdateError) {
-          console.error("Error updating new user's profile with role/status:", profileUpdateError);
-          showError("Failed to set new user's role and status.");
-          return;
-        }
-      }
+      // The handle_new_user trigger will create the profile in public.profiles
+      // with the role, status, and enable_login from user_metadata.
+      // No need for a separate update here.
     }
     
     onSave();

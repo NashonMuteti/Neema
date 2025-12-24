@@ -110,6 +110,9 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       user_metadata: {
         full_name: name,
         avatar_url: memberImageUrl,
+        role: selectedRole, // Pass role to user_metadata
+        status: status,     // Pass status to user_metadata
+        enable_login: enableLogin, // Pass enableLogin to user_metadata
       },
       emailRedirectTo: window.location.origin + '/login', // Redirect to login after email verification
     } as any); // Cast to any to bypass strict type checking for this specific property
@@ -120,26 +123,9 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       return;
     }
     
-    if (userData.user) {
-      // Update public.profiles table with role, status, and enable_login
-      const { error: profileUpdateError } = await supabase
-        .from('profiles')
-        .update({
-          name: name,
-          email: email,
-          role: selectedRole,
-          status: status,
-          enable_login: enableLogin,
-          image_url: memberImageUrl,
-        })
-        .eq('id', userData.user.id);
-        
-      if (profileUpdateError) {
-        console.error("Error updating new member's profile:", profileUpdateError);
-        showError("Failed to set new member's role and status.");
-        return;
-      }
-    }
+    // The handle_new_user trigger will create the profile in public.profiles
+    // with the role, status, and enable_login from user_metadata.
+    // No need for a separate update here.
     
     onAddMember(); // Trigger parent to re-fetch members
     showSuccess("Member added successfully!");
