@@ -143,10 +143,21 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
         return;
       }
 
-      // If login was enabled and is now disabled, we just update the profile status.
-      // We do NOT delete the auth.users entry as per the agreed-upon logic (Option B).
-      // If login was disabled and is now enabled, we don't need to do anything here
-      // because the auth.users entry already exists.
+      // If login was disabled and is now enabled, and they haven't set a password, send invite
+      if (newEnableLogin && !oldEnableLogin) {
+        const userAuthData = currentAuthUser.user;
+        if (!userAuthData?.email_confirmed_at && !userAuthData?.last_sign_in_at) {
+          const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+            redirectTo: window.location.origin + '/login',
+          });
+          if (inviteError) {
+            console.error("Error sending invitation email:", inviteError);
+            showError(`User updated, but failed to send invitation email: ${inviteError.message}`);
+          } else {
+            showSuccess("User updated and invitation email sent successfully!");
+          }
+        }
+      }
     } else {
       // Member does NOT have an auth.users entry (non-login member)
       if (newEnableLogin && !oldEnableLogin) {

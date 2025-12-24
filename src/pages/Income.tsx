@@ -31,7 +31,7 @@ interface IncomeTransaction {
   amount: number;
   account_id: string;
   source: string;
-  user_id: string;
+  profile_id: string; // Changed from user_id to profile_id
 }
 
 const Income = () => {
@@ -81,7 +81,8 @@ const Income = () => {
   const fetchFinancialAccounts = React.useCallback(async () => {
     const { data, error } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance');
+      .select('id, name, current_balance')
+      .eq('profile_id', currentUser?.id); // Filter by profile_id
       
     if (error) {
       console.error("Error fetching financial accounts:", error);
@@ -92,7 +93,7 @@ const Income = () => {
         setIncomeAccount(data[0].id); // Set default account if none selected
       }
     }
-  }, [incomeAccount]);
+  }, [incomeAccount, currentUser]);
 
   const fetchIncomeTransactions = React.useCallback(async () => {
     setLoading(true);
@@ -109,7 +110,7 @@ const Income = () => {
     let query = supabase
       .from('income_transactions')
       .select('*, financial_accounts(name)')
-      .eq('user_id', currentUser.id)
+      .eq('profile_id', currentUser.id) // Use profile_id
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString());
       
@@ -131,7 +132,7 @@ const Income = () => {
         amount: tx.amount,
         account_id: tx.account_id,
         source: tx.source,
-        user_id: tx.user_id,
+        profile_id: tx.profile_id, // Use profile_id
         account_name: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
       })));
     }
@@ -177,7 +178,7 @@ const Income = () => {
         amount,
         account_id: incomeAccount,
         source: incomeSource,
-        user_id: currentUser.id,
+        profile_id: currentUser.id, // Use profile_id
       });
       
     if (insertError) {
@@ -189,7 +190,8 @@ const Income = () => {
       const { error: updateBalanceError } = await supabase
         .from('financial_accounts')
         .update({ current_balance: newBalance })
-        .eq('id', incomeAccount);
+        .eq('id', incomeAccount)
+        .eq('profile_id', currentUser.id); // Ensure user owns the account
         
       if (updateBalanceError) {
         console.error("Error updating account balance:", updateBalanceError);
@@ -224,7 +226,7 @@ const Income = () => {
       .from('income_transactions')
       .delete()
       .eq('id', id)
-      .eq('user_id', currentUser.id); // Ensure only owner can delete
+      .eq('profile_id', currentUser.id); // Ensure only owner can delete
       
     if (deleteError) {
       console.error("Error deleting income transaction:", deleteError);
@@ -237,7 +239,8 @@ const Income = () => {
         const { error: updateBalanceError } = await supabase
           .from('financial_accounts')
           .update({ current_balance: newBalance })
-          .eq('id', accountId);
+          .eq('id', accountId)
+          .eq('profile_id', currentUser.id); // Ensure user owns the account
           
         if (updateBalanceError) {
           console.error("Error reverting account balance:", updateBalanceError);

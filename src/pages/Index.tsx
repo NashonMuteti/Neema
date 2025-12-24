@@ -60,12 +60,12 @@ const Index = () => {
       const { data: incomeTransactions, error: incomeError } = await supabase
         .from('income_transactions')
         .select('date, amount')
-        .eq('user_id', currentUser.id);
+        .eq('profile_id', currentUser.id); // Use profile_id
 
       const { data: expenditureTransactions, error: expenditureError } = await supabase
         .from('expenditure_transactions')
         .select('date, amount')
-        .eq('user_id', currentUser.id);
+        .eq('profile_id', currentUser.id); // Use profile_id
 
       if (incomeError || expenditureError) {
         console.error("Error fetching financial data:", incomeError || expenditureError);
@@ -147,7 +147,7 @@ const Index = () => {
       const { data, error } = await supabase
         .from('projects')
         .select('id, name, due_date, status')
-        .eq('user_id', currentUser.id)
+        .eq('profile_id', currentUser.id) // Use profile_id
         .neq('status', 'Deleted'); // Exclude deleted projects
 
       if (error) {
@@ -184,7 +184,7 @@ const Index = () => {
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('id, name, member_contribution_amount')
-        .eq('user_id', currentUser.id)
+        .eq('profile_id', currentUser.id) // Use profile_id
         .eq('status', 'Open'); // Only consider open projects for contributions progress
 
       if (projectsError) {
