@@ -112,7 +112,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
         avatar_url: memberImageUrl,
       },
       emailRedirectTo: window.location.origin + '/login', // Redirect to login after email verification
-    });
+    } as any); // Cast to any to bypass strict type checking for this specific property
     
     if (createUserError) {
       console.error("Error creating new member in Auth:", createUserError);

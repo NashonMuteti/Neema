@@ -150,7 +150,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           avatar_url: userImageUrl,
         },
         emailRedirectTo: window.location.origin + '/login', // emailRedirectTo is a direct property
-      });
+      } as any); // Cast to any to bypass strict type checking for this specific property
       
       if (createUserError) {
         console.error("Error creating new user:", createUserError);
