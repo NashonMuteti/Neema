@@ -30,8 +30,8 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
-import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
-import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import storage utilities
+import { supabase } from "@/integrations/supabase/client";
+import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 import { fileUploadSchema } from "@/utils/security";
 
 interface Project {
@@ -42,7 +42,7 @@ interface Project {
   thumbnailUrl?: string;
   dueDate?: Date;
   memberContributionAmount?: number;
-  user_id: string; // Add user_id to match Supabase table
+  profile_id: string; // Changed from user_id to profile_id
 }
 
 interface EditProjectDialogProps {
@@ -74,7 +74,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
     project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : ""
   );
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -117,7 +117,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       showError("Project Name is required.");
       return;
     }
-    if (!currentUser || project.user_id !== currentUser.id) {
+    if (!currentUser || project.profile_id !== currentUser.id) { // Changed from user_id to profile_id
       showError("You do not have permission to edit this project.");
       return;
     }
@@ -128,23 +128,19 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       return;
     }
 
-    setIsUploading(true); // Start loading
+    setIsSaving(true);
     let projectThumbnailUrl: string | undefined = project.thumbnailUrl;
     if (selectedFile) {
-      const filePath = `project-thumbnails/${project.user_id}/${name.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const filePath = `project-thumbnails/${project.profile_id}/${name.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Changed from user_id to profile_id
       const uploadedUrl = await uploadFileToSupabase('project-thumbnails', selectedFile, filePath);
       if (uploadedUrl) {
         projectThumbnailUrl = uploadedUrl;
-        // For simplicity, we're not deleting the old image from storage here.
-        // A more robust solution would involve storing the storage path in the DB.
       } else {
-        setIsUploading(false);
-        return; // Stop if upload failed
+        setIsSaving(false);
+        return;
       }
     } else if (!selectedFile && project.thumbnailUrl) {
-      // If user cleared the selection, remove the existing thumbnail URL from DB
       projectThumbnailUrl = undefined;
-      // Optionally, delete from storage if path is known
     }
 
     const { error } = await supabase
@@ -175,7 +171,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       showSuccess("Project updated successfully!");
       setIsOpen(false);
     }
-    setIsUploading(false); // End loading
+    setIsSaving(false);
   };
 
   return (
@@ -200,7 +196,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
-              disabled={!canManageProjects || isUploading}
+              disabled={!canManageProjects || isSaving}
             />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -212,7 +208,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="col-span-3"
-              disabled={!canManageProjects || isUploading}
+              disabled={!canManageProjects || isSaving}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -227,7 +223,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
                     "col-span-3 justify-start text-left font-normal",
                     !dueDate && "text-muted-foreground"
                   )}
-                  disabled={!canManageProjects || isUploading}
+                  disabled={!canManageProjects || isSaving}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
@@ -255,14 +251,14 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
               value={memberContributionAmount}
               onChange={(e) => setMemberContributionAmount(e.target.value)}
               className="col-span-3"
-              disabled={!canManageProjects || isUploading}
+              disabled={!canManageProjects || isSaving}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Open" | "Closed" | "Deleted" | "Suspended") => setStatus(value)} disabled={!canManageProjects || isUploading}>
+            <Select value={status} onValueChange={(value: "Open" | "Closed" | "Deleted" | "Suspended") => setStatus(value)} disabled={!canManageProjects || isSaving}>
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -293,14 +289,14 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
-                disabled={!canManageProjects || isUploading}
+                disabled={!canManageProjects || isSaving}
               />
             </div>
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManageProjects || isUploading}>
-            {isUploading ? "Saving..." : "Save Changes"}
+          <Button onClick={handleSubmit} disabled={!canManageProjects || isSaving}>
+            {isSaving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">

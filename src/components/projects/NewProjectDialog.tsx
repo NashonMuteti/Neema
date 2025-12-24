@@ -24,8 +24,8 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
-import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
+import { supabase } from "@/integrations/supabase/client";
+import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 import { fileUploadSchema } from "@/utils/security";
 
 interface NewProjectDialogProps {
@@ -36,7 +36,7 @@ interface NewProjectDialogProps {
 const newProjectSchema = z.object({
   name: z.string().min(1, "Project Name is required."),
   description: z.string().optional(),
-  dueDate: z.date().optional().nullable(), // Due date can be optional
+  dueDate: z.date().optional().nullable(),
   memberContributionAmount: z.preprocess(
     (val) => (val === "" ? undefined : Number(val)),
     z.number().min(0, "Amount cannot be negative.").optional().nullable()
@@ -62,7 +62,23 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm<NewProjectFormValues>({
+    resolver: zodResolver(newProjectSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      dueDate: undefined,
+      memberContributionAmount: undefined,
+    },
+  });
 
   React.useEffect(() => {
     return () => {
@@ -97,7 +113,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
       return;
     }
 
-    setIsUploading(true); // Start loading
+    setIsSaving(true);
     let projectThumbnailUrl: string | undefined = undefined;
     if (selectedFile) {
       const filePath = `project-thumbnails/${currentUser.id}/${data.name.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
@@ -105,12 +121,11 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
       if (uploadedUrl) {
         projectThumbnailUrl = uploadedUrl;
       } else {
-        setIsUploading(false);
-        return; // Stop if upload failed
+        setIsSaving(false);
+        return;
       }
     }
 
-    // Call the parent's onAddProject function with the collected data
     onAddProject({
       name: data.name,
       description: data.description || "",
@@ -120,10 +135,10 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
     });
     
     setIsOpen(false);
-    reset(); // Reset form fields
+    reset();
     setSelectedFile(null);
     setPreviewUrl(null);
-    setIsUploading(false); // End loading
+    setIsSaving(false);
   };
 
   return (
@@ -147,7 +162,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               id="name"
               {...register("name")}
               className="col-span-3"
-              disabled={!canManageProjects || isUploading}
+              disabled={!canManageProjects || isSaving}
             />
             {errors.name && <p className="col-span-4 text-right text-sm text-destructive">{errors.name.message}</p>}
           </div>
@@ -159,7 +174,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               id="description"
               {...register("description")}
               className="col-span-3"
-              disabled={!canManageProjects || isUploading}
+              disabled={!canManageProjects || isSaving}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -178,7 +193,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
                         "col-span-3 justify-start text-left font-normal",
                         !field.value && "text-muted-foreground"
                       )}
-                      disabled={!canManageProjects || isUploading}
+                      disabled={!canManageProjects || isSaving}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
@@ -207,7 +222,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
               placeholder="0.00"
               {...register("memberContributionAmount")}
               className="col-span-3"
-              disabled={!canManageProjects || isUploading}
+              disabled={!canManageProjects || isSaving}
             />
             {errors.memberContributionAmount && <p className="col-span-4 text-right text-sm text-destructive">{errors.memberContributionAmount.message}</p>}
           </div>
@@ -227,13 +242,13 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
-                disabled={!canManageProjects || isUploading}
+                disabled={!canManageProjects || isSaving}
               />
             </div>
           </div>
           <div className="flex justify-end">
-            <Button type="submit" disabled={!canManageProjects || isUploading}>
-              {isUploading ? "Saving..." : "Save Project"}
+            <Button type="submit" disabled={!canManageProjects || isSaving}>
+              {isSaving ? "Saving..." : "Save Project"}
             </Button>
           </div>
           <p className="text-sm text-muted-foreground mt-2">

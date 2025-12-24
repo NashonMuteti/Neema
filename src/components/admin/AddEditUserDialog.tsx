@@ -13,7 +13,7 @@ import { User } from '@/context/AuthContext';
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
-import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
+import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 
 interface AddEditUserDialogProps {
   isOpen: boolean;
@@ -33,7 +33,6 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const { currentUser: loggedInUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   
-  // Check if user is Super Admin
   const isSuperAdmin = loggedInUser?.role === "Super Admin";
   
   const { canManageUserProfiles } = React.useMemo(() => {
@@ -41,7 +40,6 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       return { canManageUserProfiles: false };
     }
     
-    // Super Admin can manage user profiles
     if (isSuperAdmin) {
       return { canManageUserProfiles: true };
     }
@@ -60,7 +58,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
-  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -102,54 +100,69 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       return;
     }
     
-    setIsUploading(true); // Start loading
+    setIsSaving(true);
     let userImageUrl: string | undefined = initialData?.imageUrl;
     if (selectedFile) {
-      // Upload image to Supabase Storage
       const filePath = `avatars/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
       const uploadedUrl = await uploadFileToSupabase('avatars', selectedFile, filePath);
       if (uploadedUrl) {
         userImageUrl = uploadedUrl;
       } else {
-        setIsUploading(false);
-        return; // Stop if upload failed
+        setIsSaving(false);
+        return;
       }
     } else if (!selectedFile && !initialData?.imageUrl) {
-      // If no new file and no existing image, ensure imageUrl is undefined
       userImageUrl = undefined;
     }
     
     if (initialData?.id) {
       // Editing existing user
-      // Fetch current auth user details to check email_confirmed_at and last_sign_in_at
-      const { data: currentAuthUser, error: fetchAuthUserError } = await supabase.auth.admin.getUserById(initialData.id);
-      if (fetchAuthUserError) {
-        console.error("Error fetching current auth user:", fetchAuthUserError);
-        showError("Failed to verify user's current login status.");
-        setIsUploading(false);
-        return;
-      }
-
       const oldEnableLogin = initialData.enableLogin;
       const newEnableLogin = enableLogin;
 
-      // 1. Update user in Supabase Auth
-      const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
-        email: email,
-        user_metadata: {
-          full_name: name,
-          avatar_url: userImageUrl,
-        },
-      });
+      // Check if the user has an auth.users entry
+      const { data: currentAuthUser, error: fetchAuthUserError } = await supabase.auth.admin.getUserById(initialData.id);
+      const hasAuthUser = !fetchAuthUserError && currentAuthUser.user !== null;
 
-      if (authUpdateError) {
-        console.error("Error updating Supabase Auth user:", authUpdateError);
-        showError("Failed to update user authentication details.");
-        setIsUploading(false);
-        return;
+      if (hasAuthUser) {
+        // User has an auth.users entry, update it
+        const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
+          email: email,
+          data: { full_name: name, avatar_url: userImageUrl },
+        });
+
+        if (authUpdateError) {
+          console.error("Error updating Supabase Auth user:", authUpdateError);
+          showError("Failed to update user authentication details.");
+          setIsSaving(false);
+          return;
+        }
+
+        // If login was disabled and is now enabled, and they haven't set a password, send invite
+        if (newEnableLogin && !oldEnableLogin) {
+          const userAuthData = currentAuthUser.user;
+          if (!userAuthData?.email_confirmed_at && !userAuthData?.last_sign_in_at) {
+            const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+              redirectTo: window.location.origin + '/login',
+            });
+            if (inviteError) {
+              console.error("Error sending invitation email:", inviteError);
+              showError(`User updated, but failed to send invitation email: ${inviteError.message}`);
+            } else {
+              showSuccess("User updated and invitation email sent successfully!");
+            }
+          }
+        }
+      } else {
+        // User does NOT have an auth.users entry (non-login member)
+        if (newEnableLogin && !oldEnableLogin) {
+          showError("To enable login for this member, please create a new user account with login enabled and then manually transfer any existing data. Direct conversion is not supported.");
+          setIsSaving(false);
+          return;
+        }
       }
 
-      // 2. Update public.profiles table
+      // Update public.profiles table
       const { error: profileUpdateError } = await supabase
         .from('profiles')
         .update({
@@ -165,55 +178,34 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       if (profileUpdateError) {
         console.error("Error updating user profile:", profileUpdateError);
         showError("Failed to update user profile details.");
-        setIsUploading(false);
+        setIsSaving(false);
         return;
       }
-
-      // 3. Conditional invitation if login is enabled and user hasn't set password
-      if (newEnableLogin && !oldEnableLogin) { // If login was disabled and is now enabled
-        const userAuthData = currentAuthUser.user;
-        // Check if email is not confirmed AND they haven't signed in (implying no password set)
-        if (!userAuthData?.email_confirmed_at && !userAuthData?.last_sign_in_at) {
-          const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-            redirectTo: window.location.origin + '/login',
-          });
-          if (inviteError) {
-            console.error("Error sending invitation email:", inviteError);
-            showError(`User updated, but failed to send invitation email: ${inviteError.message}`);
-          } else {
-            showSuccess("User updated and invitation email sent successfully!");
-          }
-        } else {
-          showSuccess("User updated successfully!");
-        }
-      } else {
-        showSuccess("User updated successfully!");
-      }
+      showSuccess("User updated successfully!");
 
     } else {
-      // Adding new user (this path should ideally be handled by AddMemberDialog,
-      // but for completeness, replicating the logic here)
-      const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
-        email: email,
-        user_metadata: {
-          full_name: name,
-          avatar_url: userImageUrl,
-          role: role,
-          status: status,
-          enable_login: enableLogin,
-        },
-      });
+      // Adding new user
+      if (enableLogin) {
+        // Create user in Supabase Auth. The handle_new_user trigger will create the profile.
+        const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
+          email: email,
+          user_metadata: {
+            full_name: name,
+            avatar_url: userImageUrl,
+            role: role,
+            status: status,
+            enable_login: enableLogin,
+          },
+        });
 
-      if (createUserError) {
-        console.error("Error creating new user:", createUserError);
-        showError(`Failed to add new user: ${createUserError.message}`);
-        setIsUploading(false);
-        return;
-      }
+        if (createUserError) {
+          console.error("Error creating new user in Auth:", createUserError);
+          showError(`Failed to add new user: ${createUserError.message}`);
+          setIsSaving(false);
+          return;
+        }
 
-      if (userData.user) {
-        // The handle_new_user trigger should have created the profile with the metadata.
-        if (enableLogin) {
+        if (userData.user) {
           const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
             redirectTo: window.location.origin + '/login',
           });
@@ -223,15 +215,33 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           } else {
             showSuccess("User added and invitation email sent successfully!");
           }
-        } else {
-          showSuccess("User added successfully (login disabled).");
         }
+      } else {
+        // Add member directly to public.profiles without creating an auth.users entry
+        const { error: createProfileError } = await supabase
+          .from('profiles')
+          .insert({
+            name: name,
+            email: email,
+            role: role,
+            status: status,
+            enable_login: false, // Explicitly false for non-login members
+            image_url: userImageUrl,
+          });
+
+        if (createProfileError) {
+          console.error("Error adding non-login user to profiles:", createProfileError);
+          showError(`Failed to add non-login user: ${createProfileError.message}`);
+          setIsSaving(false);
+          return;
+        }
+        showSuccess("Non-login user added successfully!");
       }
     }
     
     onSave();
     setIsOpen(false);
-    setIsUploading(false); // End loading
+    setIsSaving(false);
   };
 
   return (
@@ -260,7 +270,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
                 accept="image/*" 
                 onChange={handleFileChange} 
                 className="col-span-3" 
-                disabled={!canManageUserProfiles || isUploading}
+                disabled={!canManageUserProfiles || isSaving}
               />
             </div>
           </div>
@@ -273,7 +283,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               value={name} 
               onChange={(e) => setName(e.target.value)} 
               className="col-span-3" 
-              disabled={!canManageUserProfiles || isUploading}
+              disabled={!canManageUserProfiles || isSaving}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -286,7 +296,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               value={email} 
               onChange={(e) => setEmail(e.target.value)} 
               className="col-span-3" 
-              disabled={!canManageUserProfiles || isUploading}
+              disabled={!canManageUserProfiles || isSaving}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -296,7 +306,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             <Select 
               value={role} 
               onValueChange={(value: string) => setRole(value)} 
-              disabled={!canManageUserProfiles || isUploading}
+              disabled={!canManageUserProfiles || isSaving}
             >
               <SelectTrigger id="role" className="col-span-3">
                 <SelectValue placeholder="Select role" />
@@ -320,7 +330,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             <Select 
               value={status} 
               onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} 
-              disabled={!canManageUserProfiles || isUploading}
+              disabled={!canManageUserProfiles || isSaving}
             >
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
@@ -344,16 +354,16 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               checked={enableLogin} 
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)} 
               className="col-span-3" 
-              disabled={!canManageUserProfiles || isUploading}
+              disabled={!canManageUserProfiles || isSaving}
             />
           </div>
         </div>
         <div className="flex justify-end">
           <Button 
             onClick={handleSubmit} 
-            disabled={!canManageUserProfiles || isUploading}
+            disabled={!canManageUserProfiles || isSaving}
           >
-            {isUploading ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add User"}</>}
+            {isSaving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add User"}</>}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">

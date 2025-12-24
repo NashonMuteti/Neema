@@ -23,14 +23,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
-import { useAuth, User } from "@/context/AuthContext"; // New import, use centralized User interface
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
-import { supabase } from "@/integrations/supabase/client"; // Import supabase client
+import { Image as ImageIcon, Upload } from "lucide-react";
+import { useAuth, User } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
+import { fileUploadSchema } from "@/utils/security";
+import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 
 interface EditMemberDialogProps {
-  member: User; // Use the centralized User interface
-  onEditMember: () => void; // Changed to trigger a re-fetch in parent
+  member: User;
+  onEditMember: () => void;
 }
 
 const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMember }) => {
@@ -49,22 +51,24 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
 
   const [name, setName] = React.useState(member.name);
   const [email, setEmail] = React.useState(member.email);
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // New state for uploaded file
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(member.imageUrl || null); // New state for image preview
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(member.imageUrl || null);
   const [enableLogin, setEnableLogin] = React.useState(member.enableLogin);
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(member.status);
+  const [selectedRole, setSelectedRole] = React.useState<string>(member.role);
   const [isOpen, setIsOpen] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
       setName(member.name);
       setEmail(member.email);
-      setSelectedFile(null); // Reset selected file
-      setPreviewUrl(member.imageUrl || null); // Reset preview to current image
+      setSelectedFile(null);
+      setPreviewUrl(member.imageUrl || null);
       setEnableLogin(member.enableLogin);
       setStatus(member.status);
+      setSelectedRole(member.role);
     }
-    // Cleanup object URL when component unmounts or dialog closes
     return () => {
       if (previewUrl && previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(previewUrl);
@@ -75,11 +79,19 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file)); // Create a URL for immediate preview
+      try {
+        fileUploadSchema.parse(file);
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        event.target.value = "";
+        return;
+      }
     } else {
       setSelectedFile(null);
-      setPreviewUrl(member.imageUrl || null); // Revert to current image if no file selected
+      setPreviewUrl(member.imageUrl || null);
     }
   };
 
@@ -88,42 +100,80 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       showError("Name and Email are required.");
       return;
     }
+    if (!selectedRole) {
+      showError("A role must be selected for the member.");
+      return;
+    }
 
+    setIsSaving(true);
     let memberImageUrl: string | undefined = member.imageUrl;
-    if (selectedFile && previewUrl) {
-      memberImageUrl = previewUrl;
-      // In a real app, you'd upload the file to Supabase Storage here
-    } else if (!selectedFile && !member.imageUrl) {
+    if (selectedFile) {
+      const filePath = `avatars/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const uploadedUrl = await uploadFileToSupabase('avatars', selectedFile, filePath);
+      if (uploadedUrl) {
+        memberImageUrl = uploadedUrl;
+      } else {
+        setIsSaving(false);
+        return;
+      }
+    } else if (!selectedFile && member.imageUrl) {
+      // If user cleared the selection, remove the existing thumbnail URL from DB
       memberImageUrl = undefined;
     }
 
-    // Update Supabase auth user metadata (for full_name)
-    const { error: authUpdateError } = await supabase.auth.updateUser({
-      email: email, // Can update email if needed, but usually handled by Supabase Auth UI
-      data: { full_name: name, avatar_url: memberImageUrl },
-    });
+    // Check if the member has an associated auth.users entry
+    const { data: authUser, error: fetchAuthUserError } = await supabase.auth.admin.getUserById(member.id);
+    const hasAuthUser = !fetchAuthUserError && authUser.user !== null;
 
-    if (authUpdateError) {
-      console.error("Error updating user metadata:", authUpdateError);
-      showError("Failed to update member authentication details.");
-      return;
+    const oldEnableLogin = member.enableLogin;
+    const newEnableLogin = enableLogin;
+
+    if (hasAuthUser) {
+      // Member has an auth.users entry
+      // Update Supabase auth user metadata (for full_name)
+      const { error: authUpdateError } = await supabase.auth.admin.updateUserById(member.id, {
+        email: email,
+        data: { full_name: name, avatar_url: memberImageUrl },
+      });
+
+      if (authUpdateError) {
+        console.error("Error updating user metadata:", authUpdateError);
+        showError("Failed to update member authentication details.");
+        setIsSaving(false);
+        return;
+      }
+
+      // If login was enabled and is now disabled, we just update the profile status.
+      // We do NOT delete the auth.users entry as per the agreed-upon logic (Option B).
+      // If login was disabled and is now enabled, we don't need to do anything here
+      // because the auth.users entry already exists.
+    } else {
+      // Member does NOT have an auth.users entry (non-login member)
+      if (newEnableLogin && !oldEnableLogin) {
+        // Admin is trying to enable login for a non-login member (Option A)
+        showError("To enable login for this member, please create a new user account with login enabled and then manually transfer any existing data. Direct conversion is not supported.");
+        setIsSaving(false);
+        return;
+      }
     }
 
     // Update public.profiles table
     const { error: profileUpdateError } = await supabase
       .from('profiles')
-      .update({ name, email, enable_login: enableLogin, image_url: memberImageUrl, status })
+      .update({ name, email, enable_login: newEnableLogin, image_url: memberImageUrl, status, role: selectedRole })
       .eq('id', member.id);
 
     if (profileUpdateError) {
       console.error("Error updating member profile:", profileUpdateError);
       showError("Failed to update member profile details.");
+      setIsSaving(false);
       return;
     }
 
-    onEditMember(); // Trigger parent to re-fetch members
+    onEditMember();
     showSuccess("Member updated successfully!");
     setIsOpen(false);
+    setIsSaving(false);
   };
 
   return (
@@ -148,7 +198,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
-              disabled={!canManageMembers}
+              disabled={!canManageMembers || isSaving}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -161,7 +211,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="col-span-3"
-              disabled={!canManageMembers}
+              disabled={!canManageMembers || isSaving}
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
@@ -180,27 +230,35 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
-                disabled={!canManageMembers}
+                disabled={!canManageMembers || isSaving}
               />
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="enableLogin" className="text-right">
-              Enable Login
+            <Label htmlFor="member-role" className="text-right">
+              Role
             </Label>
-            <Checkbox
-              id="enableLogin"
-              checked={enableLogin}
-              onCheckedChange={(checked) => setEnableLogin(checked as boolean)}
-              className="col-span-3"
-              disabled={!canManageMembers}
-            />
+            <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!canManageMembers || isSaving}>
+              <SelectTrigger id="member-role" className="col-span-3">
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Member Role</SelectLabel>
+                  {definedRoles.map((roleOption) => (
+                    <SelectItem key={roleOption.id} value={roleOption.name}>
+                      {roleOption.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageMembers}>
+            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageMembers || isSaving}>
               <SelectTrigger id="status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -214,9 +272,21 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
               </SelectContent>
             </Select>
           </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="enableLogin" className="text-right">
+              Enable Login
+            </Label>
+            <Checkbox
+              id="enableLogin"
+              checked={enableLogin}
+              onCheckedChange={(checked) => setEnableLogin(checked as boolean)}
+              className="col-span-3"
+              disabled={!canManageMembers || isSaving}
+            />
+          </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManageMembers}>Save Changes</Button>
+          <Button onClick={handleSubmit} disabled={!canManageMembers || isSaving}>Save Changes</Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Note: Password resets must be initiated separately. Image storage and serving require backend integration (e.g., Supabase).

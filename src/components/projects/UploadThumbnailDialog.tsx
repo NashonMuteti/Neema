@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Image as ImageIcon, Upload } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
-import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
 import { fileUploadSchema } from "@/utils/security";
-import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
+import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 
 interface UploadThumbnailDialogProps {
   projectId: string;
@@ -42,7 +42,7 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(currentThumbnailUrl || null);
-  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -59,7 +59,6 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validate file before processing
       try {
         fileUploadSchema.parse(file);
         setSelectedFile(file);
@@ -67,7 +66,7 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
-        event.target.value = ""; // Reset the input
+        event.target.value = "";
         return;
       }
     } else {
@@ -82,7 +81,6 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
       return;
     }
     
-    // Validate file before upload
     try {
       fileUploadSchema.parse(selectedFile);
     } catch (error) {
@@ -91,13 +89,27 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
       return;
     }
     
-    setIsUploading(true); // Start loading
-    // Upload file to Supabase Storage
-    const filePath = `project-thumbnails/${currentUser?.id || 'unknown'}/${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+    setIsSaving(true);
+    // Fetch project details to get the profile_id
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select('profile_id')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError || !projectData?.profile_id) {
+      console.error("Error fetching project profile_id:", projectError);
+      showError("Failed to get project owner information for upload.");
+      setIsSaving(false);
+      return;
+    }
+
+    const projectOwnerProfileId = projectData.profile_id;
+
+    const filePath = `project-thumbnails/${projectOwnerProfileId}/${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
     const uploadedUrl = await uploadFileToSupabase('project-thumbnails', selectedFile, filePath);
 
     if (uploadedUrl) {
-      // Update the project's thumbnail_url in the database
       const { error: dbUpdateError } = await supabase
         .from('projects')
         .update({ thumbnail_url: uploadedUrl })
@@ -106,7 +118,7 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
       if (dbUpdateError) {
         console.error("Error updating project thumbnail URL in DB:", dbUpdateError);
         showError("Failed to update project thumbnail in database.");
-        setIsUploading(false);
+        setIsSaving(false);
         return;
       }
 
@@ -114,11 +126,10 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
       showSuccess(`Thumbnail for '${projectName}' updated successfully!`);
       setIsOpen(false);
     } else {
-      // uploadFileToSupabase already shows an error, so just return
-      setIsUploading(false);
+      setIsSaving(false);
       return;
     }
-    setIsUploading(false); // End loading
+    setIsSaving(false);
   };
 
   return (
@@ -158,14 +169,14 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
                 type="file"
                 accept="image/*"
                 onChange={handleFileChange}
-                disabled={!canManageProjects || isUploading}
+                disabled={!canManageProjects || isSaving}
               />
             </div>
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleUpload} disabled={!selectedFile || !canManageProjects || isUploading}>
-            {isUploading ? "Uploading..." : <><Upload className="mr-2 h-4 w-4" /> Upload</>}
+          <Button onClick={handleUpload} disabled={!selectedFile || !canManageProjects || isSaving}>
+            {isSaving ? "Uploading..." : <><Upload className="mr-2 h-4 w-4" /> Upload</>}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">

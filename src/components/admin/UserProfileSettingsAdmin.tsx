@@ -18,7 +18,6 @@ const UserProfileSettingsAdmin = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   
-  // Check if user is Super Admin
   const isSuperAdmin = currentUser?.role === "Super Admin";
   
   const { canManageUserProfiles } = useMemo(() => {
@@ -26,7 +25,6 @@ const UserProfileSettingsAdmin = () => {
       return { canManageUserProfiles: false };
     }
     
-    // Super Admin can manage user profiles
     if (isSuperAdmin) {
       return { canManageUserProfiles: true };
     }
@@ -72,7 +70,7 @@ const UserProfileSettingsAdmin = () => {
         status: p.status as "Active" | "Inactive" | "Suspended",
         enableLogin: p.enable_login ?? false,
         imageUrl: p.image_url || undefined,
-        receiveNotifications: p.receive_notifications ?? true, // Added missing property
+        receiveNotifications: p.receive_notifications ?? true,
       })));
     }
     
@@ -107,20 +105,21 @@ const UserProfileSettingsAdmin = () => {
   };
 
   const handleSaveUser = () => {
-    fetchUsers(); // Re-fetch users after adding/editing
+    fetchUsers();
   };
 
   const handleDeleteUser = async () => {
     if (deletingUserId) {
+      // Use the RPC function to delete the user, which now handles both auth.users and public.profiles
       const { error } = await supabase.rpc('delete_user_by_id', { user_id_to_delete: deletingUserId });
       
       if (error) {
-        console.error("Error deleting user from Supabase Auth:", error);
+        console.error("Error deleting user:", error);
         showError(`Failed to delete user: ${error.message}`);
       } else {
         showSuccess("User deleted successfully!");
         setDeletingUserId(undefined);
-        fetchUsers(); // Re-fetch to update the list
+        fetchUsers();
       }
     }
   };
@@ -240,7 +239,6 @@ const UserProfileSettingsAdmin = () => {
         )}
       </CardContent>
       
-      {/* Add/Edit User Dialog */}
       <AddEditUserDialog 
         isOpen={isAddEditUserDialogOpen} 
         setIsOpen={setIsAddEditUserDialogOpen} 
@@ -249,7 +247,6 @@ const UserProfileSettingsAdmin = () => {
         availableRoles={definedRoles}
       />
       
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingUserId} onOpenChange={(open) => !open && setDeletingUserId(undefined)}>
         <AlertDialogContent>
           <AlertDialogHeader>

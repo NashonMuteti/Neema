@@ -6,16 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast";
-import { Image as ImageIcon, Upload } from "lucide-react"; // Import ImageIcon and Upload
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
-import { supabase } from "@/integrations/supabase/client"; // Import supabase client
+import { Image as ImageIcon, Upload } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,} from "@/components/ui/select";
 import { fileUploadSchema } from "@/utils/security";
-import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
+import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 
 interface AddMemberDialogProps {
-  onAddMember: () => void; // Changed to trigger a re-fetch in parent
+  onAddMember: () => void;
 }
 
 const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
@@ -35,16 +35,15 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
 
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null); // State for the uploaded file
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null); // State for image preview
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const [enableLogin, setEnableLogin] = React.useState(false);
   const [selectedRole, setSelectedRole] = React.useState<string>(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Active");
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
+  const [isSaving, setIsSaving] = React.useState(false); // Changed from isUploading to isSaving for broader scope
 
   React.useEffect(() => {
-    // Clean up the object URL when the component unmounts or file changes
     return () => {
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
@@ -61,15 +60,14 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validate file before processing
       try {
         fileUploadSchema.parse(file);
         setSelectedFile(file);
-        setPreviewUrl(URL.createObjectURL(file)); // Create a URL for immediate preview
+        setPreviewUrl(URL.createObjectURL(file));
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
-        event.target.value = ""; // Reset the input
+        event.target.value = "";
         return;
       }
     } else {
@@ -89,46 +87,43 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       return;
     }
     
-    setIsUploading(true); // Start loading
+    setIsSaving(true);
     let memberImageUrl: string | undefined = undefined;
 
     if (selectedFile) {
-      // Upload image to Supabase Storage
       const filePath = `avatars/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
       const uploadedUrl = await uploadFileToSupabase('avatars', selectedFile, filePath);
       if (uploadedUrl) {
         memberImageUrl = uploadedUrl;
       } else {
-        setIsUploading(false);
-        return; // Stop if upload failed
+        setIsSaving(false);
+        return;
       }
     }
     
-    // 1. Create user in Supabase Auth. Pass all profile data via user_metadata for the trigger.
-    const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
-      email: email,
-      user_metadata: {
-        full_name: name,
-        avatar_url: memberImageUrl,
-        role: selectedRole,
-        status: status,
-        enable_login: enableLogin,
-      },
-    });
-    
-    if (createUserError) {
-      console.error("Error creating new member in Auth:", createUserError);
-      showError(`Failed to add new member: ${createUserError.message}`);
-      setIsUploading(false);
-      return;
-    }
-    
-    if (userData.user) {
-      // The handle_new_user trigger should have created the profile with the metadata.
-      // Now, if login is enabled, send an invitation email to set password.
-      if (enableLogin) {
+    if (enableLogin) {
+      // Create user in Supabase Auth. The handle_new_user trigger will create the profile.
+      const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
+        email: email,
+        user_metadata: {
+          full_name: name,
+          avatar_url: memberImageUrl,
+          role: selectedRole,
+          status: status,
+          enable_login: enableLogin,
+        },
+      });
+      
+      if (createUserError) {
+        console.error("Error creating new member in Auth:", createUserError);
+        showError(`Failed to add new member: ${createUserError.message}`);
+        setIsSaving(false);
+        return;
+      }
+      
+      if (userData.user) {
         const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-          redirectTo: window.location.origin + '/login', // This is the correct redirect for invite
+          redirectTo: window.location.origin + '/login',
         });
         if (inviteError) {
           console.error("Error sending invitation email:", inviteError);
@@ -136,23 +131,41 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
         } else {
           showSuccess("Member added and invitation email sent successfully!");
         }
-      } else {
-        showSuccess("Member added successfully (login disabled).");
       }
-      
-      onAddMember(); // Trigger parent to re-fetch members
-      setIsOpen(false);
-      
-      // Reset form states
-      setName("");
-      setEmail("");
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setEnableLogin(false);
-      setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
-      setStatus("Active");
+    } else {
+      // Add member directly to public.profiles without creating an auth.users entry
+      const { error: createProfileError } = await supabase
+        .from('profiles')
+        .insert({
+          name: name,
+          email: email,
+          role: selectedRole,
+          status: status,
+          enable_login: false, // Explicitly false for non-login members
+          image_url: memberImageUrl,
+        });
+
+      if (createProfileError) {
+        console.error("Error adding non-login member to profiles:", createProfileError);
+        showError(`Failed to add non-login member: ${createProfileError.message}`);
+        setIsSaving(false);
+        return;
+      }
+      showSuccess("Non-login member added successfully!");
     }
-    setIsUploading(false); // End loading
+    
+    onAddMember();
+    setIsOpen(false);
+    
+    // Reset form states
+    setName("");
+    setEmail("");
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setEnableLogin(false);
+    setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
+    setStatus("Active");
+    setIsSaving(false);
   };
 
   return (
@@ -177,7 +190,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
-              disabled={!canManageMembers || isUploading}
+              disabled={!canManageMembers || isSaving}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -190,7 +203,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="col-span-3"
-              disabled={!canManageMembers || isUploading}
+              disabled={!canManageMembers || isSaving}
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
@@ -215,7 +228,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
-                disabled={!canManageMembers || isUploading}
+                disabled={!canManageMembers || isSaving}
               />
             </div>
           </div>
@@ -223,7 +236,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
             <Label htmlFor="member-role" className="text-right">
               Role
             </Label>
-            <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!canManageMembers || isUploading}>
+            <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!canManageMembers || isSaving}>
               <SelectTrigger id="member-role" className="col-span-3">
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
@@ -243,7 +256,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
             <Label htmlFor="member-status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageMembers || isUploading}>
+            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageMembers || isSaving}>
               <SelectTrigger id="member-status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -266,16 +279,16 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               checked={enableLogin}
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)}
               className="col-span-3"
-              disabled={!canManageMembers || isUploading}
+              disabled={!canManageMembers || isSaving}
             />
           </div>
         </div>
         <div className="flex justify-end">
           <Button
             onClick={handleSubmit}
-            disabled={!name || !email || !canManageMembers || !selectedRole || isUploading}
+            disabled={!name || !email || !canManageMembers || !selectedRole || isSaving}
           >
-            {isUploading ? "Saving..." : <><Upload className="mr-2 h-4 w-4" /> Save Member</>}
+            {isSaving ? "Saving..." : <><Upload className="mr-2 h-4 w-4" /> Save Member</>}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
