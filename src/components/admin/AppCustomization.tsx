@@ -3,6 +3,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import BrandSettings from "./BrandSettings";
+import HeaderCustomization from "./HeaderCustomization"; // New import
 import {
   Select,
   SelectContent,
@@ -84,6 +85,7 @@ const AppCustomization = () => {
         </CardContent>
       </Card>
       <BrandSettings />
+      <HeaderCustomization /> {/* New: Include HeaderCustomization component */}
     </div>
   );
 };

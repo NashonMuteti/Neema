@@ -10,6 +10,7 @@ import MemberFieldCustomization from "@/components/admin/MemberFieldCustomizatio
 import UserRolesSettings from "@/components/admin/UserRolesSettings";
 import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings";
 import FinancialAccountsSettings from "@/components/admin/FinancialAccountsSettings"; // New import
+import HeaderCustomization from "@/components/admin/HeaderCustomization"; // New import
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 
@@ -43,7 +44,9 @@ const AdminSettings = () => {
   const canInitializeBalances = currentUserPrivileges.includes("Initialize Balances") || 
                                currentUser?.role === "Super Admin";
   const canManageFinancialAccounts = currentUserPrivileges.includes("Manage Financial Accounts") ||
-                                     currentUser?.role === "Super Admin"; // New privilege check
+                                     currentUser?.role === "Super Admin";
+  const canManageHeaderCustomization = currentUserPrivileges.includes("Manage Header Customization") ||
+                                       currentUser?.role === "Super Admin"; // New privilege check
   
   // --- START DEBUG LOGS ---
   console.log("AdminSettings Debug:");
@@ -59,7 +62,8 @@ const AdminSettings = () => {
   console.log("  canManageSecurity:", canManageSecurity);
   console.log("  canManageDatabaseMaintenance:", canManageDatabaseMaintenance);
   console.log("  canInitializeBalances:", canInitializeBalances);
-  console.log("  canManageFinancialAccounts:", canManageFinancialAccounts); // New debug log
+  console.log("  canManageFinancialAccounts:", canManageFinancialAccounts);
+  console.log("  canManageHeaderCustomization:", canManageHeaderCustomization); // New debug log
   // --- END DEBUG LOGS ---
 
   // If user doesn't have access to admin settings, show a message
@@ -76,7 +80,7 @@ const AdminSettings = () => {
   
   // Determine which tabs to show based on privileges
   const tabsToShow = [];
-  if (canManageAppCustomization || canManageSystemCurrency || canManageFinancialAccounts) { // Updated condition
+  if (canManageAppCustomization || canManageSystemCurrency || canManageFinancialAccounts || canManageHeaderCustomization) { // Updated condition
     tabsToShow.push({ value: "general", label: "General" });
   }
   if (canManageSecurity) {
@@ -130,7 +134,8 @@ const AdminSettings = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> {/* New grid layout */}
                 {canManageAppCustomization && <AppCustomization />}
                 {canManageSystemCurrency && <SystemCurrencySettings />}
-                {canManageFinancialAccounts && <FinancialAccountsSettings />} {/* New component */}
+                {canManageFinancialAccounts && <FinancialAccountsSettings />}
+                {canManageHeaderCustomization && <HeaderCustomization />} {/* New component */}
               </div>
             )}
             {tab.value === "security" && <SecuritySettings />}

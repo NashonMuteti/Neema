@@ -44,4 +44,5 @@ export const allPrivilegeNames = [
   "Manage Member Fields",
   "Manage Database Maintenance",
   "Manage Financial Accounts",
+  "Manage Header Customization", // New privilege
 ];
