@@ -12,6 +12,7 @@ import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client"; // Import supabase client
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,} from "@/components/ui/select";
 import { fileUploadSchema } from "@/utils/security";
+import { uploadFileToSupabase } from "@/integrations/supabase/storage"; // Import the new storage utility
 
 interface AddMemberDialogProps {
   onAddMember: () => void; // Changed to trigger a re-fetch in parent
@@ -40,6 +41,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [selectedRole, setSelectedRole] = React.useState<string>(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Active");
   const [isOpen, setIsOpen] = React.useState(false);
+  const [isUploading, setIsUploading] = React.useState(false); // New state for upload loading
 
   React.useEffect(() => {
     // Clean up the object URL when the component unmounts or file changes
@@ -87,26 +89,24 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       return;
     }
     
+    setIsUploading(true); // Start loading
     let memberImageUrl: string | undefined = undefined;
+
     if (selectedFile) {
-      // Validate file before upload
-      try {
-        fileUploadSchema.parse(selectedFile);
-        // In a real app, this is where you'd upload the file to a storage service
-        // and get a permanent URL. For now, we use the preview URL.
-        memberImageUrl = previewUrl || undefined;
-      } catch (error) {
-        console.error("File validation error:", error);
-        showError("Invalid file. Please upload an image file less than 5MB.");
-        return;
+      // Upload image to Supabase Storage
+      const filePath = `avatars/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const uploadedUrl = await uploadFileToSupabase('avatars', selectedFile, filePath);
+      if (uploadedUrl) {
+        memberImageUrl = uploadedUrl;
+      } else {
+        setIsUploading(false);
+        return; // Stop if upload failed
       }
     }
     
     // 1. Create user in Supabase Auth. Pass all profile data via user_metadata for the trigger.
     const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
       email: email,
-      // Do not set email_confirm: true here to avoid sending an immediate verification email
-      // if login is intended to be disabled initially.
       user_metadata: {
         full_name: name,
         avatar_url: memberImageUrl,
@@ -114,13 +114,12 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
         status: status,
         enable_login: enableLogin,
       },
-      // emailRedirectTo is for email verification links, not invite links.
-      // We will use inviteUserByEmail for password setting.
     });
     
     if (createUserError) {
       console.error("Error creating new member in Auth:", createUserError);
       showError(`Failed to add new member: ${createUserError.message}`);
+      setIsUploading(false);
       return;
     }
     
@@ -153,6 +152,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
       setStatus("Active");
     }
+    setIsUploading(false); // End loading
   };
 
   return (
@@ -177,7 +177,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
-              disabled={!canManageMembers}
+              disabled={!canManageMembers || isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -190,7 +190,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="col-span-3"
-              disabled={!canManageMembers}
+              disabled={!canManageMembers || isUploading}
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
@@ -215,7 +215,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
                 accept="image/*"
                 onChange={handleFileChange}
                 className="col-span-3"
-                disabled={!canManageMembers}
+                disabled={!canManageMembers || isUploading}
               />
             </div>
           </div>
@@ -223,7 +223,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
             <Label htmlFor="member-role" className="text-right">
               Role
             </Label>
-            <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!canManageMembers}>
+            <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!canManageMembers || isUploading}>
               <SelectTrigger id="member-role" className="col-span-3">
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
@@ -243,7 +243,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
             <Label htmlFor="member-status" className="text-right">
               Status
             </Label>
-            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageMembers}>
+            <Select value={status} onValueChange={(value: "Active" | "Inactive" | "Suspended") => setStatus(value)} disabled={!canManageMembers || isUploading}>
               <SelectTrigger id="member-status" className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -266,20 +266,20 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               checked={enableLogin}
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)}
               className="col-span-3"
-              disabled={!canManageMembers}
+              disabled={!canManageMembers || isUploading}
             />
           </div>
         </div>
         <div className="flex justify-end">
           <Button
             onClick={handleSubmit}
-            disabled={!name || !email || !canManageMembers || !selectedRole}
+            disabled={!name || !email || !canManageMembers || !selectedRole || isUploading}
           >
-            <Upload className="mr-2 h-4 w-4" /> Save Member
+            {isUploading ? "Saving..." : <><Upload className="mr-2 h-4 w-4" /> Save Member</>}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: If "Enable Login" is checked, an invitation email will be sent to the user to set their password. Image storage and serving require backend integration (e.g., Supabase).
+          Note: If "Enable Login" is checked, an invitation email will be sent to the user to set their password.
         </p>
       </DialogContent>
     </Dialog>
