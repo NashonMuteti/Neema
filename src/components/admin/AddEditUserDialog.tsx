@@ -149,11 +149,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           full_name: name,
           avatar_url: userImageUrl,
         },
-        // password is optional for admin.createUser, user can use "Forgot Password" flow
-        // emailRedirectTo is part of options for admin.createUser
-        options: {
-          emailRedirectTo: window.location.origin + '/login',
-        }
+        emailRedirectTo: window.location.origin + '/login', // emailRedirectTo is a direct property
       });
       
       if (createUserError) {

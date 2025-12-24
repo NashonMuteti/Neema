@@ -12,6 +12,18 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { useAuth, User } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
+// Define an interface for the data returned from the 'profiles' table
+interface ProfileRow {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: string | null;
+  status: "Active" | "Inactive" | "Suspended" | null;
+  enable_login: boolean | null;
+  image_url: string | null;
+  receive_notifications: boolean | null;
+}
+
 const UserRolesSettings = () => {
   const { currentUser } = useAuth();
   const { userRoles, addRole, updateRole, deleteRole, fetchRoles } = useUserRoles();
@@ -38,7 +50,7 @@ const UserRolesSettings = () => {
     setLoadingUsers(true);
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, email, role, enable_login, image_url, receive_notifications') // Select all necessary fields
+      .select('id, name, email, role, status, enable_login, image_url, receive_notifications') // Select all necessary fields explicitly
       .order('name', { ascending: true });
       
     if (error) {
@@ -46,15 +58,15 @@ const UserRolesSettings = () => {
       showError("Failed to load users for role assignment.");
       setAllUsers([]);
     } else {
-      setAllUsers(data.map(p => ({
+      setAllUsers(data.map((p: ProfileRow) => ({ // Use the new ProfileRow interface
         id: p.id,
         name: p.name || p.email || "Unknown",
         email: p.email || "N/A",
         role: p.role || "Contributor",
-        status: p.status as "Active" | "Inactive" | "Suspended", // Ensure status is correctly typed
+        status: p.status || "Active", // Default to 'Active' if null
         enableLogin: p.enable_login ?? true,
         imageUrl: p.image_url || undefined,
-        receiveNotifications: p.receive_notifications ?? true, // Added missing property
+        receiveNotifications: p.receive_notifications ?? true,
       })));
     }
     
