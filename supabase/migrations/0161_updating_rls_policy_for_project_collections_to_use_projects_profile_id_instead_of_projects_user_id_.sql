@@ -1,0 +1,3 @@
+DROP POLICY IF EXISTS "Users can only view their own project collections" ON public.project_collections;
+CREATE POLICY "Users can only view their own project collections" ON public.project_collections
+FOR SELECT TO authenticated USING (EXISTS ( SELECT 1 FROM projects WHERE ((projects.id = project_collections.project_id) AND (projects.profile_id = ( SELECT auth.uid() AS uid)))));
