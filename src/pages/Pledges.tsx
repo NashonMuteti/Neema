@@ -30,7 +30,7 @@ interface Pledge {
   project_id: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue"; // Database status
+  status: "Active" | "Paid"; // Updated: Removed "Overdue"
   member_name: string;
   project_name: string;
   comments?: string; // Added comments
@@ -43,7 +43,7 @@ interface PledgeRowWithJoinedData {
   project_id: string;
   amount: number;
   due_date: string; // ISO string from DB
-  status: "Active" | "Paid" | "Overdue";
+  status: "Active" | "Paid"; // Updated: Removed "Overdue"
   profiles: { name: string } | null; // Joined profile data
   projects: { name: string } | null; // Joined project data
   comments?: string; // Added comments
@@ -163,7 +163,7 @@ const Pledges = () => {
         project_id: p.project_id,
         amount: p.amount,
         due_date: parseISO(p.due_date),
-        status: p.status as "Active" | "Paid" | "Overdue",
+        status: p.status as "Active" | "Paid", // Updated: Removed "Overdue"
         member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
         project_name: p.projects?.name || 'Unknown Project', // Access name directly from typed projects
         comments: p.comments || undefined, // Include comments

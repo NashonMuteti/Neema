@@ -22,7 +22,7 @@ interface Pledge {
   project_id: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue"; // Database status
+  status: "Active" | "Paid"; // Updated: Removed "Overdue"
   member_name: string;
   project_name: string;
   comments?: string; // Added comments
@@ -52,7 +52,7 @@ interface PledgeTableProps {
 // Helper to determine display status
 const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
   if (pledge.status === "Paid") return "Paid";
-  return "Unpaid"; // Active and Overdue are now considered Unpaid
+  return "Unpaid"; // Active is now considered Unpaid
 };
 
 const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
