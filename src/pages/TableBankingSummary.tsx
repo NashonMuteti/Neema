@@ -43,6 +43,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"; // Import Collapsible components
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 interface FinancialAccount {
   id: string;
@@ -60,6 +61,7 @@ interface ProjectCollection {
 
 const TableBankingSummary: React.FC = () => {
   const { currency } = useSystemSettings(); // Use currency from context
+  const { currentUser } = useAuth(); // Use currentUser to filter accounts
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date());
 
@@ -87,9 +89,15 @@ const TableBankingSummary: React.FC = () => {
     setLoading(true);
     setError(null);
 
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
       .select('id, name')
+      .eq('profile_id', currentUser.id) // Filter by current user's profile_id
       .order('name', { ascending: true });
 
     if (accountsError) {
@@ -113,7 +121,7 @@ const TableBankingSummary: React.FC = () => {
       setAllCollections(collectionsData || []);
     }
     setLoading(false);
-  }, []);
+  }, [currentUser]); // Added currentUser to dependencies
 
   useEffect(() => {
     fetchTableBankingData();

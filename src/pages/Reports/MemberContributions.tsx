@@ -89,7 +89,7 @@ const MemberContributions = () => {
       const { data: incomeData, error: incomeError } = (await supabase
         .from('income_transactions')
         .select('amount')
-        .eq('user_id', profile.id)
+        .eq('profile_id', profile.id) // Changed to profile_id
         .gte('date', startOfMonth.toISOString())
         .lte('date', endOfMonth.toISOString())) as { data: { amount: number }[] | null, error: PostgrestError | null };
 

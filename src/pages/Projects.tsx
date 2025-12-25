@@ -27,7 +27,7 @@ interface Project {
   thumbnailUrl?: string;
   dueDate?: Date;
   memberContributionAmount?: number;
-  user_id: string; // Add user_id to match Supabase table
+  profile_id: string; // Changed from user_id to profile_id
 }
 
 const Projects = () => {
@@ -114,7 +114,7 @@ const Projects = () => {
         thumbnailUrl: p.thumbnail_url || undefined,
         dueDate: p.due_date ? new Date(p.due_date) : undefined,
         memberContributionAmount: p.member_contribution_amount || undefined,
-        user_id: p.user_id,
+        profile_id: p.profile_id, // Changed from user_id to profile_id
       })));
     }
     
@@ -178,7 +178,7 @@ const Projects = () => {
         thumbnail_url: projectData.thumbnailUrl,
         due_date: projectData.dueDate?.toISOString(),
         member_contribution_amount: projectData.memberContributionAmount,
-        user_id: currentUser.id, // Assign current user as creator
+        profile_id: currentUser.id, // Assign current user's profile_id as creator
       })
       .select()
       .single();
@@ -193,7 +193,7 @@ const Projects = () => {
   };
 
   const handleEditProject = async (updatedProject: Project) => {
-    if (!currentUser || updatedProject.user_id !== currentUser.id) {
+    if (!currentUser || updatedProject.profile_id !== currentUser.id) { // Changed from user_id to profile_id
       showError("You do not have permission to edit this project.");
       return;
     }
@@ -222,7 +222,7 @@ const Projects = () => {
   const handleToggleProjectStatus = async (projectId: string, currentStatus: Project['status']) => {
     const projectToUpdate = projects.find(p => p.id === projectId);
     
-    if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
+    if (!projectToUpdate || !currentUser || projectToUpdate.profile_id !== currentUser.id) { // Changed from user_id to profile_id
       showError("You do not have permission to change the status of this project.");
       return;
     }
@@ -255,7 +255,7 @@ const Projects = () => {
   const handleDeleteProject = async (projectId: string, projectName: string) => {
     const projectToUpdate = projects.find(p => p.id === projectId);
     
-    if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
+    if (!projectToUpdate || !currentUser || projectToUpdate.profile_id !== currentUser.id) { // Changed from user_id to profile_id
       showError("You do not have permission to delete this project.");
       return;
     }
@@ -282,7 +282,7 @@ const Projects = () => {
   const handleThumbnailUpload = async (projectId: string, newUrl: string) => {
     const projectToUpdate = projects.find(p => p.id === projectId);
     
-    if (!projectToUpdate || !currentUser || projectToUpdate.user_id !== currentUser.id) {
+    if (!projectToUpdate || !currentUser || projectToUpdate.profile_id !== currentUser.id) { // Changed from user_id to profile_id
       showError("You do not have permission to upload a thumbnail for this project.");
       return;
     }

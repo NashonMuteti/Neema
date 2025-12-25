@@ -28,7 +28,7 @@ interface Project {
   thumbnailUrl?: string;
   dueDate?: Date;
   memberContributionAmount?: number;
-  user_id: string;
+  profile_id: string; // Changed from user_id to profile_id
 }
 
 // Use the exported types from the hook
@@ -94,7 +94,7 @@ const ProjectFinancialsDetail: React.FC = () => {
           thumbnailUrl: data.thumbnail_url || undefined,
           dueDate: data.due_date ? parseISO(data.due_date) : undefined,
           memberContributionAmount: data.member_contribution_amount || undefined,
-          user_id: data.user_id,
+          profile_id: data.profile_id, // Changed from user_id to profile_id
         });
       }
       setLoadingProjectDetails(false);

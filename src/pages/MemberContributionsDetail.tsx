@@ -99,21 +99,21 @@ const MemberContributionsDetail: React.FC = () => {
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
       .select('id, date, amount, source, financial_accounts(name)')
-      .eq('user_id', memberId)
+      .eq('profile_id', memberId) // Changed to profile_id
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString()) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
     const { data: expenditureData, error: expenditureError } = await supabase
       .from('expenditure_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('user_id', memberId)
+      .eq('profile_id', memberId) // Changed to profile_id
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString()) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
 
     const { data: pettyCashData, error: pettyCashError } = await supabase
       .from('petty_cash_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('user_id', memberId)
+      .eq('profile_id', memberId) // Changed to profile_id
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString()) as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
 
