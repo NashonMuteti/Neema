@@ -24,6 +24,7 @@ interface Pledge {
   status: "Active" | "Paid" | "Overdue";
   member_name: string;
   project_name: string;
+  comments?: string; // Added comments
 }
 
 interface PledgeTableProps {
@@ -77,6 +78,7 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="text-center">Status</TableHead>
+              <TableHead>Comments</TableHead> {/* New TableHead for Comments */}
               {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
             </TableRow>
           </TableHeader>
@@ -94,6 +96,7 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
                       {status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="max-w-[150px] truncate">{pledge.comments || "-"}</TableCell> {/* Display comments */}
                   {canManagePledges && (
                     <TableCell className="text-center">
                       <div className="flex justify-center space-x-2">

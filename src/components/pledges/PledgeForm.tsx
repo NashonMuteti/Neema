@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import { CalendarIcon, PlusCircle } from "lucide-react";
 import { showError } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
+import { Textarea } from "@/components/ui/textarea"; // Import Textarea
 
 interface Member {
   id: string;
@@ -40,6 +41,7 @@ interface PledgeFormProps {
     project_id: string;
     amount: number;
     due_date: Date;
+    comments?: string; // Added comments
   }) => void;
   canManagePledges: boolean;
 }
@@ -56,6 +58,7 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
   const [newPledgeProjectId, setNewPledgeProjectId] = React.useState<string | undefined>(undefined);
   const [newPledgeAmount, setNewPledgeAmount] = React.useState("");
   const [newPledgeDueDate, setNewPledgeDueDate] = React.useState<Date | undefined>(new Date());
+  const [newPledgeComments, setNewPledgeComments] = React.useState(""); // New state for comments
 
   React.useEffect(() => {
     if (members.length > 0 && !newPledgeMemberId) {
@@ -82,6 +85,7 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
       project_id: newPledgeProjectId,
       amount,
       due_date: newPledgeDueDate,
+      comments: newPledgeComments.trim() || undefined, // Include comments
     });
 
     // Reset form
@@ -89,6 +93,7 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
     setNewPledgeDueDate(new Date());
     setNewPledgeMemberId(members.length > 0 ? members[0].id : undefined);
     setNewPledgeProjectId(projects.length > 0 ? projects[0].id : undefined);
+    setNewPledgeComments(""); // Reset comments
   };
 
   return (
@@ -175,6 +180,17 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
               />
             </PopoverContent>
           </Popover>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="pledge-comments">Comments (Optional)</Label>
+          <Textarea
+            id="pledge-comments"
+            placeholder="Add any relevant comments about this pledge..."
+            value={newPledgeComments}
+            onChange={(e) => setNewPledgeComments(e.target.value)}
+            disabled={!canManagePledges}
+          />
         </div>
 
         <Button onClick={handleSubmit} className="w-full" disabled={!canManagePledges || !newPledgeMemberId || !newPledgeProjectId || !newPledgeAmount || !newPledgeDueDate}>

@@ -32,6 +32,7 @@ interface Pledge {
   status: "Active" | "Paid" | "Overdue";
   member_name: string;
   project_name: string;
+  comments?: string; // Added comments
 }
 
 // Define the expected structure of a pledge row with joined profile and project data
@@ -44,6 +45,7 @@ interface PledgeRowWithJoinedData {
   status: "Active" | "Paid" | "Overdue";
   profiles: { name: string } | null; // Joined profile data
   projects: { name: string } | null; // Joined project data
+  comments?: string; // Added comments
 }
 
 const Pledges = () => {
@@ -119,7 +121,9 @@ const Pledges = () => {
       console.error("Error fetching projects:", projectsError);
       setError("Failed to load projects.");
     } else {
-      setProjects(projectsData || []);
+      // Ensure unique projects by ID before setting state
+      const uniqueProjects = Array.from(new Map((projectsData || []).map(p => [p.id, p])).values());
+      setProjects(uniqueProjects);
     }
 
     // Fetch pledges based on filters
@@ -135,6 +139,7 @@ const Pledges = () => {
         amount,
         due_date,
         status,
+        comments,
         profiles ( name ),
         projects ( name )
       `)
@@ -156,6 +161,7 @@ const Pledges = () => {
         status: p.status as "Active" | "Paid" | "Overdue",
         member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
         project_name: p.projects?.name || 'Unknown Project', // Access name directly from typed projects
+        comments: p.comments || undefined, // Include comments
       }));
 
       const filteredByStatusAndSearch = fetchedPledges.filter(pledge => {
@@ -163,7 +169,10 @@ const Pledges = () => {
         const matchesStatus = filterStatus === "All" || actualStatus === filterStatus;
         const memberName = (pledge.member_name || "").toLowerCase();
         const projectName = (pledge.project_name || "").toLowerCase();
-        const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || projectName.includes(searchQuery.toLowerCase());
+        const comments = (pledge.comments || "").toLowerCase(); // Include comments in search
+        const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || 
+                              projectName.includes(searchQuery.toLowerCase()) ||
+                              comments.includes(searchQuery.toLowerCase());
         return matchesStatus && matchesSearch;
       });
       setPledges(filteredByStatusAndSearch);
@@ -180,6 +189,7 @@ const Pledges = () => {
     project_id: string;
     amount: number;
     due_date: Date;
+    comments?: string; // Added comments
   }) => {
     if (!currentUser) {
       showError("You must be logged in to record a pledge.");
@@ -194,6 +204,7 @@ const Pledges = () => {
         amount: pledgeData.amount,
         due_date: pledgeData.due_date.toISOString(),
         status: "Active", // New pledges are active by default
+        comments: pledgeData.comments, // Insert comments
       });
 
     if (insertError) {
