@@ -49,18 +49,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Function to fetch and set the application's currentUser profile
   const fetchUserProfile = async (user: SupabaseUser | null) => {
-    console.log("AuthContext: fetchUserProfile called with user:", user);
     if (user) {
       try {
-        // Attempt to fetch only the role initially to diagnose 500 error
-        const { data: profileRoleData, error: profileRoleError } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('role')
+          .select('*')
           .eq('id', user.id)
           .single();
-
-        console.log("AuthContext: Profile role data from DB:", profileRoleData);
-        console.log("AuthContext: Profile role error from DB:", profileRoleError);
 
         let userRole = "Contributor"; // Default role
         let userStatus: "Active" | "Inactive" | "Suspended" = "Active";
@@ -70,42 +65,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let userName = user.user_metadata?.full_name || user.email || "User";
         let userEmail = user.email || "";
 
-        if (profileRoleError && profileRoleError.code !== 'PGRST116') { // PGRST116 means no rows found
-          console.error("AuthContext: Error fetching user profile role from DB, falling back to metadata:", profileRoleError);
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found
+          console.error("AuthContext: Error fetching user profile from DB, falling back to metadata:", profileError);
           // Fallback to user_metadata if DB fetch fails (but not if row simply doesn't exist)
           userRole = user.user_metadata?.role || "Contributor";
           userStatus = user.user_metadata?.status || "Active";
           userEnableLogin = user.user_metadata?.enable_login ?? true;
           userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
           userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
-        } else if (profileRoleData) {
-          // If role was successfully fetched, now fetch full profile
-          const { data: fullProfile, error: fullProfileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-          console.log("AuthContext: Full profile data from DB:", fullProfile);
-          console.log("AuthContext: Full profile error from DB:", fullProfileError);
-
-          if (fullProfileError) {
-            console.error("AuthContext: Error fetching full user profile from DB, falling back to role data and metadata:", fullProfileError);
-            userRole = profileRoleData.role || user.user_metadata?.role || "Contributor";
-            userStatus = user.user_metadata?.status || "Active";
-            userEnableLogin = user.user_metadata?.enable_login ?? true;
-            userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
-            userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
-          } else if (fullProfile) {
-            // Use full profile data if available
-            userRole = fullProfile.role || user.user_metadata?.role || "Contributor";
-            userStatus = fullProfile.status || "Active";
-            userEnableLogin = fullProfile.enable_login ?? true;
-            userImageUrl = fullProfile.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${fullProfile.name || user.email}`;
-            userReceiveNotifications = fullProfile.receive_notifications ?? true;
-            userName = fullProfile.name || user.user_metadata?.full_name || user.email || "User";
-            userEmail = fullProfile.email || user.email || "";
-          }
+        } else if (profileData) {
+          // Use full profile data if available
+          userRole = profileData.role || user.user_metadata?.role || "Contributor";
+          userStatus = profileData.status || "Active";
+          userEnableLogin = profileData.enable_login ?? true;
+          userImageUrl = profileData.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${profileData.name || user.email}`;
+          userReceiveNotifications = profileData.receive_notifications ?? true;
+          userName = profileData.name || user.user_metadata?.full_name || user.email || "User";
+          userEmail = profileData.email || user.email || "";
         } else {
           // Profile not found in DB, likely a new user or a user whose profile wasn't created by trigger
           console.warn("AuthContext: User profile not found in public.profiles, using user_metadata defaults.");
@@ -127,14 +103,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           receiveNotifications: userReceiveNotifications,
         };
         setCurrentUser(finalUser);
-        console.log("AuthContext: Current User set to:", finalUser);
 
       } catch (error) {
         console.error("AuthContext: Error in fetchUserProfile:", error);
         setCurrentUser(null);
       }
     } else {
-      console.log("AuthContext: User is null, setting currentUser to null.");
       setCurrentUser(null);
     }
   };
@@ -142,8 +116,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log("AuthContext: onAuthStateChange event:", event);
-        console.log("AuthContext: onAuthStateChange session:", currentSession);
         setSession(currentSession);
         setSupabaseUser(currentSession?.user || null);
         await fetchUserProfile(currentSession?.user || null);
@@ -153,7 +125,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      console.log("AuthContext: Initial session check:", initialSession);
       setSession(initialSession);
       setSupabaseUser(initialSession?.user || null);
       await fetchUserProfile(initialSession?.user || null);

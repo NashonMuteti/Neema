@@ -31,7 +31,7 @@ interface PettyCashTransaction {
   amount: number;
   account_id: string;
   purpose: string;
-  user_id: string;
+  profile_id: string; // Changed from user_id to profile_id
 }
 
 const PettyCash = () => {
@@ -81,7 +81,8 @@ const PettyCash = () => {
   const fetchFinancialAccounts = React.useCallback(async () => {
     const { data, error } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance');
+      .select('id, name, current_balance')
+      .eq('profile_id', currentUser?.id); // Filter by profile_id
       
     if (error) {
       console.error("Error fetching financial accounts:", error);
@@ -92,7 +93,7 @@ const PettyCash = () => {
         setExpenseAccount(data[0].id); // Set default account if none selected
       }
     }
-  }, [expenseAccount]);
+  }, [expenseAccount, currentUser]);
 
   const fetchPettyCashTransactions = React.useCallback(async () => {
     setLoading(true);
@@ -109,7 +110,7 @@ const PettyCash = () => {
     let query = supabase
       .from('petty_cash_transactions')
       .select('*, financial_accounts(name)')
-      .eq('user_id', currentUser.id)
+      .eq('profile_id', currentUser.id) // Changed to profile_id
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString());
       
@@ -131,7 +132,7 @@ const PettyCash = () => {
         amount: tx.amount,
         account_id: tx.account_id,
         purpose: tx.purpose,
-        user_id: tx.user_id,
+        profile_id: tx.profile_id, // Changed to profile_id
         account_name: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
       })));
     }
@@ -182,7 +183,7 @@ const PettyCash = () => {
         amount,
         account_id: expenseAccount,
         purpose: expensePurpose,
-        user_id: currentUser.id,
+        profile_id: currentUser.id, // Changed to profile_id
       });
       
     if (insertError) {
@@ -194,7 +195,8 @@ const PettyCash = () => {
       const { error: updateBalanceError } = await supabase
         .from('financial_accounts')
         .update({ current_balance: newBalance })
-        .eq('id', expenseAccount);
+        .eq('id', expenseAccount)
+        .eq('profile_id', currentUser.id); // Ensure user owns the account
         
       if (updateBalanceError) {
         console.error("Error updating account balance:", updateBalanceError);
@@ -229,7 +231,7 @@ const PettyCash = () => {
       .from('petty_cash_transactions')
       .delete()
       .eq('id', id)
-      .eq('user_id', currentUser.id); // Ensure only owner can delete
+      .eq('profile_id', currentUser.id); // Changed to profile_id
       
     if (deleteError) {
       console.error("Error deleting petty cash transaction:", deleteError);
@@ -242,7 +244,8 @@ const PettyCash = () => {
         const { error: updateBalanceError } = await supabase
           .from('financial_accounts')
           .update({ current_balance: newBalance })
-          .eq('id', accountId);
+          .eq('id', accountId)
+          .eq('profile_id', currentUser.id); // Ensure user owns the account
           
         if (updateBalanceError) {
           console.error("Error reverting account balance:", updateBalanceError);

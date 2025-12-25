@@ -207,12 +207,6 @@ const Sidebar = () => {
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
 
-  // --- START DEBUG LOGS ---
-  console.log("Sidebar: currentUser", currentUser);
-  console.log("Sidebar: currentUser.role", currentUser?.role);
-  console.log("Sidebar: currentUserPrivileges (from role definition)", currentUserPrivileges);
-  // --- END DEBUG LOGS ---
-
   // Memoize hasAccess function for stability
   const hasAccess = React.useCallback((requiredPrivileges?: string[]) => {
     if (!requiredPrivileges || requiredPrivileges.length === 0) return true;

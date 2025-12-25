@@ -18,20 +18,11 @@ const Members = () => {
 
   const { canManageMembers, canExportPdf, canExportExcel } = useMemo(() => {
     if (!currentUser || !definedRoles) {
-      console.log("Members: currentUser or definedRoles not available yet.");
       return { canManageMembers: false, canExportPdf: false, canExportExcel: false };
     }
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageMembers = currentUserPrivileges.includes("Manage Members");
-
-    // --- START DEBUG LOGS ---
-    console.log("Members Page Debug:");
-    console.log("  currentUser:", currentUser);
-    console.log("  currentUser.role:", currentUser.role);
-    console.log("  currentUserPrivileges (from role definition):", currentUserPrivileges);
-    console.log("  canManageMembers (calculated):", canManageMembers);
-    // --- END DEBUG LOGS ---
 
     const canExportPdf = currentUserPrivileges.includes("Export Member List PDF");
     const canExportExcel = currentUserPrivileges.includes("Export Member List Excel");
