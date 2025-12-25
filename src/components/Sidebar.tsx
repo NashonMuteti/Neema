@@ -116,7 +116,7 @@ export const navItems: SidebarItem[] = [
     name: "Members",
     href: "/members",
     icon: Users,
-    requiredPrivileges: ["View Members"],
+    requiredPrivileges: ["View Members", "Manage Members"], // Added "Manage Members" for broader access check
   },
   {
     name: "Board Members",
@@ -207,7 +207,11 @@ const Sidebar = () => {
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
 
-  console.log("Sidebar: currentUserPrivileges", currentUserPrivileges);
+  // --- START DEBUG LOGS ---
+  console.log("Sidebar: currentUser", currentUser);
+  console.log("Sidebar: currentUser.role", currentUser?.role);
+  console.log("Sidebar: currentUserPrivileges (from role definition)", currentUserPrivileges);
+  // --- END DEBUG LOGS ---
 
   // Memoize hasAccess function for stability
   const hasAccess = React.useCallback((requiredPrivileges?: string[]) => {
