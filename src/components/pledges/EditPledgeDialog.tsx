@@ -50,7 +50,7 @@ export interface Pledge {
   project_id: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue";
+  status: "Active" | "Paid"; // Changed: Removed "Overdue"
   comments?: string;
 }
 
@@ -87,7 +87,7 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
   const [amount, setAmount] = React.useState(initialData.amount.toString());
   const [dueDate, setDueDate] = React.useState<Date | undefined>(initialData.due_date);
   const [comments, setComments] = React.useState(initialData.comments || "");
-  const [status, setStatus] = React.useState<"Active" | "Paid" | "Overdue">(initialData.status);
+  const [status, setStatus] = React.useState<"Active" | "Paid">(initialData.status); // Changed: Removed "Overdue"
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -140,11 +140,6 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" disabled={!canManagePledges}>
-          <Edit className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Pledge</DialogTitle>
@@ -235,7 +230,7 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
 
           <div className="grid gap-1.5">
             <Label htmlFor="edit-pledge-status">Status</Label>
-            <Select value={status} onValueChange={(value: "Active" | "Paid" | "Overdue") => setStatus(value)} disabled={!canManagePledges || isSaving}>
+            <Select value={status} onValueChange={(value: "Active" | "Paid") => setStatus(value)} disabled={!canManagePledges || isSaving}>
               <SelectTrigger id="edit-pledge-status">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
@@ -244,7 +239,6 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
                   <SelectLabel>Pledge Status</SelectLabel>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Paid">Paid</SelectItem>
-                  <SelectItem value="Overdue">Overdue</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>

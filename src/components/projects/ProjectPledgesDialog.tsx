@@ -48,7 +48,7 @@ interface ProjectPledge {
   member_name: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue"; // Database status
+  status: "Active" | "Paid"; // Changed: Removed "Overdue"
 }
 
 interface ProjectPledgesDialogProps {
@@ -69,14 +69,14 @@ interface PledgeRowWithProfile {
   member_id: string;
   amount: number;
   due_date: string; // ISO string from DB
-  status: "Active" | "Paid" | "Overdue";
+  status: "Active" | "Paid" | "Overdue"; // Keep "Overdue" for fetching, but map to "Active"
   profiles: { name: string } | null; // Joined profile data
 }
 
 // Helper to determine display status
 const getDisplayPledgeStatus = (pledge: ProjectPledge): "Paid" | "Unpaid" => {
   if (pledge.status === "Paid") return "Paid";
-  return "Unpaid"; // Active and Overdue are now considered Unpaid
+  return "Unpaid"; // Active is now considered Unpaid
 };
 
 const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
@@ -136,7 +136,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
         amount: p.amount,
         due_date: parseISO(p.due_date),
-        status: p.status as "Active" | "Paid" | "Overdue",
+        status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid", // Map "Overdue" to "Active"
       })));
     }
     setLoadingPledges(false);
@@ -173,7 +173,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
       case "Paid":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
       case "Unpaid":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"; // Active/Overdue now red for Unpaid
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
     }
