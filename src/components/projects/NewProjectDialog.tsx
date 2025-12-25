@@ -137,7 +137,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
     setIsSaving(true);
     let projectThumbnailUrl: string | undefined = undefined;
     if (selectedFile) {
-      const filePath = `project-thumbnails/${currentUser.id}/${data.name.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const filePath = `${currentUser.id}/${data.name.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Corrected: Removed 'project-thumbnails/' prefix
       const uploadedUrl = await uploadFileToSupabase('project-thumbnails', selectedFile, filePath);
       if (uploadedUrl) {
         projectThumbnailUrl = uploadedUrl;

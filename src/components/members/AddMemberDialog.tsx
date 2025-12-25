@@ -110,7 +110,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     let memberImageUrl: string | undefined = undefined;
 
     if (selectedFile) {
-      const filePath = `avatars/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const filePath = `${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Corrected: Removed 'avatars/' prefix
       const uploadedUrl = await uploadFileToSupabase('avatars', selectedFile, filePath);
       if (uploadedUrl) {
         memberImageUrl = uploadedUrl;

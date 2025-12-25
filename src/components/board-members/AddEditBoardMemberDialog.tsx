@@ -125,7 +125,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
     if (selectedFile) {
       try {
         fileUploadSchema.parse(selectedFile);
-        const filePath = `board-members/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+        const filePath = `${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Corrected: Removed 'board-members/' prefix
         const uploadedUrl = await uploadFileToSupabase('board-members', selectedFile, filePath);
         if (uploadedUrl) {
           memberImageUrl = uploadedUrl;

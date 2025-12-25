@@ -147,7 +147,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
     setIsSaving(true);
     let projectThumbnailUrl: string | undefined = project.thumbnailUrl;
     if (selectedFile) {
-      const filePath = `project-thumbnails/${project.profile_id}/${name.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Changed from user_id to profile_id
+      const filePath = `${project.profile_id}/${name.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Corrected: Removed 'project-thumbnails/' prefix
       const uploadedUrl = await uploadFileToSupabase('project-thumbnails', selectedFile, filePath);
       if (uploadedUrl) {
         projectThumbnailUrl = uploadedUrl;

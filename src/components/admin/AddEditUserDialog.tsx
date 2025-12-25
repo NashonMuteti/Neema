@@ -126,7 +126,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     setIsSaving(true);
     let userImageUrl: string | undefined = initialData?.imageUrl;
     if (selectedFile) {
-      const filePath = `avatars/${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const filePath = `${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Corrected: Removed 'avatars/' prefix
       const uploadedUrl = await uploadFileToSupabase('avatars', selectedFile, filePath);
       if (uploadedUrl) {
         userImageUrl = uploadedUrl;

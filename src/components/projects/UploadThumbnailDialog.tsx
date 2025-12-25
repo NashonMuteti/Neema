@@ -122,7 +122,7 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
 
     const projectOwnerProfileId = projectData.profile_id;
 
-    const filePath = `project-thumbnails/${projectOwnerProfileId}/${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+    const filePath = `${projectOwnerProfileId}/${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Corrected: Removed 'project-thumbnails/' prefix
     const uploadedUrl = await uploadFileToSupabase('project-thumbnails', selectedFile, filePath);
 
     if (uploadedUrl) {

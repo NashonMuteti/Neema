@@ -77,7 +77,7 @@ const BrandSettings = () => {
     let newLogoUrl = brandLogoUrl;
 
     if (selectedFile) {
-      const filePath = `brand-logos/logo_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const filePath = `logo_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Corrected: Removed 'brand-logos/' prefix
       const uploadedUrl = await uploadFileToSupabase('brand-logos', selectedFile, filePath);
       if (uploadedUrl) {
         newLogoUrl = uploadedUrl;
