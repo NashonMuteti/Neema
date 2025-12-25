@@ -17,6 +17,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"; // Added import for table components
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,7 +76,7 @@ const FinancialAccountsSettings = () => {
     const { data, error } = await supabase
       .from('financial_accounts')
       .select('*')
-      .eq('profile_id', currentUser.id) // Changed from user_id to profile_id
+      .eq('profile_id', currentUser.id)
       .order('name', { ascending: true });
 
     if (error) {
@@ -104,7 +112,7 @@ const FinancialAccountsSettings = () => {
     const { error } = await supabase
       .from('financial_accounts')
       .insert({
-        profile_id: currentUser.id, // Changed from user_id to profile_id
+        profile_id: currentUser.id,
         name: newAccountName.trim(),
         initial_balance: initialBalance,
         current_balance: initialBalance, // Current balance starts as initial balance
@@ -147,7 +155,7 @@ const FinancialAccountsSettings = () => {
         // current_balance is not directly editable here, it's transaction-driven
       })
       .eq('id', editingAccount.id)
-      .eq('profile_id', currentUser.id); // Ensure user owns the account // Changed from user_id to profile_id
+      .eq('profile_id', currentUser.id); // Ensure user owns the account
 
     if (error) {
       console.error("Error updating account:", error);
@@ -169,7 +177,7 @@ const FinancialAccountsSettings = () => {
       .from('financial_accounts')
       .delete()
       .eq('id', deletingAccountId)
-      .eq('profile_id', currentUser.id); // Ensure user owns the account // Changed from user_id to profile_id
+      .eq('profile_id', currentUser.id); // Ensure user owns the account
 
     if (error) {
       console.error("Error deleting account:", error);
@@ -267,23 +275,23 @@ const FinancialAccountsSettings = () => {
         <h3 className="text-lg font-semibold">Existing Accounts</h3>
         {accounts.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px] border-collapse">
-              <thead>
-                <tr className="border-b">
-                  <th className="py-2 px-4 text-left text-sm font-medium text-muted-foreground">Account Name</th>
-                  <th className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Initial Balance</th>
-                  <th className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Current Balance</th>
-                  {canManageFinancialAccounts && <th className="py-2 px-4 text-center text-sm font-medium text-muted-foreground w-[120px]">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
+            <Table> {/* Changed from <table> */}
+              <TableHeader> {/* Changed from <thead> */}
+                <TableRow> {/* Changed from <tr> */}
+                  <TableHead className="py-2 px-4 text-left text-sm font-medium text-muted-foreground">Account Name</TableHead> {/* Changed from <th> */}
+                  <TableHead className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Initial Balance</TableHead> {/* Changed from <th> */}
+                  <TableHead className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Current Balance</TableHead> {/* Changed from <th> */}
+                  {canManageFinancialAccounts && <TableHead className="py-2 px-4 text-center text-sm font-medium text-muted-foreground w-[120px]">Actions</TableHead>} {/* Changed from <th> */}
+                </TableRow> {/* Changed from </tr> */}
+              </TableHeader> {/* Changed from </thead> */}
+              <TableBody> {/* Changed from <tbody> */}
                 {accounts.map((account) => (
-                  <tr key={account.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                    <td className="py-2 px-4 font-medium">{account.name}</td>
-                    <td className="py-2 px-4 text-right">{currency.symbol}{account.initial_balance.toFixed(2)}</td>
-                    <td className="py-2 px-4 text-right">{currency.symbol}{account.current_balance.toFixed(2)}</td>
+                  <TableRow key={account.id} className="border-b last:border-b-0 hover:bg-muted/50"> {/* Changed from <tr> */}
+                    <TableCell className="py-2 px-4 font-medium">{account.name}</TableCell> {/* Changed from <td> */}
+                    <TableCell className="py-2 px-4 text-right">{currency.symbol}{account.initial_balance.toFixed(2)}</TableCell> {/* Changed from <td> */}
+                    <TableCell className="py-2 px-4 text-right">{currency.symbol}{account.current_balance.toFixed(2)}</TableCell> {/* Changed from <td> */}
                     {canManageFinancialAccounts && (
-                      <td className="py-2 px-4 text-center">
+                      <TableCell className="py-2 px-4 text-center"> {/* Changed from <td> */}
                         <div className="flex justify-center space-x-2">
                           <Button variant="outline" size="sm" onClick={() => openEditDialog(account)}>
                             <Edit className="h-4 w-4" />
@@ -292,12 +300,12 @@ const FinancialAccountsSettings = () => {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </td>
+                      </TableCell> {/* Changed from </td> */}
                     )}
-                  </tr>
+                  </TableRow>
                 ))}
               </TableBody>
-            </table>
+            </Table>
           </div>
         ) : (
           <p className="text-muted-foreground text-center mt-4">No financial accounts found. Add one above!</p>
@@ -308,8 +316,8 @@ const FinancialAccountsSettings = () => {
       <AlertDialog open={!!editingAccount} onOpenChange={(open) => !open && setEditingAccount(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Edit Financial Account</AlertDialogTitle> {/* Corrected */}
-            <AlertDialogDescription> {/* Corrected */}
+            <AlertDialogTitle>Edit Financial Account</AlertDialogTitle>
+            <AlertDialogDescription>
               Make changes to the account details. Note: Changing initial balance will not automatically adjust current balance.
             </AlertDialogDescription>
           </AlertDialogHeader>
