@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "profiles_update_policy" ON public.profiles;

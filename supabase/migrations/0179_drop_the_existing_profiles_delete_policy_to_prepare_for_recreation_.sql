@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "profiles_delete_policy" ON public.profiles;
