@@ -68,7 +68,7 @@ const FinancialAccountsSettings = () => {
     const { data, error } = await supabase
       .from('financial_accounts')
       .select('*')
-      .eq('user_id', currentUser.id)
+      .eq('profile_id', currentUser.id) // Changed from user_id to profile_id
       .order('name', { ascending: true });
 
     if (error) {
@@ -104,7 +104,7 @@ const FinancialAccountsSettings = () => {
     const { error } = await supabase
       .from('financial_accounts')
       .insert({
-        user_id: currentUser.id,
+        profile_id: currentUser.id, // Changed from user_id to profile_id
         name: newAccountName.trim(),
         initial_balance: initialBalance,
         current_balance: initialBalance, // Current balance starts as initial balance
@@ -147,7 +147,7 @@ const FinancialAccountsSettings = () => {
         // current_balance is not directly editable here, it's transaction-driven
       })
       .eq('id', editingAccount.id)
-      .eq('user_id', currentUser.id); // Ensure user owns the account
+      .eq('profile_id', currentUser.id); // Ensure user owns the account // Changed from user_id to profile_id
 
     if (error) {
       console.error("Error updating account:", error);
@@ -169,7 +169,7 @@ const FinancialAccountsSettings = () => {
       .from('financial_accounts')
       .delete()
       .eq('id', deletingAccountId)
-      .eq('user_id', currentUser.id); // Ensure user owns the account
+      .eq('profile_id', currentUser.id); // Ensure user owns the account // Changed from user_id to profile_id
 
     if (error) {
       console.error("Error deleting account:", error);
@@ -292,11 +292,11 @@ const FinancialAccountsSettings = () => {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </td>
+                      </TableCell>
                     )}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
+              </TableBody>
             </table>
           </div>
         ) : (
