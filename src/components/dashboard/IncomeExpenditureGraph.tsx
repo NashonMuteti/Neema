@@ -30,6 +30,7 @@ interface MonthlyFinancialData {
   month: string;
   income: number;
   expenditure: number;
+  outstandingPledges: number; // New: Outstanding pledges
 }
 
 interface IncomeExpenditureGraphProps {
@@ -63,6 +64,7 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
 
   const totalIncome = filteredData.reduce((sum, item) => sum + item.income, 0);
   const totalExpenditure = filteredData.reduce((sum, item) => sum + item.expenditure, 0);
+  const totalOutstandingPledges = filteredData.reduce((sum, item) => sum + item.outstandingPledges, 0); // New total
   const netBalance = totalIncome - totalExpenditure;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -122,9 +124,12 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
                 <Bar dataKey="expenditure" fill="hsl(var(--destructive))" name="Expenditure">
                   <LabelList dataKey="expenditure" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `${currency.symbol}${value.toFixed(0)}`} />
                 </Bar>
+                <Bar dataKey="outstandingPledges" fill="hsl(var(--accent))" name="Outstanding Pledges"> {/* New Bar */}
+                  <LabelList dataKey="outstandingPledges" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `${currency.symbol}${value.toFixed(0)}`} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <div className="mt-6 grid grid-cols-3 gap-4 text-center">
+            <div className="mt-6 grid grid-cols-4 gap-4 text-center"> {/* Changed to grid-cols-4 */}
               <div>
                 <p className="text-sm text-muted-foreground">Total Income ({selectedYear})</p>
                 <p className="text-xl font-bold text-primary">{currency.symbol}{totalIncome.toFixed(2)}</p>
@@ -134,6 +139,10 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
                 <p className="text-xl font-bold text-destructive">{currency.symbol}{totalExpenditure.toFixed(2)}</p>
               </div>
               <div>
+                <p className="text-sm text-muted-foreground">Outstanding Pledges ({selectedYear})</p> {/* New display */}
+                <p className="text-xl font-bold text-accent">{currency.symbol}{totalOutstandingPledges.toFixed(2)}</p>
+              </div>
+              <div>
                 <p className="text-sm text-muted-foreground">Net Balance ({selectedYear})</p>
                 <p className={`text-xl font-bold ${netBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {currency.symbol}{netBalance.toFixed(2)}
@@ -141,7 +150,7 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
               </div>
             </div>
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              Monthly breakdown of financial inflows and outflows for the selected year.
+              Monthly breakdown of financial inflows, outflows, and outstanding pledges for the selected year.
             </p>
           </>
         ) : (

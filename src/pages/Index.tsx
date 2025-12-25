@@ -17,12 +17,13 @@ interface DashboardProject {
   status: "Open" | "Closed" | "Deleted";
 }
 
-// Define interface for monthly financial data, now including year
+// Define interface for monthly financial data, now including year and outstanding pledges
 interface MonthlyFinancialData {
   year: number;
   month: string;
-  income: number;
+  income: number; // Now includes original income, project collections, and paid pledges
   expenditure: number;
+  outstandingPledges: number; // New field
 }
 
 // Define interface for project contribution data
@@ -57,53 +58,71 @@ const Index = () => {
     }
 
     try {
+      // Fetch income transactions
       const { data: incomeTransactions, error: incomeError } = await supabase
         .from('income_transactions')
         .select('date, amount')
-        .eq('profile_id', currentUser.id); // Use profile_id
+        .eq('profile_id', currentUser.id);
 
+      // Fetch expenditure transactions
       const { data: expenditureTransactions, error: expenditureError } = await supabase
         .from('expenditure_transactions')
         .select('date, amount')
-        .eq('profile_id', currentUser.id); // Use profile_id
+        .eq('profile_id', currentUser.id);
 
-      if (incomeError || expenditureError) {
-        console.error("Error fetching financial data:", incomeError || expenditureError);
+      // Fetch project collections (contributions to projects)
+      const { data: projectCollections, error: collectionsError } = await supabase
+        .from('project_collections')
+        .select('date, amount')
+        .eq('member_id', currentUser.id); // Assuming member_id in project_collections refers to the current user
+
+      // Fetch project pledges
+      const { data: projectPledges, error: pledgesError } = await supabase
+        .from('project_pledges')
+        .select('due_date, amount, status')
+        .eq('member_id', currentUser.id); // Assuming member_id in project_pledges refers to the current user
+
+      if (incomeError || expenditureError || collectionsError || pledgesError) {
+        console.error("Error fetching financial data:", incomeError || expenditureError || collectionsError || pledgesError);
         setFinancialsError("Failed to load financial data.");
         setMonthlyFinancialData([]);
         setAvailableYears([]);
         return;
       }
 
-      const aggregatedData: Record<string, { income: number; expenditure: number }> = {};
+      const aggregatedData: Record<string, { income: number; expenditure: number; outstandingPledges: number }> = {};
       const yearsSet = new Set<number>();
 
-      // Process income
-      incomeTransactions?.forEach(tx => {
-        const date = parseISO(tx.date);
-        const year = getYear(date);
-        const month = format(date, 'MMM'); // e.g., Jan, Feb
-        const key = `${year}-${month}`;
-        
-        if (!aggregatedData[key]) {
-          aggregatedData[key] = { income: 0, expenditure: 0 };
-        }
-        aggregatedData[key].income += tx.amount;
-        yearsSet.add(year);
-      });
-
-      // Process expenditure
-      expenditureTransactions?.forEach(tx => {
-        const date = parseISO(tx.date);
+      // Helper to aggregate data
+      const aggregateByMonth = (dateStr: string, type: 'income' | 'expenditure' | 'outstandingPledges', amount: number) => {
+        const date = parseISO(dateStr);
         const year = getYear(date);
         const month = format(date, 'MMM');
         const key = `${year}-${month}`;
-
+        
         if (!aggregatedData[key]) {
-          aggregatedData[key] = { income: 0, expenditure: 0 };
+          aggregatedData[key] = { income: 0, expenditure: 0, outstandingPledges: 0 };
         }
-        aggregatedData[key].expenditure += tx.amount;
+        aggregatedData[key][type] += amount;
         yearsSet.add(year);
+      };
+
+      // Process income transactions
+      incomeTransactions?.forEach(tx => aggregateByMonth(tx.date, 'income', tx.amount));
+
+      // Process expenditure transactions
+      expenditureTransactions?.forEach(tx => aggregateByMonth(tx.date, 'expenditure', tx.amount));
+
+      // Process project collections (add to income)
+      projectCollections?.forEach(collection => aggregateByMonth(collection.date, 'income', collection.amount));
+
+      // Process project pledges
+      projectPledges?.forEach(pledge => {
+        if (pledge.status === 'Paid') {
+          aggregateByMonth(pledge.due_date, 'income', pledge.amount); // Paid pledges count as income
+        } else if (pledge.status === 'Active' || pledge.status === 'Overdue') {
+          aggregateByMonth(pledge.due_date, 'outstandingPledges', pledge.amount);
+        }
       });
 
       // Convert to array and sort
@@ -115,6 +134,7 @@ const Index = () => {
             month: monthStr,
             income: aggregatedData[key].income,
             expenditure: aggregatedData[key].expenditure,
+            outstandingPledges: aggregatedData[key].outstandingPledges,
           };
         })
         .sort((a, b) => {
@@ -125,7 +145,12 @@ const Index = () => {
         });
 
       setMonthlyFinancialData(sortedData);
-      setAvailableYears(Array.from(yearsSet).sort((a, b) => b - a)); // Sort years descending
+      
+      // Generate available years for the filter (current year and 9 preceding years)
+      const currentYear = getYear(new Date());
+      const yearsArray = Array.from({ length: 10 }, (_, i) => currentYear - i).sort((a, b) => b - a);
+      setAvailableYears(yearsArray);
+
     } catch (err) {
       console.error("Unexpected error in fetchFinancialData:", err);
       setFinancialsError("An unexpected error occurred while loading financial data.");
