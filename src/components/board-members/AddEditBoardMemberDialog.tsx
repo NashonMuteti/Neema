@@ -58,7 +58,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
   const [address, setAddress] = React.useState(initialData?.address || "");
   const [notes, setNotes] = React.useState(initialData?.notes || "");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(initialData?.image_url || null);
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
   const [isSaving, setIsSaving] = React.useState(false);
 
   // Effect to reset form fields when dialog opens or initialData changes
@@ -71,37 +71,41 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       setAddress(initialData?.address || "");
       setNotes(initialData?.notes || "");
       setSelectedFile(null); // Clear selected file on open
-      setLocalPreviewUrl(initialData?.image_url || null); // Set initial image URL
+      setBlobUrl(null); // Clear blobUrl on open
     }
   }, [isOpen, initialData]);
 
-  // Effect to manage the blob URL lifecycle based on selectedFile
+  // Effect to create and revoke blob URL
   React.useEffect(() => {
     if (selectedFile) {
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setLocalPreviewUrl(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
-    } else if (!initialData?.image_url) { // If no file selected and no initial image, ensure preview is null
-      setLocalPreviewUrl(null);
-    } else { // If no file selected but there's an initial image, use that
-      setLocalPreviewUrl(initialData.image_url);
+      const url = URL.createObjectURL(selectedFile);
+      setBlobUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        setBlobUrl(null); // Clear blobUrl on cleanup
+      };
+    } else {
+      setBlobUrl(null); // Clear blobUrl if no file is selected
     }
-  }, [selectedFile, initialData?.image_url]);
+  }, [selectedFile]);
+
+  // Determine the URL to display: blobUrl if present, otherwise initialData?.image_url
+  const displayImageUrl = blobUrl || initialData?.image_url || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file); // This will trigger the useEffect above
+        setSelectedFile(file);
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
         event.target.value = "";
-        return;
+        setSelectedFile(null); // Clear selected file on error
       }
     } else {
-      setSelectedFile(null); // This will trigger the useEffect above
+      setSelectedFile(null);
     }
   };
 
@@ -130,7 +134,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && !initialData?.image_url) {
+    } else if (!selectedFile && initialData?.image_url && !blobUrl) { // If no new file, but there was an old one, and no blobUrl (meaning user cleared it)
       memberImageUrl = undefined;
     }
     
@@ -165,9 +169,9 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {localPreviewUrl ? (
+            {displayImageUrl ? (
               <img
-                src={localPreviewUrl}
+                src={displayImageUrl}
                 alt="Board Member Avatar Preview"
                 className="w-24 h-24 object-cover rounded-full border"
               />

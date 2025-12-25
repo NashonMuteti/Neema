@@ -52,7 +52,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
   const [name, setName] = React.useState(member.name);
   const [email, setEmail] = React.useState(member.email);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(member.imageUrl || null);
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
   const [enableLogin, setEnableLogin] = React.useState(member.enableLogin);
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(member.status);
   const [selectedRole, setSelectedRole] = React.useState<string>(member.role);
@@ -65,40 +65,44 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       setName(member.name);
       setEmail(member.email);
       setSelectedFile(null); // Clear selected file on open
-      setLocalPreviewUrl(member.imageUrl || null); // Set initial image URL
+      setBlobUrl(null); // Clear blobUrl on open
       setEnableLogin(member.enableLogin);
       setStatus(member.status);
       setSelectedRole(member.role);
     }
   }, [isOpen, member]);
 
-  // Effect to manage the blob URL lifecycle based on selectedFile
+  // Effect to create and revoke blob URL
   React.useEffect(() => {
     if (selectedFile) {
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setLocalPreviewUrl(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
-    } else if (!member.imageUrl) { // If no file selected and no initial image, ensure preview is null
-      setLocalPreviewUrl(null);
-    } else { // If no file selected but there's an initial image, use that
-      setLocalPreviewUrl(member.imageUrl);
+      const url = URL.createObjectURL(selectedFile);
+      setBlobUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        setBlobUrl(null); // Clear blobUrl on cleanup
+      };
+    } else {
+      setBlobUrl(null); // Clear blobUrl if no file is selected
     }
-  }, [selectedFile, member.imageUrl]);
+  }, [selectedFile]);
+
+  // Determine the URL to display: blobUrl if present, otherwise member.imageUrl
+  const displayImageUrl = blobUrl || member.imageUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file); // This will trigger the useEffect above
+        setSelectedFile(file);
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
         event.target.value = "";
-        return;
+        setSelectedFile(null); // Clear selected file on error
       }
     } else {
-      setSelectedFile(null); // This will trigger the useEffect above
+      setSelectedFile(null);
     }
   };
 
@@ -123,7 +127,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && member.imageUrl) {
+    } else if (!selectedFile && member.imageUrl && !blobUrl) {
       // If user cleared the selection, remove the existing thumbnail URL from DB
       memberImageUrl = undefined;
     }
@@ -233,8 +237,8 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {localPreviewUrl ? (
-              <img src={localPreviewUrl} alt="Member Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
+            {displayImageUrl ? (
+              <img src={displayImageUrl} alt="Member Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
             ) : (
               <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />

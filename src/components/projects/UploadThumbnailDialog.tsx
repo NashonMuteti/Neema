@@ -41,44 +41,48 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
 
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(currentThumbnailUrl || null);
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
   const [isSaving, setIsSaving] = React.useState(false);
 
   // Effect to reset form fields when dialog opens
   React.useEffect(() => {
     if (isOpen) {
       setSelectedFile(null); // Clear selected file on open
-      setLocalPreviewUrl(currentThumbnailUrl || null); // Set initial image URL
+      setBlobUrl(null); // Clear blobUrl on open
     }
-  }, [isOpen, currentThumbnailUrl]);
+  }, [isOpen]);
 
-  // Effect to manage the blob URL lifecycle based on selectedFile
+  // Effect to create and revoke blob URL
   React.useEffect(() => {
     if (selectedFile) {
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setLocalPreviewUrl(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
-    } else if (!currentThumbnailUrl) { // If no file selected and no initial thumbnail, ensure preview is null
-      setLocalPreviewUrl(null);
-    } else { // If no file selected but there's an initial thumbnail, use that
-      setLocalPreviewUrl(currentThumbnailUrl);
+      const url = URL.createObjectURL(selectedFile);
+      setBlobUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        setBlobUrl(null); // Clear blobUrl on cleanup
+      };
+    } else {
+      setBlobUrl(null); // Clear blobUrl if no file is selected
     }
-  }, [selectedFile, currentThumbnailUrl]);
+  }, [selectedFile]);
+
+  // Determine the URL to display: blobUrl if present, otherwise currentThumbnailUrl
+  const displayImageUrl = blobUrl || currentThumbnailUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file); // This will trigger the useEffect above
+        setSelectedFile(file);
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
         event.target.value = "";
-        return;
+        setSelectedFile(null); // Clear selected file on error
       }
     } else {
-      setSelectedFile(null); // This will trigger the useEffect above
+      setSelectedFile(null);
     }
   };
 
@@ -156,9 +160,9 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex flex-col items-center gap-4">
-            {localPreviewUrl ? (
+            {displayImageUrl ? (
               <img
-                src={localPreviewUrl}
+                src={displayImageUrl}
                 alt="Thumbnail Preview"
                 className="w-48 h-48 object-cover rounded-md border"
               />

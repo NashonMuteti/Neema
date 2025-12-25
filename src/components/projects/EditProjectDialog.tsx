@@ -68,7 +68,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   const [description, setDescription] = React.useState(project.description);
   const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted" | "Suspended">(project.status);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(project.thumbnailUrl || null);
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
   const [dueDate, setDueDate] = React.useState<Date | undefined>(project.dueDate ? new Date(project.dueDate) : undefined);
   const [memberContributionAmount, setMemberContributionAmount] = React.useState<string>(
     project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : ""
@@ -83,39 +83,43 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       setDescription(project.description);
       setStatus(project.status);
       setSelectedFile(null); // Clear selected file on open
-      setLocalPreviewUrl(project.thumbnailUrl || null); // Set initial image URL
+      setBlobUrl(null); // Clear blobUrl on open
       setDueDate(project.dueDate ? new Date(project.dueDate) : undefined);
       setMemberContributionAmount(project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : "");
     }
   }, [isOpen, project]);
 
-  // Effect to manage the blob URL lifecycle based on selectedFile
+  // Effect to create and revoke blob URL
   React.useEffect(() => {
     if (selectedFile) {
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setLocalPreviewUrl(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
-    } else if (!project.thumbnailUrl) { // If no file selected and no initial thumbnail, ensure preview is null
-      setLocalPreviewUrl(null);
-    } else { // If no file selected but there's an initial thumbnail, use that
-      setLocalPreviewUrl(project.thumbnailUrl);
+      const url = URL.createObjectURL(selectedFile);
+      setBlobUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        setBlobUrl(null); // Clear blobUrl on cleanup
+      };
+    } else {
+      setBlobUrl(null); // Clear blobUrl if no file is selected
     }
-  }, [selectedFile, project.thumbnailUrl]);
+  }, [selectedFile]);
+
+  // Determine the URL to display: blobUrl if present, otherwise project.thumbnailUrl
+  const displayImageUrl = blobUrl || project.thumbnailUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file); // This will trigger the useEffect above
+        setSelectedFile(file);
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
         event.target.value = "";
-        return;
+        setSelectedFile(null); // Clear selected file on error
       }
     } else {
-      setSelectedFile(null); // This will trigger the useEffect above
+      setSelectedFile(null);
     }
   };
 
@@ -146,7 +150,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && project.thumbnailUrl) {
+    } else if (!selectedFile && project.thumbnailUrl && !blobUrl) { // If no new file, but there was an old one, and no blobUrl (meaning user cleared it)
       projectThumbnailUrl = undefined;
     }
 
@@ -281,8 +285,8 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
             </Select>
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {localPreviewUrl ? (
-              <img src={localPreviewUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
+            {displayImageUrl ? (
+              <img src={displayImageUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
             ) : (
               <div className="w-32 h-32 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />

@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileToSupabase } from "@/integrations/supabase/storage";
+import { fileUploadSchema } from "@/utils/security";
 
 interface AddEditUserDialogProps {
   isOpen: boolean;
@@ -57,7 +58,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(initialData?.status || "Active");
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -68,29 +69,41 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       setStatus(initialData?.status || "Active");
       setEnableLogin(initialData?.enableLogin || false);
       setSelectedFile(null); // Clear selected file on open
-      setLocalPreviewUrl(initialData?.imageUrl || null); // Set initial image URL
+      setBlobUrl(null); // Clear blobUrl on open
     }
   }, [isOpen, initialData, availableRoles]);
 
-  // Effect to manage the blob URL lifecycle based on selectedFile
+  // Effect to create and revoke blob URL
   React.useEffect(() => {
     if (selectedFile) {
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setLocalPreviewUrl(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
-    } else if (!initialData?.imageUrl) { // If no file selected and no initial image, ensure preview is null
-      setLocalPreviewUrl(null);
-    } else { // If no file selected but there's an initial image, use that
-      setLocalPreviewUrl(initialData.imageUrl);
+      const url = URL.createObjectURL(selectedFile);
+      setBlobUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        setBlobUrl(null); // Clear blobUrl on cleanup
+      };
+    } else {
+      setBlobUrl(null); // Clear blobUrl if no file is selected
     }
-  }, [selectedFile, initialData?.imageUrl]);
+  }, [selectedFile]);
+
+  // Determine the URL to display: blobUrl if present, otherwise initialData?.imageUrl
+  const displayImageUrl = blobUrl || initialData?.imageUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file); // This will trigger the useEffect above
+      try {
+        fileUploadSchema.parse(file);
+        setSelectedFile(file);
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        event.target.value = "";
+        setSelectedFile(null); // Clear selected file on error
+      }
     } else {
-      setSelectedFile(null); // This will trigger the useEffect above
+      setSelectedFile(null);
     }
   };
 
@@ -116,8 +129,8 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && !initialData?.imageUrl) {
-      userImageUrl = undefined;
+    } else if (!selectedFile && initialData?.imageUrl && !blobUrl) { // If no new file, but there was an old one, and no blobUrl (meaning user cleared it)
+      userImageUrl = undefined; // Clear the image
     }
     
     if (initialData?.id) {
@@ -260,8 +273,8 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {localPreviewUrl ? (
-              <img src={localPreviewUrl} alt="User Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
+            {displayImageUrl ? (
+              <img src={displayImageUrl} alt="User Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
             ) : (
               <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />

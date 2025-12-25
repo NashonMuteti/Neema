@@ -5,11 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Save, Image as ImageIcon, Upload } from "lucide-react";
+import { Save, Image as ImageIcon } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
-import { useBranding } from "@/context/BrandingContext"; // Import useBranding
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useBranding } from "@/context/BrandingContext";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
 import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 import { fileUploadSchema } from "@/utils/security";
 
@@ -21,48 +21,49 @@ const BrandSettings = () => {
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   const canManageAppCustomization = currentUserPrivileges.includes("Manage App Customization");
 
-  const { brandLogoUrl, tagline, setBrandLogoUrl, setTagline, isLoading: brandingLoading } = useBranding(); // Use the branding context
+  const { brandLogoUrl, tagline, setBrandLogoUrl, setTagline, isLoading: brandingLoading } = useBranding();
+  
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(brandLogoUrl);
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
   const [localTagline, setLocalTagline] = React.useState(tagline);
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // Effect to update local state when context changes (for tagline and initial logo)
+  // Effect to update local tagline when context changes
   React.useEffect(() => {
     setLocalTagline(tagline);
-    // Only update localPreviewUrl from brandLogoUrl if no file is currently selected
-    if (!selectedFile) {
-      setLocalPreviewUrl(brandLogoUrl);
-    }
-  }, [brandLogoUrl, tagline, selectedFile]);
+  }, [tagline]);
 
-  // Effect to manage the blob URL lifecycle based on selectedFile
+  // Effect to create and revoke blob URL
   React.useEffect(() => {
     if (selectedFile) {
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setLocalPreviewUrl(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
-    } else if (!brandLogoUrl) { // If no file selected and no global logo, ensure preview is null
-      setLocalPreviewUrl(null);
-    } else { // If no file selected but there's a global logo, use that
-      setLocalPreviewUrl(brandLogoUrl);
+      const url = URL.createObjectURL(selectedFile);
+      setBlobUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        setBlobUrl(null); // Clear blobUrl on cleanup
+      };
+    } else {
+      setBlobUrl(null); // Clear blobUrl if no file is selected
     }
-  }, [selectedFile, brandLogoUrl]);
+  }, [selectedFile]);
+
+  // Determine the URL to display: blobUrl if present, otherwise brandLogoUrl
+  const displayImageUrl = blobUrl || brandLogoUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file); // This will trigger the useEffect above
+        setSelectedFile(file);
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
         event.target.value = "";
-        return;
+        setSelectedFile(null); // Clear selected file on error
       }
     } else {
-      setSelectedFile(null); // This will trigger the useEffect above
+      setSelectedFile(null);
     }
   };
 
@@ -79,9 +80,8 @@ const BrandSettings = () => {
         setIsSaving(false);
         return;
       }
-    } else if (localPreviewUrl === null && brandLogoUrl !== "") {
-      // If user cleared the selection and there was a previous logo, clear it
-      newLogoUrl = "";
+    } else if (!selectedFile && brandLogoUrl && !blobUrl) { // If no new file, but there was an old one, and no blobUrl (meaning user cleared it)
+      newLogoUrl = ""; // Clear the logo
     }
 
     await setBrandLogoUrl(newLogoUrl);
@@ -104,8 +104,8 @@ const BrandSettings = () => {
         <div className="grid w-full items-center gap-1.5">
           <Label htmlFor="brand-logo-upload">Brand Logo</Label>
           <div className="flex items-center gap-4">
-            {localPreviewUrl ? (
-              <img src={localPreviewUrl} alt="Brand Logo Preview" className="w-24 h-24 object-contain rounded-md border" />
+            {displayImageUrl ? (
+              <img src={displayImageUrl} alt="Brand Logo Preview" className="w-24 h-24 object-contain rounded-md border" />
             ) : (
               <div className="w-24 h-24 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />

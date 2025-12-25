@@ -36,7 +36,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
   const [enableLogin, setEnableLogin] = React.useState(false);
   const [selectedRole, setSelectedRole] = React.useState<string>(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Active");
@@ -49,38 +49,44 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       setName("");
       setEmail("");
       setSelectedFile(null); // Clear selected file on open
-      setLocalPreviewUrl(null); // Clear preview URL
+      setBlobUrl(null); // Clear blobUrl on open
       setEnableLogin(false);
       setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
       setStatus("Active");
     }
   }, [isOpen, definedRoles]);
 
-  // Effect to manage the blob URL lifecycle based on selectedFile
+  // Effect to create and revoke blob URL
   React.useEffect(() => {
     if (selectedFile) {
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setLocalPreviewUrl(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
+      const url = URL.createObjectURL(selectedFile);
+      setBlobUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        setBlobUrl(null); // Clear blobUrl on cleanup
+      };
     } else {
-      setLocalPreviewUrl(null); // If no file selected, ensure preview is null
+      setBlobUrl(null); // Clear blobUrl if no file is selected
     }
   }, [selectedFile]);
+
+  // Determine the URL to display: blobUrl if present, otherwise null
+  const displayImageUrl = blobUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file); // This will trigger the useEffect above
+        setSelectedFile(file);
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
         event.target.value = "";
-        return;
+        setSelectedFile(null); // Clear selected file on error
       }
     } else {
-      setSelectedFile(null); // This will trigger the useEffect above
+      setSelectedFile(null);
     }
   };
 
@@ -169,7 +175,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     setName("");
     setEmail("");
     setSelectedFile(null);
-    setLocalPreviewUrl(null);
+    setBlobUrl(null); // Ensure blobUrl is cleared
     setEnableLogin(false);
     setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
     setStatus("Active");
@@ -212,9 +218,9 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {localPreviewUrl ? (
+            {displayImageUrl ? (
               <img
-                src={localPreviewUrl}
+                src={displayImageUrl}
                 alt="Member Avatar Preview"
                 className="w-24 h-24 object-cover rounded-full border"
               />
