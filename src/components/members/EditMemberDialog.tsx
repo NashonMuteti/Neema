@@ -133,7 +133,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       // Update Supabase auth user metadata (for full_name)
       const { error: authUpdateError } = await supabase.auth.admin.updateUserById(member.id, {
         email: email,
-        data: { full_name: name, avatar_url: memberImageUrl },
+        user_metadata: { full_name: name, avatar_url: memberImageUrl },
       });
 
       if (authUpdateError) {
@@ -145,7 +145,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
 
       // If login was disabled and is now enabled, and they haven't set a password, send invite
       if (newEnableLogin && !oldEnableLogin) {
-        const userAuthData = currentAuthUser.user;
+        const userAuthData = authUser.user; // Corrected variable name
         if (!userAuthData?.email_confirmed_at && !userAuthData?.last_sign_in_at) {
           const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
             redirectTo: window.location.origin + '/login',
