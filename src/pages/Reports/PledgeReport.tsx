@@ -40,7 +40,7 @@ interface Pledge {
   project_id: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue";
+  status: "Active" | "Paid" | "Overdue"; // Database status
   member_name: string;
   project_name: string;
 }
@@ -81,7 +81,7 @@ const PledgeReport = () => {
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
 
-  const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Paid" | "Overdue">("All");
+  const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All"); // Updated filter options
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -95,14 +95,10 @@ const PledgeReport = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const getPledgeStatus = (pledge: Pledge): Pledge['status'] => {
+  // Helper to determine display status (Unpaid for Active/Overdue)
+  const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
     if (pledge.status === "Paid") return "Paid";
-    const today = startOfDay(new Date());
-    const dueDate = startOfDay(pledge.due_date);
-    if (isBefore(dueDate, today)) {
-      return "Overdue";
-    }
-    return "Active";
+    return "Unpaid";
   };
 
   const fetchReportData = useCallback(async () => {
@@ -128,7 +124,7 @@ const PledgeReport = () => {
     const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
     const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
-    const { data: pledgesData, error: pledgesError } = (await supabase
+    let query = supabase
       .from('project_pledges')
       .select(`
         id,
@@ -141,15 +137,23 @@ const PledgeReport = () => {
         projects ( name )
       `)
       .gte('due_date', startOfMonth.toISOString())
-      .lte('due_date', endOfMonth.toISOString())
-      .order('due_date', { ascending: false })) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null };
+      .lte('due_date', endOfMonth.toISOString());
+      
+    if (filterStatus === "Paid") {
+      query = query.eq('status', 'Paid');
+    } else if (filterStatus === "Unpaid") {
+      query = query.in('status', ['Active', 'Overdue']);
+    }
+    // If filterStatus is "All", no status filter is applied to the DB query
+
+    const { data: pledgesData, error: pledgesError } = (await query.order('due_date', { ascending: false })) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null };
 
     if (pledgesError) {
       console.error("Error fetching pledges:", pledgesError);
       setError("Failed to load pledges.");
       setPledges([]);
     } else {
-      setPledges((pledgesData || []).map(p => ({
+      const fetchedPledges: Pledge[] = (pledgesData || []).map(p => ({
         id: p.id,
         member_id: p.member_id,
         project_id: p.project_id,
@@ -158,10 +162,18 @@ const PledgeReport = () => {
         status: p.status as "Active" | "Paid" | "Overdue",
         member_name: p.profiles?.name || 'Unknown Member',
         project_name: p.projects?.name || 'Unknown Project',
-      })));
+      }));
+
+      const filteredBySearch = fetchedPledges.filter(pledge => {
+        const memberName = (pledge.member_name || "").toLowerCase();
+        const projectName = (pledge.project_name || "").toLowerCase();
+        const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || projectName.includes(searchQuery.toLowerCase());
+        return matchesSearch;
+      });
+      setPledges(filteredBySearch);
     }
     setLoading(false);
-  }, [filterMonth, filterYear]);
+  }, [filterMonth, filterYear, filterStatus, searchQuery]);
 
   useEffect(() => {
     fetchReportData();
@@ -169,16 +181,11 @@ const PledgeReport = () => {
 
   const filteredPledges = React.useMemo(() => {
     return pledges.filter(pledge => {
-      const actualStatus = getPledgeStatus(pledge);
-      const matchesStatus = filterStatus === "All" || actualStatus === filterStatus;
-
-      const memberName = (pledge.member_name || "").toLowerCase();
-      const projectName = (pledge.project_name || "").toLowerCase();
-      const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || projectName.includes(searchQuery.toLowerCase());
-
-      return matchesStatus && matchesSearch;
+      const displayStatus = getDisplayPledgeStatus(pledge);
+      const matchesStatus = filterStatus === "All" || displayStatus === filterStatus;
+      return matchesStatus;
     }).sort((a, b) => b.due_date.getTime() - a.due_date.getTime()); // Sort by due date descending
-  }, [pledges, filterStatus, searchQuery]);
+  }, [pledges, filterStatus]);
 
   const handleMarkAsPaid = async (id: string, memberName: string, amount: number) => {
     if (!canManagePledges) {
@@ -224,13 +231,11 @@ const PledgeReport = () => {
     }
   };
 
-  const getStatusBadgeClasses = (status: Pledge['status']) => {
-    switch (status) {
-      case "Active":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+  const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
+    switch (displayStatus) {
       case "Paid":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Overdue":
+      case "Unpaid":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
@@ -268,16 +273,15 @@ const PledgeReport = () => {
         <CardContent>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
             <div className="flex flex-wrap items-center gap-4">
-              <Select value={filterStatus} onValueChange={(value: "All" | "Active" | "Paid" | "Overdue") => setFilterStatus(value)}>
+              <Select value={filterStatus} onValueChange={(value: "All" | "Paid" | "Unpaid") => setFilterStatus(value)}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="All">All Pledges</SelectItem>
-                    <SelectItem value="Active">Active</SelectItem>
                     <SelectItem value="Paid">Paid</SelectItem>
-                    <SelectItem value="Overdue">Overdue</SelectItem>
+                    <SelectItem value="Unpaid">Unpaid</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -338,7 +342,7 @@ const PledgeReport = () => {
               </TableHeader>
               <TableBody>
                 {filteredPledges.map((pledge) => {
-                  const status = getPledgeStatus(pledge);
+                  const displayStatus = getDisplayPledgeStatus(pledge);
                   const memberName = members.find(m => m.id === pledge.member_id)?.name;
                   const projectName = projects.find(p => p.id === pledge.project_id)?.name;
                   return (
@@ -348,14 +352,14 @@ const PledgeReport = () => {
                       <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
                       <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-center">
-                        <Badge className={getStatusBadgeClasses(status)}>
-                          {status}
+                        <Badge className={getStatusBadgeClasses(displayStatus)}>
+                          {displayStatus}
                         </Badge>
                       </TableCell>
                       {canManagePledges && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
-                            {status !== "Paid" && (
+                            {displayStatus !== "Paid" && (
                               <Button variant="outline" size="icon" onClick={() => handleMarkAsPaid(pledge.id, memberName || "Unknown Member", pledge.amount)}>
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               </Button>
