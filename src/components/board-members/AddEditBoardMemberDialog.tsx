@@ -54,7 +54,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
 
   const [name, setName] = React.useState(initialData?.name || "");
   const [role, setRole] = React.useState(initialData?.role || "");
-  const [email, React.useState] = React.useState(initialData?.email || "");
+  const [email, setEmail] = React.useState(initialData?.email || "");
   const [phone, setPhone] = React.useState(initialData?.phone || "");
   const [address, setAddress] = React.useState(initialData?.address || "");
   const [notes, setNotes] = React.useState(initialData?.notes || "");
