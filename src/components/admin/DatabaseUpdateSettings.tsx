@@ -7,9 +7,10 @@ import { RefreshCcw, Database, Upload, Download } from "lucide-react"; // Added 
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { supabase } from "@/integrations/supabase/client";
 
 const DatabaseUpdateSettings = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, session } = useAuth(); // Get session for auth header
   const { userRoles: definedRoles } = useUserRoles();
 
   const { canManageDatabaseMaintenance } = React.useMemo(() => {
@@ -27,9 +28,50 @@ const DatabaseUpdateSettings = () => {
     console.log("Attempted to check and update database fields (requires backend).");
   };
 
-  const handleBackupDatabase = () => {
-    showError("Database backup functionality requires backend implementation.");
-    console.log("Attempted to initiate database backup (requires backend).");
+  const handleBackupDatabase = async () => {
+    if (!canManageDatabaseMaintenance) {
+      showError("You do not have permission to backup the database.");
+      return;
+    }
+
+    if (!session) {
+      showError("You must be logged in to perform a database backup.");
+      return;
+    }
+
+    const toastId = showLoading("Initiating database backup...");
+    try {
+      const { data, error } = await supabase.functions.invoke('export-database-data', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error("Error invoking Edge Function for backup:", error);
+        showError(`Failed to backup database: ${error.message}`);
+        return;
+      }
+
+      // Assuming 'data' contains the JSON object with table data
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `supabase_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showSuccess("Database backup downloaded successfully!");
+    } catch (err) {
+      console.error("Unexpected error during database backup:", err);
+      showError("An unexpected error occurred during database backup.");
+    } finally {
+      dismissToast(toastId);
+    }
   };
 
   const handleRestoreDatabase = () => {
