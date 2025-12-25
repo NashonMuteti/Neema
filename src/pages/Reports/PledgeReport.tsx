@@ -30,9 +30,10 @@ import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import the new dialog and its Pledge type
 
 // Add interfaces for fetched data
-interface Member { id: string; name: string; }
+interface Member { id: string; name: string; email: string; } // Added email for dialog
 interface Project { id: string; name: string; }
 interface Pledge {
   id: string;
@@ -43,6 +44,7 @@ interface Pledge {
   status: "Active" | "Paid" | "Overdue"; // Database status
   member_name: string;
   project_name: string;
+  comments?: string; // Added comments
 }
 
 // Define the expected structure of a pledge row with joined profile and project data
@@ -53,8 +55,9 @@ interface PledgeRowWithJoinedData {
   amount: number;
   due_date: string; // ISO string from DB
   status: "Active" | "Paid" | "Overdue";
-  profiles: { name: string } | null; // Joined profile data
+  profiles: { name: string; email: string } | null; // Joined profile data, added email
   projects: { name: string } | null; // Joined project data
+  comments?: string; // Added comments
 }
 
 const PledgeReport = () => {
@@ -107,7 +110,7 @@ const PledgeReport = () => {
 
     const { data: membersData, error: membersError } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, email') // Fetch email for dialog
       .order('name', { ascending: true });
 
     const { data: projectsData, error: projectsError } = await supabase
@@ -133,7 +136,8 @@ const PledgeReport = () => {
         amount,
         due_date,
         status,
-        profiles ( name ),
+        comments,
+        profiles ( name, email ),
         projects ( name )
       `)
       .gte('due_date', startOfMonth.toISOString())
@@ -162,12 +166,16 @@ const PledgeReport = () => {
         status: p.status as "Active" | "Paid" | "Overdue",
         member_name: p.profiles?.name || 'Unknown Member',
         project_name: p.projects?.name || 'Unknown Project',
+        comments: p.comments || undefined,
       }));
 
       const filteredBySearch = fetchedPledges.filter(pledge => {
         const memberName = (pledge.member_name || "").toLowerCase();
         const projectName = (pledge.project_name || "").toLowerCase();
-        const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || projectName.includes(searchQuery.toLowerCase());
+        const comments = (pledge.comments || "").toLowerCase();
+        const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || 
+                              projectName.includes(searchQuery.toLowerCase()) ||
+                              comments.includes(searchQuery.toLowerCase());
         return matchesSearch;
       });
       setPledges(filteredBySearch);
@@ -206,10 +214,10 @@ const PledgeReport = () => {
     }
   };
 
-  const handleEditPledge = (id: string) => {
-    // In a real app, this would open an edit dialog pre-filled with pledge data
-    console.log("Editing pledge:", id);
-    showError(`Edit functionality for pledge ${id} (placeholder).`);
+  const handleEditPledge = (updatedPledge: Pledge) => {
+    // This function is called by the EditPledgeDialog on successful save
+    // We just need to re-fetch the data to update the table
+    fetchReportData();
   };
 
   const handleDeletePledge = async (id: string) => {
@@ -289,17 +297,17 @@ const PledgeReport = () => {
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Month</SelectLabel>
-                    {months.map((month) => (
-                      <SelectItem key={month.value} value={month.value}>
-                        {month.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Month</SelectLabel>
+                      {months.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               <Select value={filterYear} onValueChange={setFilterYear}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="Select year" />
@@ -337,6 +345,7 @@ const PledgeReport = () => {
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead className="text-center">Status</TableHead>
+                  <TableHead>Comments</TableHead>
                   {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -356,6 +365,7 @@ const PledgeReport = () => {
                           {displayStatus}
                         </Badge>
                       </TableCell>
+                      <TableCell className="max-w-[150px] truncate">{pledge.comments || "-"}</TableCell>
                       {canManagePledges && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
@@ -364,9 +374,12 @@ const PledgeReport = () => {
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" onClick={() => handleEditPledge(pledge.id)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <EditPledgeDialog
+                              initialData={pledge as EditPledgeDialogPledge}
+                              onSave={handleEditPledge}
+                              members={members}
+                              projects={projects}
+                            />
                             <Button variant="ghost" size="icon" onClick={() => handleDeletePledge(pledge.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>

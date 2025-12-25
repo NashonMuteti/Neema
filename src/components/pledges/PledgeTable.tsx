@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, CheckCircle } from "lucide-react";
 import { format, isBefore, startOfDay } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
+import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "./EditPledgeDialog"; // Import the new dialog and its Pledge type
 
 interface Pledge {
   id: string;
@@ -27,12 +28,25 @@ interface Pledge {
   comments?: string; // Added comments
 }
 
+interface Member { // Define Member interface for EditPledgeDialog
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Project { // Define Project interface for EditPledgeDialog
+  id: string;
+  name: string;
+}
+
 interface PledgeTableProps {
   pledges: Pledge[];
   canManagePledges: boolean;
   onMarkAsPaid: (id: string, memberName: string, amount: number) => void;
-  onEditPledge: (id: string) => void;
+  onEditPledge: (updatedPledge: Pledge) => void; // Changed to pass the updated pledge object
   onDeletePledge: (id: string) => void;
+  members: Member[]; // Pass members to the dialog
+  projects: Project[]; // Pass projects to the dialog
 }
 
 // Helper to determine display status
@@ -58,6 +72,8 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
   onMarkAsPaid,
   onEditPledge,
   onDeletePledge,
+  members,
+  projects,
 }) => {
   const { currency } = useSystemSettings();
 
@@ -99,9 +115,12 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
                             <CheckCircle className="h-4 w-4 text-green-600" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => onEditPledge(pledge.id)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <EditPledgeDialog
+                          initialData={pledge as EditPledgeDialogPledge} // Cast to the dialog's Pledge type
+                          onSave={onEditPledge}
+                          members={members}
+                          projects={projects}
+                        />
                         <Button variant="ghost" size="icon" onClick={() => onDeletePledge(pledge.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

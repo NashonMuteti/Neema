@@ -11,6 +11,7 @@ import { PostgrestError } from "@supabase/supabase-js";
 import PledgeForm from "@/components/pledges/PledgeForm";
 import PledgeFilters from "@/components/pledges/PledgeFilters";
 import PledgeTable from "@/components/pledges/PledgeTable";
+import { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import Pledge type from dialog
 
 interface Member {
   id: string;
@@ -218,10 +219,10 @@ const Pledges = () => {
     }
   };
 
-  const handleEditPledge = (id: string) => {
-    // In a real app, this would open an edit dialog pre-filled with pledge data
-    console.log("Editing pledge:", id);
-    showError(`Edit functionality for pledge ${id} is not yet implemented.`);
+  const handleEditPledge = (updatedPledge: Pledge) => {
+    // This function is called by the EditPledgeDialog on successful save
+    // We just need to re-fetch the data to update the table
+    fetchInitialData();
   };
 
   const handleDeletePledge = async (id: string) => {
@@ -319,8 +320,10 @@ const Pledges = () => {
               pledges={pledges}
               canManagePledges={canManagePledges}
               onMarkAsPaid={handleMarkAsPaid}
-              onEditPledge={handleEditPledge}
+              onEditPledge={handleEditPledge} // Pass the updated handler
               onDeletePledge={handleDeletePledge}
+              members={members}
+              projects={projects}
             />
           </CardContent>
         </Card>
