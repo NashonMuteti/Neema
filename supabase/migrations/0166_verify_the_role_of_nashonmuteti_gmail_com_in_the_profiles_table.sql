@@ -1,0 +1,1 @@
+SELECT id, name, email, role FROM public.profiles WHERE email = 'nashonmuteti@gmail.com';

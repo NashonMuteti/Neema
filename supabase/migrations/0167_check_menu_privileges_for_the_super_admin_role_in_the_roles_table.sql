@@ -1,0 +1,1 @@
+SELECT id, name, menu_privileges FROM public.roles WHERE name = 'Super Admin';
