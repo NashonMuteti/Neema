@@ -57,7 +57,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(initialData?.status || "Active");
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
+  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(initialData?.imageUrl || null);
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -67,25 +67,30 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       setRole(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : ""));
       setStatus(initialData?.status || "Active");
       setEnableLogin(initialData?.enableLogin || false);
-      setSelectedFile(null);
-      setPreviewUrl(initialData?.imageUrl || null);
+      setSelectedFile(null); // Clear selected file on open
+      setLocalPreviewUrl(initialData?.imageUrl || null); // Set initial image URL
     }
-    
-    return () => {
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [isOpen, initialData, previewUrl, availableRoles]);
+  }, [isOpen, initialData, availableRoles]);
+
+  // Effect to manage the blob URL lifecycle based on selectedFile
+  React.useEffect(() => {
+    if (selectedFile) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setLocalPreviewUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
+    } else if (!initialData?.imageUrl) { // If no file selected and no initial image, ensure preview is null
+      setLocalPreviewUrl(null);
+    } else { // If no file selected but there's an initial image, use that
+      setLocalPreviewUrl(initialData.imageUrl);
+    }
+  }, [selectedFile, initialData?.imageUrl]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      setSelectedFile(file); // This will trigger the useEffect above
     } else {
-      setSelectedFile(null);
-      setPreviewUrl(initialData?.imageUrl || null);
+      setSelectedFile(null); // This will trigger the useEffect above
     }
   };
 
@@ -255,8 +260,8 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {previewUrl ? (
-              <img src={previewUrl} alt="User Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
+            {localPreviewUrl ? (
+              <img src={localPreviewUrl} alt="User Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
             ) : (
               <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />

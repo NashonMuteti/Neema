@@ -58,9 +58,10 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
   const [address, setAddress] = React.useState(initialData?.address || "");
   const [notes, setNotes] = React.useState(initialData?.notes || "");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialData?.image_url || null);
+  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(initialData?.image_url || null);
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // Effect to reset form fields when dialog opens or initialData changes
   React.useEffect(() => {
     if (isOpen) {
       setName(initialData?.name || "");
@@ -69,23 +70,30 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       setPhone(initialData?.phone || "");
       setAddress(initialData?.address || "");
       setNotes(initialData?.notes || "");
-      setSelectedFile(null);
-      setPreviewUrl(initialData?.image_url || null);
+      setSelectedFile(null); // Clear selected file on open
+      setLocalPreviewUrl(initialData?.image_url || null); // Set initial image URL
     }
-    return () => {
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [isOpen, initialData, previewUrl]);
+  }, [isOpen, initialData]);
+
+  // Effect to manage the blob URL lifecycle based on selectedFile
+  React.useEffect(() => {
+    if (selectedFile) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setLocalPreviewUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
+    } else if (!initialData?.image_url) { // If no file selected and no initial image, ensure preview is null
+      setLocalPreviewUrl(null);
+    } else { // If no file selected but there's an initial image, use that
+      setLocalPreviewUrl(initialData.image_url);
+    }
+  }, [selectedFile, initialData?.image_url]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
+        setSelectedFile(file); // This will trigger the useEffect above
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
@@ -93,8 +101,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
         return;
       }
     } else {
-      setSelectedFile(null);
-      setPreviewUrl(initialData?.image_url || null);
+      setSelectedFile(null); // This will trigger the useEffect above
     }
   };
 
@@ -158,9 +165,9 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {previewUrl ? (
+            {localPreviewUrl ? (
               <img
-                src={previewUrl}
+                src={localPreviewUrl}
                 alt="Board Member Avatar Preview"
                 className="w-24 h-24 object-cover rounded-full border"
               />

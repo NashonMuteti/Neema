@@ -36,34 +36,43 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(null);
   const [enableLogin, setEnableLogin] = React.useState(false);
   const [selectedRole, setSelectedRole] = React.useState<string>(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Active");
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false); // Changed from isUploading to isSaving for broader scope
 
+  // Effect to reset form fields when dialog opens
   React.useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
-
-  React.useEffect(() => {
-    if (definedRoles.length > 0 && !selectedRole) {
-      setSelectedRole(definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name);
+    if (isOpen) {
+      setName("");
+      setEmail("");
+      setSelectedFile(null); // Clear selected file on open
+      setLocalPreviewUrl(null); // Clear preview URL
+      setEnableLogin(false);
+      setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
+      setStatus("Active");
     }
-  }, [definedRoles, selectedRole]);
+  }, [isOpen, definedRoles]);
+
+  // Effect to manage the blob URL lifecycle based on selectedFile
+  React.useEffect(() => {
+    if (selectedFile) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setLocalPreviewUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
+    } else {
+      setLocalPreviewUrl(null); // If no file selected, ensure preview is null
+    }
+  }, [selectedFile]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
+        setSelectedFile(file); // This will trigger the useEffect above
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
@@ -71,8 +80,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
         return;
       }
     } else {
-      setSelectedFile(null);
-      setPreviewUrl(null);
+      setSelectedFile(null); // This will trigger the useEffect above
     }
   };
 
@@ -161,7 +169,7 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     setName("");
     setEmail("");
     setSelectedFile(null);
-    setPreviewUrl(null);
+    setLocalPreviewUrl(null);
     setEnableLogin(false);
     setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
     setStatus("Active");
@@ -170,9 +178,6 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button disabled={!canManageMembers}>Add Member</Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Member</DialogTitle>
@@ -207,9 +212,9 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {previewUrl ? (
+            {localPreviewUrl ? (
               <img
-                src={previewUrl}
+                src={localPreviewUrl}
                 alt="Member Avatar Preview"
                 className="w-24 h-24 object-cover rounded-full border"
               />

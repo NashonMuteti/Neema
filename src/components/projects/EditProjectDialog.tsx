@@ -68,7 +68,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   const [description, setDescription] = React.useState(project.description);
   const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted" | "Suspended">(project.status);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(project.thumbnailUrl || null);
+  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(project.thumbnailUrl || null);
   const [dueDate, setDueDate] = React.useState<Date | undefined>(project.dueDate ? new Date(project.dueDate) : undefined);
   const [memberContributionAmount, setMemberContributionAmount] = React.useState<string>(
     project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : ""
@@ -76,30 +76,38 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // Effect to reset form fields when dialog opens or project data changes
   React.useEffect(() => {
     if (isOpen) {
       setName(project.name);
       setDescription(project.description);
       setStatus(project.status);
-      setSelectedFile(null);
-      setPreviewUrl(project.thumbnailUrl || null);
+      setSelectedFile(null); // Clear selected file on open
+      setLocalPreviewUrl(project.thumbnailUrl || null); // Set initial image URL
       setDueDate(project.dueDate ? new Date(project.dueDate) : undefined);
       setMemberContributionAmount(project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : "");
     }
-    return () => {
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [isOpen, project, previewUrl]);
+  }, [isOpen, project]);
+
+  // Effect to manage the blob URL lifecycle based on selectedFile
+  React.useEffect(() => {
+    if (selectedFile) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setLocalPreviewUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
+    } else if (!project.thumbnailUrl) { // If no file selected and no initial thumbnail, ensure preview is null
+      setLocalPreviewUrl(null);
+    } else { // If no file selected but there's an initial thumbnail, use that
+      setLocalPreviewUrl(project.thumbnailUrl);
+    }
+  }, [selectedFile, project.thumbnailUrl]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
+        setSelectedFile(file); // This will trigger the useEffect above
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
@@ -107,8 +115,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
         return;
       }
     } else {
-      setSelectedFile(null);
-      setPreviewUrl(project.thumbnailUrl || null);
+      setSelectedFile(null); // This will trigger the useEffect above
     }
   };
 
@@ -274,8 +281,8 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
             </Select>
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {previewUrl ? (
-              <img src={previewUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
+            {localPreviewUrl ? (
+              <img src={localPreviewUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
             ) : (
               <div className="w-32 h-32 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />

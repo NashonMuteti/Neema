@@ -21,41 +21,46 @@ const BrandSettings = () => {
 
   const { brandLogoUrl, tagline, setBrandLogoUrl, setTagline } = useBranding(); // Use the branding context
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(brandLogoUrl);
+  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(brandLogoUrl);
   const [localTagline, setLocalTagline] = React.useState(tagline);
 
+  // Effect to update local state when context changes (for tagline and initial logo)
   React.useEffect(() => {
-    // Update local state when context changes
-    setPreviewUrl(brandLogoUrl);
     setLocalTagline(tagline);
-  }, [brandLogoUrl, tagline]);
+    // Only update localPreviewUrl from brandLogoUrl if no file is currently selected
+    if (!selectedFile) {
+      setLocalPreviewUrl(brandLogoUrl);
+    }
+  }, [brandLogoUrl, tagline, selectedFile]);
 
+  // Effect to manage the blob URL lifecycle based on selectedFile
   React.useEffect(() => {
-    // Cleanup object URL when component unmounts or file changes
-    return () => {
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
+    if (selectedFile) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setLocalPreviewUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
+    } else if (!brandLogoUrl) { // If no file selected and no global logo, ensure preview is null
+      setLocalPreviewUrl(null);
+    } else { // If no file selected but there's a global logo, use that
+      setLocalPreviewUrl(brandLogoUrl);
+    }
+  }, [selectedFile, brandLogoUrl]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      setSelectedFile(file); // This will trigger the useEffect above
     } else {
-      setSelectedFile(null);
-      setPreviewUrl(brandLogoUrl); // Revert to current global logo if no file selected
+      setSelectedFile(null); // This will trigger the useEffect above
     }
   };
 
   const handleSaveBranding = () => {
-    if (selectedFile && previewUrl) {
+    if (selectedFile && localPreviewUrl) {
       // Simulate upload and update global URL
-      setBrandLogoUrl(previewUrl);
+      setBrandLogoUrl(localPreviewUrl); // Use localPreviewUrl which is either blob or actual URL
       showSuccess("Brand logo uploaded and settings saved!");
-    } else if (!selectedFile && previewUrl !== brandLogoUrl) {
+    } else if (!selectedFile && localPreviewUrl !== brandLogoUrl) {
       // If user cleared selection and there was a previous logo, clear it
       setBrandLogoUrl(""); // Or set to a default empty state
       showSuccess("Brand logo cleared and settings saved!");
@@ -63,7 +68,7 @@ const BrandSettings = () => {
       showSuccess("Branding settings saved!");
     }
     setTagline(localTagline); // Update global tagline
-    console.log("Saving brand settings:", { brandLogoUrl: previewUrl, tagline: localTagline });
+    console.log("Saving brand settings:", { brandLogoUrl: localPreviewUrl, tagline: localTagline });
   };
 
   return (
@@ -72,15 +77,15 @@ const BrandSettings = () => {
         <CardTitle>Brand Settings</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground mb-4">
           Customize your application's branding, including logo and tagline.
         </p>
 
         <div className="grid w-full items-center gap-1.5">
           <Label htmlFor="brand-logo-upload">Brand Logo</Label>
           <div className="flex items-center gap-4">
-            {previewUrl ? (
-              <img src={previewUrl} alt="Brand Logo Preview" className="w-24 h-24 object-contain rounded-md border" />
+            {localPreviewUrl ? (
+              <img src={localPreviewUrl} alt="Brand Logo Preview" className="w-24 h-24 object-contain rounded-md border" />
             ) : (
               <div className="w-24 h-24 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />

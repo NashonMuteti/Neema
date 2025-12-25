@@ -61,7 +61,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
 
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
 
   const {
@@ -80,21 +80,32 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
     },
   });
 
+  // Effect to reset form fields when dialog opens
   React.useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
+    if (isOpen) {
+      reset();
+      setSelectedFile(null); // Clear selected file on open
+      setLocalPreviewUrl(null); // Clear preview URL
+    }
+  }, [isOpen, reset]);
+
+  // Effect to manage the blob URL lifecycle based on selectedFile
+  React.useEffect(() => {
+    if (selectedFile) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setLocalPreviewUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
+    } else {
+      setLocalPreviewUrl(null); // If no file selected, ensure preview is null
+    }
+  }, [selectedFile]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
+        setSelectedFile(file); // This will trigger the useEffect above
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
@@ -102,8 +113,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
         return;
       }
     } else {
-      setSelectedFile(null);
-      setPreviewUrl(null);
+      setSelectedFile(null); // This will trigger the useEffect above
     }
   };
 
@@ -137,7 +147,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
     setIsOpen(false);
     reset();
     setSelectedFile(null);
-    setPreviewUrl(null);
+    setLocalPreviewUrl(null);
     setIsSaving(false);
   };
 
@@ -227,8 +237,8 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onAddProject }) => 
             {errors.memberContributionAmount && <p className="col-span-4 text-right text-sm text-destructive">{errors.memberContributionAmount.message}</p>}
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {previewUrl ? (
-              <img src={previewUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
+            {localPreviewUrl ? (
+              <img src={localPreviewUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
             ) : (
               <div className="w-32 h-32 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />

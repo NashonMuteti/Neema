@@ -52,37 +52,45 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
   const [name, setName] = React.useState(member.name);
   const [email, setEmail] = React.useState(member.email);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(member.imageUrl || null);
+  const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(member.imageUrl || null);
   const [enableLogin, setEnableLogin] = React.useState(member.enableLogin);
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(member.status);
   const [selectedRole, setSelectedRole] = React.useState<string>(member.role);
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // Effect to reset form fields when dialog opens or member data changes
   React.useEffect(() => {
     if (isOpen) {
       setName(member.name);
       setEmail(member.email);
-      setSelectedFile(null);
-      setPreviewUrl(member.imageUrl || null);
+      setSelectedFile(null); // Clear selected file on open
+      setLocalPreviewUrl(member.imageUrl || null); // Set initial image URL
       setEnableLogin(member.enableLogin);
       setStatus(member.status);
       setSelectedRole(member.role);
     }
-    return () => {
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [isOpen, member, previewUrl]);
+  }, [isOpen, member]);
+
+  // Effect to manage the blob URL lifecycle based on selectedFile
+  React.useEffect(() => {
+    if (selectedFile) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setLocalPreviewUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl); // Revoke when selectedFile changes or component unmounts
+    } else if (!member.imageUrl) { // If no file selected and no initial image, ensure preview is null
+      setLocalPreviewUrl(null);
+    } else { // If no file selected but there's an initial image, use that
+      setLocalPreviewUrl(member.imageUrl);
+    }
+  }, [selectedFile, member.imageUrl]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
         fileUploadSchema.parse(file);
-        setSelectedFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
+        setSelectedFile(file); // This will trigger the useEffect above
       } catch (error) {
         console.error("File validation error:", error);
         showError("Invalid file. Please upload an image file less than 5MB.");
@@ -90,8 +98,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
         return;
       }
     } else {
-      setSelectedFile(null);
-      setPreviewUrl(member.imageUrl || null);
+      setSelectedFile(null); // This will trigger the useEffect above
     }
   };
 
@@ -226,8 +233,8 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
             />
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
-            {previewUrl ? (
-              <img src={previewUrl} alt="Member Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
+            {localPreviewUrl ? (
+              <img src={localPreviewUrl} alt="Member Avatar Preview" className="w-24 h-24 object-cover rounded-full border" />
             ) : (
               <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
                 <ImageIcon className="h-12 w-12" />
