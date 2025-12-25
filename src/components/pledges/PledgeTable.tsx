@@ -43,7 +43,7 @@ interface PledgeTableProps {
   pledges: Pledge[];
   canManagePledges: boolean;
   onMarkAsPaid: (id: string, memberName: string, amount: number) => void;
-  onEditPledge: (updatedPledge: Pledge) => void; // Changed to pass the updated pledge object
+  onEditPledge: (updatedPledge: EditPledgeDialogPledge) => void; // Changed to use EditPledgeDialogPledge
   onDeletePledge: (id: string) => void;
   members: Member[]; // Pass members to the dialog
   projects: Project[]; // Pass projects to the dialog

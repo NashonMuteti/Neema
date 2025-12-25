@@ -219,7 +219,7 @@ const Pledges = () => {
     }
   };
 
-  const handleEditPledge = (updatedPledge: Pledge) => {
+  const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => { // Changed to use EditPledgeDialogPledge
     // This function is called by the EditPledgeDialog on successful save
     // We just need to re-fetch the data to update the table
     fetchInitialData();
