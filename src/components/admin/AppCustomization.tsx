@@ -20,45 +20,48 @@ import { useTheme } from "next-themes"; // Import useTheme
 import { showSuccess } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 const AppCustomization = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { defaultTheme: persistedDefaultTheme, setDefaultTheme, isLoading: settingsLoading } = useSystemSettings();
 
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   const canManageAppCustomization = currentUserPrivileges.includes("Manage App Customization");
 
-  const { theme, setTheme } = useTheme(); // Get current theme and setter
-  const [defaultTheme, setDefaultTheme] = React.useState<string>(theme || "system"); // State for the default theme setting
+  const { setTheme } = useTheme(); // Get current theme setter from next-themes
+  const [localDefaultTheme, setLocalDefaultTheme] = React.useState<string>(persistedDefaultTheme); // State for the default theme setting
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
-    // When the component mounts, set the local state to the current theme from next-themes
-    // In a real app, this would likely be fetched from a backend setting
-    setDefaultTheme(theme || "system");
-  }, [theme]);
+    // When the component mounts or persistedDefaultTheme changes, update local state
+    setLocalDefaultTheme(persistedDefaultTheme);
+  }, [persistedDefaultTheme]);
 
-  const handleSaveDefaultTheme = () => {
-    // In a real application, this would save the 'defaultTheme' to a backend
-    // For now, we'll just apply it immediately and show a toast.
-    setTheme(defaultTheme);
-    showSuccess(`Default theme set to '${defaultTheme}' successfully!`);
-    console.log("Saving default theme:", defaultTheme);
+  const handleSaveDefaultTheme = async () => {
+    setIsSaving(true);
+    await setDefaultTheme(localDefaultTheme); // Persist to Supabase via context
+    setTheme(localDefaultTheme); // Also apply to next-themes immediately
+    showSuccess(`Default theme set to '${localDefaultTheme}' successfully!`);
+    console.log("Saving default theme:", localDefaultTheme);
+    setIsSaving(false);
   };
 
   return (
     <div className="space-y-6">
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
-          <CardTitle>App Customization</CardTitle>
+          <CardTitle>Application Theme</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-muted-foreground">
-            Adjust the application's look and feel, branding, and default behaviors.
+            Adjust the application's default theme.
           </p>
           <div className="grid w-full max-w-sm items-center gap-1.5">
             <Label htmlFor="default-theme">Default Application Theme</Label>
-            <Select value={defaultTheme} onValueChange={setDefaultTheme} disabled={!canManageAppCustomization}>
+            <Select value={localDefaultTheme} onValueChange={setLocalDefaultTheme} disabled={!canManageAppCustomization || isSaving || settingsLoading}>
               <SelectTrigger id="default-theme">
                 <SelectValue placeholder="Select default theme" />
               </SelectTrigger>
@@ -79,13 +82,13 @@ const AppCustomization = () => {
               This sets the default theme for users who haven't chosen one.
             </p>
           </div>
-          <Button onClick={handleSaveDefaultTheme} disabled={!canManageAppCustomization}>
-            <Save className="mr-2 h-4 w-4" /> Save Default Theme
+          <Button onClick={handleSaveDefaultTheme} disabled={!canManageAppCustomization || isSaving || settingsLoading}>
+            {isSaving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> Save Default Theme</>}
           </Button>
         </CardContent>
       </Card>
       <BrandSettings />
-      <HeaderCustomization /> {/* New: Include HeaderCustomization component */}
+      <HeaderCustomization />
     </div>
   );
 };

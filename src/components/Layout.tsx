@@ -3,7 +3,6 @@
 import React from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
-import { MadeWithDyad } from "./made-with-dyad";
 import { useBranding } from "@/context/BrandingContext"; // Import useBranding
 import { Outlet } from "react-router-dom"; // Import Outlet
 
@@ -20,7 +19,7 @@ const Layout: React.FC = () => { // Removed LayoutProps interface and children p
         </main>
         <footer className="p-4 text-center text-sm text-muted-foreground border-t shadow-inner transition-all duration-300 ease-in-out">
           <p>{tagline}</p> {/* Use dynamic tagline */}
-          <MadeWithDyad />
+          {/* <MadeWithDyad /> Removed as requested */}
         </footer>
       </div>
     </div>

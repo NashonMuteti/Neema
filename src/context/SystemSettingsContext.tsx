@@ -11,7 +11,9 @@ interface CurrencyInfo {
 
 interface SystemSettingsContextType {
   currency: CurrencyInfo;
+  defaultTheme: string; // New: Default theme
   setCurrency: (code: string) => Promise<void>;
+  setDefaultTheme: (theme: string) => Promise<void>; // New: Setter for default theme
   isLoading: boolean;
 }
 
@@ -30,6 +32,7 @@ const SystemSettingsContext = createContext<SystemSettingsContextType | undefine
 
 export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currency, setCurrencyState] = useState<CurrencyInfo>({ code: "USD", symbol: "$" });
+  const [defaultTheme, setDefaultThemeState] = useState("system"); // New: Default theme state
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
@@ -37,28 +40,31 @@ export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ chil
     const { data, error } = await supabase
       .from('settings')
       .select('key, value')
-      .eq('key', 'default_currency_code')
-      .single();
+      .in('key', ['default_currency_code', 'default_theme']); // Fetch both settings
 
     if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
       console.error("Error fetching system settings:", error);
       showError("Failed to load system settings.");
     } else if (data) {
-      const code = data.value;
-      setCurrencyState({ code, symbol: currencyMap[code] || "$" });
+      const settingsMap = new Map(data.map(item => [item.key, item.value]));
+      const fetchedCurrencyCode = settingsMap.get('default_currency_code') || 'USD';
+      setCurrencyState({ code: fetchedCurrencyCode, symbol: currencyMap[fetchedCurrencyCode] || "$" });
+      setDefaultThemeState(settingsMap.get('default_theme') || 'system'); // Set fetched default theme
     } else {
-      // If no setting found, insert default
+      // If no setting found, insert defaults
       const { error: insertError } = await supabase
         .from('settings')
-        .insert({ key: 'default_currency_code', value: 'USD' })
-        .select('key, value')
-        .single();
+        .insert([
+          { key: 'default_currency_code', value: 'USD' },
+          { key: 'default_theme', value: 'system' }
+        ]);
       
       if (insertError) {
-        console.error("Error inserting default currency setting:", insertError);
-        showError("Failed to set default currency.");
+        console.error("Error inserting default settings:", insertError);
+        showError("Failed to set default system settings.");
       } else {
         setCurrencyState({ code: 'USD', symbol: '$' });
+        setDefaultThemeState('system');
       }
     }
     setIsLoading(false);
@@ -68,24 +74,36 @@ export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ chil
     fetchSettings();
   }, [fetchSettings]);
 
-  const setCurrency = async (code: string) => {
+  const updateSetting = async (key: string, value: string) => {
     setIsLoading(true);
     const { error } = await supabase
       .from('settings')
-      .update({ value: code })
-      .eq('key', 'default_currency_code');
+      .upsert({ key, value }, { onConflict: 'key' });
 
     if (error) {
-      console.error("Error updating currency setting:", error);
-      showError("Failed to update system currency.");
-    } else {
-      setCurrencyState({ code, symbol: currencyMap[code] || "$" });
+      console.error(`Error updating ${key} setting:`, error);
+      showError(`Failed to update ${key}.`);
+      setIsLoading(false);
+      return false;
     }
     setIsLoading(false);
+    return true;
+  };
+
+  const setCurrency = async (code: string) => {
+    if (await updateSetting('default_currency_code', code)) {
+      setCurrencyState({ code, symbol: currencyMap[code] || "$" });
+    }
+  };
+
+  const setDefaultTheme = async (theme: string) => {
+    if (await updateSetting('default_theme', theme)) {
+      setDefaultThemeState(theme);
+    }
   };
 
   return (
-    <SystemSettingsContext.Provider value={{ currency, setCurrency, isLoading }}>
+    <SystemSettingsContext.Provider value={{ currency, defaultTheme, setCurrency, setDefaultTheme, isLoading }}>
       {children}
     </SystemSettingsContext.Provider>
   );

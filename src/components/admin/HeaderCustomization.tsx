@@ -19,17 +19,20 @@ const HeaderCustomization = () => {
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   const canManageHeaderCustomization = currentUserPrivileges.includes("Manage Header Customization");
 
-  const { headerTitle, setHeaderTitle } = useBranding();
+  const { headerTitle, setHeaderTitle, isLoading: brandingLoading } = useBranding();
   const [localHeaderTitle, setLocalHeaderTitle] = React.useState(headerTitle);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     setLocalHeaderTitle(headerTitle);
   }, [headerTitle]);
 
-  const handleSaveHeaderSettings = () => {
-    setHeaderTitle(localHeaderTitle);
+  const handleSaveHeaderSettings = async () => {
+    setIsSaving(true);
+    await setHeaderTitle(localHeaderTitle);
     showSuccess("Header title updated successfully!");
     console.log("Saving header title:", localHeaderTitle);
+    setIsSaving(false);
   };
 
   return (
@@ -49,12 +52,12 @@ const HeaderCustomization = () => {
             value={localHeaderTitle}
             onChange={(e) => setLocalHeaderTitle(e.target.value)}
             placeholder="Your App Title"
-            disabled={!canManageHeaderCustomization}
+            disabled={!canManageHeaderCustomization || isSaving || brandingLoading}
           />
           <p className="text-sm text-muted-foreground">This title appears prominently in the application header.</p>
         </div>
-        <Button onClick={handleSaveHeaderSettings} disabled={!canManageHeaderCustomization}>
-          <Save className="mr-2 h-4 w-4" /> Save Header Settings
+        <Button onClick={handleSaveHeaderSettings} disabled={!canManageHeaderCustomization || isSaving || brandingLoading}>
+          {isSaving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> Save Header Settings</>}
         </Button>
       </CardContent>
     </Card>

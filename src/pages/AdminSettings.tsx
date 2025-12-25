@@ -9,8 +9,7 @@ import SystemCurrencySettings from "@/components/admin/SystemCurrencySettings";
 import MemberFieldCustomization from "@/components/admin/MemberFieldCustomization";
 import UserRolesSettings from "@/components/admin/UserRolesSettings";
 import DatabaseUpdateSettings from "@/components/admin/DatabaseUpdateSettings";
-import FinancialAccountsSettings from "@/components/admin/FinancialAccountsSettings"; // New import
-import HeaderCustomization from "@/components/admin/HeaderCustomization"; // New import
+import FinancialAccountsSettings from "@/components/admin/FinancialAccountsSettings";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 
@@ -46,7 +45,7 @@ const AdminSettings = () => {
   const canManageFinancialAccounts = currentUserPrivileges.includes("Manage Financial Accounts") ||
                                      currentUser?.role === "Super Admin";
   const canManageHeaderCustomization = currentUserPrivileges.includes("Manage Header Customization") ||
-                                       currentUser?.role === "Super Admin"; // New privilege check
+                                       currentUser?.role === "Super Admin";
   
   // --- START DEBUG LOGS ---
   console.log("AdminSettings Debug:");
@@ -63,7 +62,7 @@ const AdminSettings = () => {
   console.log("  canManageDatabaseMaintenance:", canManageDatabaseMaintenance);
   console.log("  canInitializeBalances:", canInitializeBalances);
   console.log("  canManageFinancialAccounts:", canManageFinancialAccounts);
-  console.log("  canManageHeaderCustomization:", canManageHeaderCustomization); // New debug log
+  console.log("  canManageHeaderCustomization:", canManageHeaderCustomization);
   // --- END DEBUG LOGS ---
 
   // If user doesn't have access to admin settings, show a message
@@ -80,7 +79,7 @@ const AdminSettings = () => {
   
   // Determine which tabs to show based on privileges
   const tabsToShow = [];
-  if (canManageAppCustomization || canManageSystemCurrency || canManageFinancialAccounts || canManageHeaderCustomization) { // Updated condition
+  if (canManageAppCustomization || canManageSystemCurrency || canManageFinancialAccounts || canManageHeaderCustomization) {
     tabsToShow.push({ value: "general", label: "General" });
   }
   if (canManageSecurity) {
@@ -135,7 +134,7 @@ const AdminSettings = () => {
                 {canManageAppCustomization && <AppCustomization />}
                 {canManageSystemCurrency && <SystemCurrencySettings />}
                 {canManageFinancialAccounts && <FinancialAccountsSettings />}
-                {canManageHeaderCustomization && <HeaderCustomization />} {/* New component */}
+                {/* HeaderCustomization is now part of AppCustomization, so no need to render separately here */}
               </div>
             )}
             {tab.value === "security" && <SecuritySettings />}

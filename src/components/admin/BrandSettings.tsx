@@ -10,6 +10,8 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useBranding } from "@/context/BrandingContext"; // Import useBranding
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { uploadFileToSupabase } from "@/integrations/supabase/storage";
+import { fileUploadSchema } from "@/utils/security";
 
 const BrandSettings = () => {
   const { currentUser } = useAuth();
@@ -19,10 +21,11 @@ const BrandSettings = () => {
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
   const canManageAppCustomization = currentUserPrivileges.includes("Manage App Customization");
 
-  const { brandLogoUrl, tagline, setBrandLogoUrl, setTagline } = useBranding(); // Use the branding context
+  const { brandLogoUrl, tagline, setBrandLogoUrl, setTagline, isLoading: brandingLoading } = useBranding(); // Use the branding context
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(brandLogoUrl);
   const [localTagline, setLocalTagline] = React.useState(tagline);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   // Effect to update local state when context changes (for tagline and initial logo)
   React.useEffect(() => {
@@ -49,26 +52,43 @@ const BrandSettings = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file); // This will trigger the useEffect above
+      try {
+        fileUploadSchema.parse(file);
+        setSelectedFile(file); // This will trigger the useEffect above
+      } catch (error) {
+        console.error("File validation error:", error);
+        showError("Invalid file. Please upload an image file less than 5MB.");
+        event.target.value = "";
+        return;
+      }
     } else {
       setSelectedFile(null); // This will trigger the useEffect above
     }
   };
 
-  const handleSaveBranding = () => {
-    if (selectedFile && localPreviewUrl) {
-      // Simulate upload and update global URL
-      setBrandLogoUrl(localPreviewUrl); // Use localPreviewUrl which is either blob or actual URL
-      showSuccess("Brand logo uploaded and settings saved!");
-    } else if (!selectedFile && localPreviewUrl !== brandLogoUrl) {
-      // If user cleared selection and there was a previous logo, clear it
-      setBrandLogoUrl(""); // Or set to a default empty state
-      showSuccess("Brand logo cleared and settings saved!");
-    } else {
-      showSuccess("Branding settings saved!");
+  const handleSaveBranding = async () => {
+    setIsSaving(true);
+    let newLogoUrl = brandLogoUrl;
+
+    if (selectedFile) {
+      const filePath = `brand-logos/logo_${Date.now()}.${selectedFile.name.split('.').pop()}`;
+      const uploadedUrl = await uploadFileToSupabase('brand-logos', selectedFile, filePath);
+      if (uploadedUrl) {
+        newLogoUrl = uploadedUrl;
+      } else {
+        setIsSaving(false);
+        return;
+      }
+    } else if (localPreviewUrl === null && brandLogoUrl !== "") {
+      // If user cleared the selection and there was a previous logo, clear it
+      newLogoUrl = "";
     }
-    setTagline(localTagline); // Update global tagline
-    console.log("Saving brand settings:", { brandLogoUrl: localPreviewUrl, tagline: localTagline });
+
+    await setBrandLogoUrl(newLogoUrl);
+    await setTagline(localTagline);
+    
+    showSuccess("Branding settings saved successfully!");
+    setIsSaving(false);
   };
 
   return (
@@ -97,7 +117,7 @@ const BrandSettings = () => {
               accept="image/*"
               onChange={handleFileChange}
               className="flex-1"
-              disabled={!canManageAppCustomization}
+              disabled={!canManageAppCustomization || isSaving || brandingLoading}
             />
           </div>
           <p className="text-sm text-muted-foreground">Upload a new logo image.</p>
@@ -111,13 +131,13 @@ const BrandSettings = () => {
             value={localTagline}
             onChange={(e) => setLocalTagline(e.target.value)}
             placeholder="Your cinematic tagline here."
-            disabled={!canManageAppCustomization}
+            disabled={!canManageAppCustomization || isSaving || brandingLoading}
           />
           <p className="text-sm text-muted-foreground">This tagline appears in reports and footers.</p>
         </div>
 
-        <Button onClick={handleSaveBranding} disabled={!canManageAppCustomization}>
-          <Save className="mr-2 h-4 w-4" /> Save Brand Settings
+        <Button onClick={handleSaveBranding} disabled={!canManageAppCustomization || isSaving || brandingLoading}>
+          {isSaving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> Save Brand Settings</>}
         </Button>
       </CardContent>
     </Card>
