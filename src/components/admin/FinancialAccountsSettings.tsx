@@ -24,7 +24,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"; // Added import for table components
+} from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -275,23 +275,23 @@ const FinancialAccountsSettings = () => {
         <h3 className="text-lg font-semibold">Existing Accounts</h3>
         {accounts.length > 0 ? (
           <div className="overflow-x-auto">
-            <Table> {/* Changed from <table> */}
-              <TableHeader> {/* Changed from <thead> */}
-                <TableRow> {/* Changed from <tr> */}
-                  <TableHead className="py-2 px-4 text-left text-sm font-medium text-muted-foreground">Account Name</TableHead> {/* Changed from <th> */}
-                  <TableHead className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Initial Balance</TableHead> {/* Changed from <th> */}
-                  <TableHead className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Current Balance</TableHead> {/* Changed from <th> */}
-                  {canManageFinancialAccounts && <TableHead className="py-2 px-4 text-center text-sm font-medium text-muted-foreground w-[120px]">Actions</TableHead>} {/* Changed from <th> */}
-                </TableRow> {/* Changed from </tr> */}
-              </TableHeader> {/* Changed from </thead> */}
-              <TableBody> {/* Changed from <tbody> */}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="py-2 px-4 text-left text-sm font-medium text-muted-foreground">Account Name</TableHead>
+                  <TableHead className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Initial Balance</TableHead>
+                  <TableHead className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Current Balance</TableHead>
+                  {canManageFinancialAccounts && <TableHead className="py-2 px-4 text-center text-sm font-medium text-muted-foreground w-[120px]">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {accounts.map((account) => (
-                  <TableRow key={account.id} className="border-b last:border-b-0 hover:bg-muted/50"> {/* Changed from <tr> */}
-                    <TableCell className="py-2 px-4 font-medium">{account.name}</TableCell> {/* Changed from <td> */}
-                    <TableCell className="py-2 px-4 text-right">{currency.symbol}{account.initial_balance.toFixed(2)}</TableCell> {/* Changed from <td> */}
-                    <TableCell className="py-2 px-4 text-right">{currency.symbol}{account.current_balance.toFixed(2)}</TableCell> {/* Changed from <td> */}
+                  <TableRow key={account.id} className="border-b last:border-b-0 hover:bg-muted/50">
+                    <TableCell className="py-2 px-4 font-medium">{account.name}</TableCell>
+                    <TableCell className="py-2 px-4 text-right">{currency.symbol}{account.initial_balance.toFixed(2)}</TableCell>
+                    <TableCell className="py-2 px-4 text-right">{currency.symbol}{account.current_balance.toFixed(2)}</TableCell>
                     {canManageFinancialAccounts && (
-                      <TableCell className="py-2 px-4 text-center"> {/* Changed from <td> */}
+                      <TableCell className="py-2 px-4 text-center">
                         <div className="flex justify-center space-x-2">
                           <Button variant="outline" size="sm" onClick={() => openEditDialog(account)}>
                             <Edit className="h-4 w-4" />
@@ -300,7 +300,7 @@ const FinancialAccountsSettings = () => {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </TableCell> {/* Changed from </td> */}
+                      </TableCell>
                     )}
                   </TableRow>
                 ))}
