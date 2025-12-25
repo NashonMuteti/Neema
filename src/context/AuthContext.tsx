@@ -52,14 +52,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log("AuthContext: fetchUserProfile called with user:", user);
     if (user) {
       try {
-        const { data: profile, error } = await supabase
+        // Attempt to fetch only the role initially to diagnose 500 error
+        const { data: profileRoleData, error: profileRoleError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('role')
           .eq('id', user.id)
           .single();
 
-        console.log("AuthContext: Profile data from DB:", profile);
-        console.log("AuthContext: Profile error from DB:", error);
+        console.log("AuthContext: Profile role data from DB:", profileRoleData);
+        console.log("AuthContext: Profile role error from DB:", profileRoleError);
 
         let userRole = "Contributor"; // Default role
         let userStatus: "Active" | "Inactive" | "Suspended" = "Active";
@@ -69,23 +70,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let userName = user.user_metadata?.full_name || user.email || "User";
         let userEmail = user.email || "";
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-          console.error("AuthContext: Error fetching user profile from DB, falling back to metadata:", error);
+        if (profileRoleError && profileRoleError.code !== 'PGRST116') { // PGRST116 means no rows found
+          console.error("AuthContext: Error fetching user profile role from DB, falling back to metadata:", profileRoleError);
           // Fallback to user_metadata if DB fetch fails (but not if row simply doesn't exist)
           userRole = user.user_metadata?.role || "Contributor";
           userStatus = user.user_metadata?.status || "Active";
           userEnableLogin = user.user_metadata?.enable_login ?? true;
           userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
           userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
-        } else if (profile) {
-          // Use profile data if available
-          userRole = profile.role || user.user_metadata?.role || "Contributor";
-          userStatus = profile.status || "Active";
-          userEnableLogin = profile.enable_login ?? true;
-          userImageUrl = profile.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${profile.name || user.email}`;
-          userReceiveNotifications = profile.receive_notifications ?? true;
-          userName = profile.name || user.user_metadata?.full_name || user.email || "User";
-          userEmail = profile.email || user.email || "";
+        } else if (profileRoleData) {
+          // If role was successfully fetched, now fetch full profile
+          const { data: fullProfile, error: fullProfileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+          console.log("AuthContext: Full profile data from DB:", fullProfile);
+          console.log("AuthContext: Full profile error from DB:", fullProfileError);
+
+          if (fullProfileError) {
+            console.error("AuthContext: Error fetching full user profile from DB, falling back to role data and metadata:", fullProfileError);
+            userRole = profileRoleData.role || user.user_metadata?.role || "Contributor";
+            userStatus = user.user_metadata?.status || "Active";
+            userEnableLogin = user.user_metadata?.enable_login ?? true;
+            userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
+            userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
+          } else if (fullProfile) {
+            // Use full profile data if available
+            userRole = fullProfile.role || user.user_metadata?.role || "Contributor";
+            userStatus = fullProfile.status || "Active";
+            userEnableLogin = fullProfile.enable_login ?? true;
+            userImageUrl = fullProfile.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${fullProfile.name || user.email}`;
+            userReceiveNotifications = fullProfile.receive_notifications ?? true;
+            userName = fullProfile.name || user.user_metadata?.full_name || user.email || "User";
+            userEmail = fullProfile.email || user.email || "";
+          }
         } else {
           // Profile not found in DB, likely a new user or a user whose profile wasn't created by trigger
           console.warn("AuthContext: User profile not found in public.profiles, using user_metadata defaults.");
