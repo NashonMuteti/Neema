@@ -292,9 +292,9 @@ const FinancialAccountsSettings = () => {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </TableCell>
+                      </td>
                     )}
-                  </TableRow>
+                  </tr>
                 ))}
               </TableBody>
             </table>
@@ -308,8 +308,8 @@ const FinancialAccountsSettings = () => {
       <AlertDialog open={!!editingAccount} onOpenChange={(open) => !open && setEditingAccount(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Edit Financial Account</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle>Edit Financial Account</AlertDialogTitle> {/* Corrected */}
+            <AlertDialogDescription> {/* Corrected */}
               Make changes to the account details. Note: Changing initial balance will not automatically adjust current balance.
             </AlertDialogDescription>
           </AlertDialogHeader>
