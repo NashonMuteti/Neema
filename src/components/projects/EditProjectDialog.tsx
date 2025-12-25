@@ -33,6 +33,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 import { fileUploadSchema } from "@/utils/security";
+import { fileToBase64 } from "@/utils/imageUtils"; // New import
 
 interface Project {
   id: string;
@@ -68,7 +69,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
   const [description, setDescription] = React.useState(project.description);
   const [status, setStatus] = React.useState<"Open" | "Closed" | "Deleted" | "Suspended">(project.status);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
+  const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
   const [dueDate, setDueDate] = React.useState<Date | undefined>(project.dueDate ? new Date(project.dueDate) : undefined);
   const [memberContributionAmount, setMemberContributionAmount] = React.useState<string>(
     project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : ""
@@ -83,28 +84,32 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
       setDescription(project.description);
       setStatus(project.status);
       setSelectedFile(null); // Clear selected file on open
-      setBlobUrl(null); // Clear blobUrl on open
+      setBase64Image(null); // Clear Base64 image on open
       setDueDate(project.dueDate ? new Date(project.dueDate) : undefined);
       setMemberContributionAmount(project.memberContributionAmount !== undefined ? project.memberContributionAmount.toString() : "");
     }
   }, [isOpen, project]);
 
-  // Effect to create and revoke blob URL
+  // Effect to convert selected file to Base64 for preview
   React.useEffect(() => {
-    if (selectedFile) {
-      const url = URL.createObjectURL(selectedFile);
-      setBlobUrl(url);
-      return () => {
-        URL.revokeObjectURL(url);
-        setBlobUrl(null); // Clear blobUrl on cleanup
-      };
-    } else {
-      setBlobUrl(null); // Clear blobUrl if no file is selected
-    }
+    const convertFile = async () => {
+      if (selectedFile) {
+        try {
+          const base64 = await fileToBase64(selectedFile);
+          setBase64Image(base64);
+        } catch (error) {
+          console.error("Error converting file to Base64:", error);
+          setBase64Image(null);
+        }
+      } else {
+        setBase64Image(null);
+      }
+    };
+    convertFile();
   }, [selectedFile]);
 
-  // Determine the URL to display: blobUrl if present, otherwise project.thumbnailUrl
-  const displayImageUrl = blobUrl || project.thumbnailUrl || null;
+  // Determine the URL to display: base64Image if present, otherwise project.thumbnailUrl
+  const displayImageUrl = base64Image || project.thumbnailUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -150,7 +155,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && project.thumbnailUrl && !blobUrl) { // If no new file, but there was an old one, and no blobUrl (meaning user cleared it)
+    } else if (!selectedFile && project.thumbnailUrl && !base64Image) { // If no new file, but there was an old one, and no base64Image (meaning user cleared it)
       projectThumbnailUrl = undefined;
     }
 

@@ -12,6 +12,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { fileUploadSchema } from "@/utils/security";
 import { uploadFileToSupabase } from "@/integrations/supabase/storage";
+import { fileToBase64 } from "@/utils/imageUtils"; // New import
 
 export interface BoardMember {
   id: string;
@@ -53,12 +54,12 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
 
   const [name, setName] = React.useState(initialData?.name || "");
   const [role, setRole] = React.useState(initialData?.role || "");
-  const [email, setEmail] = React.useState(initialData?.email || "");
+  const [email, React.useState] = React.useState(initialData?.email || "");
   const [phone, setPhone] = React.useState(initialData?.phone || "");
   const [address, setAddress] = React.useState(initialData?.address || "");
   const [notes, setNotes] = React.useState(initialData?.notes || "");
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
+  const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
   const [isSaving, setIsSaving] = React.useState(false);
 
   // Effect to reset form fields when dialog opens or initialData changes
@@ -71,26 +72,30 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
       setAddress(initialData?.address || "");
       setNotes(initialData?.notes || "");
       setSelectedFile(null); // Clear selected file on open
-      setBlobUrl(null); // Clear blobUrl on open
+      setBase64Image(null); // Clear Base64 image on open
     }
   }, [isOpen, initialData]);
 
-  // Effect to create and revoke blob URL
+  // Effect to convert selected file to Base64 for preview
   React.useEffect(() => {
-    if (selectedFile) {
-      const url = URL.createObjectURL(selectedFile);
-      setBlobUrl(url);
-      return () => {
-        URL.revokeObjectURL(url);
-        setBlobUrl(null); // Clear blobUrl on cleanup
-      };
-    } else {
-      setBlobUrl(null); // Clear blobUrl if no file is selected
-    }
+    const convertFile = async () => {
+      if (selectedFile) {
+        try {
+          const base64 = await fileToBase64(selectedFile);
+          setBase64Image(base64);
+        } catch (error) {
+          console.error("Error converting file to Base64:", error);
+          setBase64Image(null);
+        }
+      } else {
+        setBase64Image(null);
+      }
+    };
+    convertFile();
   }, [selectedFile]);
 
-  // Determine the URL to display: blobUrl if present, otherwise initialData?.image_url
-  const displayImageUrl = blobUrl || initialData?.image_url || null;
+  // Determine the URL to display: base64Image if present, otherwise initialData?.image_url
+  const displayImageUrl = base64Image || initialData?.image_url || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -134,7 +139,7 @@ const AddEditBoardMemberDialog: React.FC<AddEditBoardMemberDialogProps> = ({
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && initialData?.image_url && !blobUrl) { // If no new file, but there was an old one, and no blobUrl (meaning user cleared it)
+    } else if (!selectedFile && initialData?.image_url && !base64Image) { // If no new file, but there was an old one, and no base64Image (meaning user cleared it)
       memberImageUrl = undefined;
     }
     

@@ -11,6 +11,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { fileUploadSchema } from "@/utils/security";
 import { uploadFileToSupabase } from "@/integrations/supabase/storage";
+import { fileToBase64 } from "@/utils/imageUtils"; // New import
 
 interface UploadThumbnailDialogProps {
   projectId: string;
@@ -41,33 +42,37 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
 
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
+  const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
   const [isSaving, setIsSaving] = React.useState(false);
 
   // Effect to reset form fields when dialog opens
   React.useEffect(() => {
     if (isOpen) {
       setSelectedFile(null); // Clear selected file on open
-      setBlobUrl(null); // Clear blobUrl on open
+      setBase64Image(null); // Clear Base64 image on open
     }
   }, [isOpen]);
 
-  // Effect to create and revoke blob URL
+  // Effect to convert selected file to Base64 for preview
   React.useEffect(() => {
-    if (selectedFile) {
-      const url = URL.createObjectURL(selectedFile);
-      setBlobUrl(url);
-      return () => {
-        URL.revokeObjectURL(url);
-        setBlobUrl(null); // Clear blobUrl on cleanup
-      };
-    } else {
-      setBlobUrl(null); // Clear blobUrl if no file is selected
-    }
+    const convertFile = async () => {
+      if (selectedFile) {
+        try {
+          const base64 = await fileToBase64(selectedFile);
+          setBase64Image(base64);
+        } catch (error) {
+          console.error("Error converting file to Base64:", error);
+          setBase64Image(null);
+        }
+      } else {
+        setBase64Image(null);
+      }
+    };
+    convertFile();
   }, [selectedFile]);
 
-  // Determine the URL to display: blobUrl if present, otherwise currentThumbnailUrl
-  const displayImageUrl = blobUrl || currentThumbnailUrl || null;
+  // Determine the URL to display: base64Image if present, otherwise currentThumbnailUrl
+  const displayImageUrl = base64Image || currentThumbnailUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

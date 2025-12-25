@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 import { fileUploadSchema } from "@/utils/security";
+import { fileToBase64 } from "@/utils/imageUtils"; // New import
 
 const BrandSettings = () => {
   const { currentUser } = useAuth();
@@ -24,7 +25,7 @@ const BrandSettings = () => {
   const { brandLogoUrl, tagline, setBrandLogoUrl, setTagline, isLoading: brandingLoading } = useBranding();
   
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
+  const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
   const [localTagline, setLocalTagline] = React.useState(tagline);
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -33,22 +34,26 @@ const BrandSettings = () => {
     setLocalTagline(tagline);
   }, [tagline]);
 
-  // Effect to create and revoke blob URL
+  // Effect to convert selected file to Base64 for preview
   React.useEffect(() => {
-    if (selectedFile) {
-      const url = URL.createObjectURL(selectedFile);
-      setBlobUrl(url);
-      return () => {
-        URL.revokeObjectURL(url);
-        setBlobUrl(null); // Clear blobUrl on cleanup
-      };
-    } else {
-      setBlobUrl(null); // Clear blobUrl if no file is selected
-    }
+    const convertFile = async () => {
+      if (selectedFile) {
+        try {
+          const base64 = await fileToBase64(selectedFile);
+          setBase64Image(base64);
+        } catch (error) {
+          console.error("Error converting file to Base64:", error);
+          setBase64Image(null);
+        }
+      } else {
+        setBase64Image(null);
+      }
+    };
+    convertFile();
   }, [selectedFile]);
 
-  // Determine the URL to display: blobUrl if present, otherwise brandLogoUrl
-  const displayImageUrl = blobUrl || brandLogoUrl || null;
+  // Determine the URL to display: base64Image if present, otherwise brandLogoUrl
+  const displayImageUrl = base64Image || brandLogoUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -80,12 +85,15 @@ const BrandSettings = () => {
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && brandLogoUrl && !blobUrl) { // If no new file, but there was an old one, and no blobUrl (meaning user cleared it)
+    } else if (!selectedFile && brandLogoUrl && !base64Image) { // If no new file, but there was an old one, and no base64Image (meaning user cleared it)
       newLogoUrl = ""; // Clear the logo
     }
 
     await setBrandLogoUrl(newLogoUrl);
     await setTagline(localTagline);
+    
+    setSelectedFile(null); // Clear selected file after successful save
+    setBase64Image(null); // Clear Base64 preview
     
     showSuccess("Branding settings saved successfully!");
     setIsSaving(false);

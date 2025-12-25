@@ -15,6 +15,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileToSupabase } from "@/integrations/supabase/storage";
 import { fileUploadSchema } from "@/utils/security";
+import { fileToBase64 } from "@/utils/imageUtils"; // New import
 
 interface AddEditUserDialogProps {
   isOpen: boolean;
@@ -58,7 +59,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(initialData?.status || "Active");
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
+  const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -69,26 +70,30 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       setStatus(initialData?.status || "Active");
       setEnableLogin(initialData?.enableLogin || false);
       setSelectedFile(null); // Clear selected file on open
-      setBlobUrl(null); // Clear blobUrl on open
+      setBase64Image(null); // Clear Base64 image on open
     }
   }, [isOpen, initialData, availableRoles]);
 
-  // Effect to create and revoke blob URL
+  // Effect to convert selected file to Base64 for preview
   React.useEffect(() => {
-    if (selectedFile) {
-      const url = URL.createObjectURL(selectedFile);
-      setBlobUrl(url);
-      return () => {
-        URL.revokeObjectURL(url);
-        setBlobUrl(null); // Clear blobUrl on cleanup
-      };
-    } else {
-      setBlobUrl(null); // Clear blobUrl if no file is selected
-    }
+    const convertFile = async () => {
+      if (selectedFile) {
+        try {
+          const base64 = await fileToBase64(selectedFile);
+          setBase64Image(base64);
+        } catch (error) {
+          console.error("Error converting file to Base64:", error);
+          setBase64Image(null);
+        }
+      } else {
+        setBase64Image(null);
+      }
+    };
+    convertFile();
   }, [selectedFile]);
 
-  // Determine the URL to display: blobUrl if present, otherwise initialData?.imageUrl
-  const displayImageUrl = blobUrl || initialData?.imageUrl || null;
+  // Determine the URL to display: base64Image if present, otherwise initialData?.imageUrl
+  const displayImageUrl = base64Image || initialData?.imageUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -129,7 +134,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && initialData?.imageUrl && !blobUrl) { // If no new file, but there was an old one, and no blobUrl (meaning user cleared it)
+    } else if (!selectedFile && initialData?.imageUrl && !base64Image) { // If no new file, but there was an old one, and no base64Image (meaning user cleared it)
       userImageUrl = undefined; // Clear the image
     }
     

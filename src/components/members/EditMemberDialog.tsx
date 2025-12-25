@@ -29,6 +29,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { fileUploadSchema } from "@/utils/security";
 import { uploadFileToSupabase } from "@/integrations/supabase/storage";
+import { fileToBase64 } from "@/utils/imageUtils"; // New import
 
 interface EditMemberDialogProps {
   member: User;
@@ -52,7 +53,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
   const [name, setName] = React.useState(member.name);
   const [email, setEmail] = React.useState(member.email);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [blobUrl, setBlobUrl] = React.useState<string | null>(null); // State for the blob URL
+  const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
   const [enableLogin, setEnableLogin] = React.useState(member.enableLogin);
   const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(member.status);
   const [selectedRole, setSelectedRole] = React.useState<string>(member.role);
@@ -65,29 +66,33 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
       setName(member.name);
       setEmail(member.email);
       setSelectedFile(null); // Clear selected file on open
-      setBlobUrl(null); // Clear blobUrl on open
+      setBase64Image(null); // Clear Base64 image on open
       setEnableLogin(member.enableLogin);
       setStatus(member.status);
       setSelectedRole(member.role);
     }
   }, [isOpen, member]);
 
-  // Effect to create and revoke blob URL
+  // Effect to convert selected file to Base64 for preview
   React.useEffect(() => {
-    if (selectedFile) {
-      const url = URL.createObjectURL(selectedFile);
-      setBlobUrl(url);
-      return () => {
-        URL.revokeObjectURL(url);
-        setBlobUrl(null); // Clear blobUrl on cleanup
-      };
-    } else {
-      setBlobUrl(null); // Clear blobUrl if no file is selected
-    }
+    const convertFile = async () => {
+      if (selectedFile) {
+        try {
+          const base64 = await fileToBase64(selectedFile);
+          setBase64Image(base64);
+        } catch (error) {
+          console.error("Error converting file to Base64:", error);
+          setBase64Image(null);
+        }
+      } else {
+        setBase64Image(null);
+      }
+    };
+    convertFile();
   }, [selectedFile]);
 
-  // Determine the URL to display: blobUrl if present, otherwise member.imageUrl
-  const displayImageUrl = blobUrl || member.imageUrl || null;
+  // Determine the URL to display: base64Image if present, otherwise member.imageUrl
+  const displayImageUrl = base64Image || member.imageUrl || null;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -127,7 +132,7 @@ const EditMemberDialog: React.FC<EditMemberDialogProps> = ({ member, onEditMembe
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && member.imageUrl && !blobUrl) {
+    } else if (!selectedFile && member.imageUrl && !base64Image) {
       // If user cleared the selection, remove the existing thumbnail URL from DB
       memberImageUrl = undefined;
     }
