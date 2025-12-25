@@ -15,8 +15,8 @@ import {
 import { Search } from "lucide-react";
 
 interface PledgeFiltersProps {
-  filterStatus: "All" | "Active" | "Paid" | "Overdue";
-  setFilterStatus: (status: "All" | "Active" | "Paid" | "Overdue") => void;
+  filterStatus: "All" | "Paid" | "Unpaid"; // Updated filter options
+  setFilterStatus: (status: "All" | "Paid" | "Unpaid") => void; // Updated filter options
   filterMonth: string;
   setFilterMonth: (month: string) => void;
   filterYear: string;
@@ -50,9 +50,8 @@ const PledgeFilters: React.FC<PledgeFiltersProps> = ({
           <SelectContent>
             <SelectGroup>
               <SelectItem value="All">All Pledges</SelectItem>
-              <SelectItem value="Active">Active</SelectItem>
               <SelectItem value="Paid">Paid</SelectItem>
-              <SelectItem value="Overdue">Overdue</SelectItem>
+              <SelectItem value="Unpaid">Unpaid</SelectItem> {/* Consolidated Active and Overdue */}
             </SelectGroup>
           </SelectContent>
         </Select>

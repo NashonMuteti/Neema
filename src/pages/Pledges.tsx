@@ -29,7 +29,7 @@ interface Pledge {
   project_id: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue";
+  status: "Active" | "Paid" | "Overdue"; // Database status
   member_name: string;
   project_name: string;
   comments?: string; // Added comments
@@ -72,7 +72,7 @@ const Pledges = () => {
   // Filter State
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
-  const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Paid" | "Overdue">("All");
+  const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All"); // Updated filter options
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -86,14 +86,10 @@ const Pledges = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const getPledgeStatus = (pledge: Pledge): Pledge['status'] => {
+  // Helper to determine display status (Unpaid for Active/Overdue)
+  const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
     if (pledge.status === "Paid") return "Paid";
-    const today = startOfDay(new Date());
-    const dueDate = startOfDay(pledge.due_date);
-    if (isBefore(dueDate, today)) {
-      return "Overdue";
-    }
-    return "Active";
+    return "Unpaid";
   };
 
   const fetchInitialData = useCallback(async () => {
@@ -130,7 +126,7 @@ const Pledges = () => {
     const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
     const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
-    const { data: pledgesData, error: pledgesError } = (await supabase
+    let query = supabase
       .from('project_pledges')
       .select(`
         id,
@@ -144,8 +140,16 @@ const Pledges = () => {
         projects ( name )
       `)
       .gte('due_date', startOfMonth.toISOString())
-      .lte('due_date', endOfMonth.toISOString())
-      .order('due_date', { ascending: false })) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null };
+      .lte('due_date', endOfMonth.toISOString());
+      
+    if (filterStatus === "Paid") {
+      query = query.eq('status', 'Paid');
+    } else if (filterStatus === "Unpaid") {
+      query = query.in('status', ['Active', 'Overdue']);
+    }
+    // If filterStatus is "All", no status filter is applied to the DB query
+
+    const { data: pledgesData, error: pledgesError } = (await query.order('due_date', { ascending: false })) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null };
 
     if (pledgesError) {
       console.error("Error fetching pledges:", pledgesError);
@@ -164,18 +168,16 @@ const Pledges = () => {
         comments: p.comments || undefined, // Include comments
       }));
 
-      const filteredByStatusAndSearch = fetchedPledges.filter(pledge => {
-        const actualStatus = getPledgeStatus(pledge);
-        const matchesStatus = filterStatus === "All" || actualStatus === filterStatus;
+      const filteredBySearch = fetchedPledges.filter(pledge => {
         const memberName = (pledge.member_name || "").toLowerCase();
         const projectName = (pledge.project_name || "").toLowerCase();
         const comments = (pledge.comments || "").toLowerCase(); // Include comments in search
         const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || 
                               projectName.includes(searchQuery.toLowerCase()) ||
                               comments.includes(searchQuery.toLowerCase());
-        return matchesStatus && matchesSearch;
+        return matchesSearch;
       });
-      setPledges(filteredByStatusAndSearch);
+      setPledges(filteredBySearch);
     }
     setLoading(false);
   }, [filterMonth, filterYear, filterStatus, searchQuery]);

@@ -21,7 +21,7 @@ interface Pledge {
   project_id: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue";
+  status: "Active" | "Paid" | "Overdue"; // Database status
   member_name: string;
   project_name: string;
   comments?: string; // Added comments
@@ -35,24 +35,18 @@ interface PledgeTableProps {
   onDeletePledge: (id: string) => void;
 }
 
-const getPledgeStatus = (pledge: Pledge): Pledge['status'] => {
+// Helper to determine display status
+const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
   if (pledge.status === "Paid") return "Paid";
-  const today = startOfDay(new Date());
-  const dueDate = startOfDay(pledge.due_date);
-  if (isBefore(dueDate, today)) {
-    return "Overdue";
-  }
-  return "Active";
+  return "Unpaid"; // Active and Overdue are now considered Unpaid
 };
 
-const getStatusBadgeClasses = (status: Pledge['status']) => {
-  switch (status) {
-    case "Active":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
+  switch (displayStatus) {
     case "Paid":
       return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-    case "Overdue":
-      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+    case "Unpaid":
+      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"; // Active/Overdue now red for Unpaid
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
   }
@@ -78,13 +72,13 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="text-center">Status</TableHead>
-              <TableHead>Comments</TableHead> {/* New TableHead for Comments */}
+              <TableHead>Comments</TableHead>
               {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {pledges.map((pledge) => {
-              const status = getPledgeStatus(pledge);
+              const displayStatus = getDisplayPledgeStatus(pledge);
               return (
                 <TableRow key={pledge.id}>
                   <TableCell className="font-medium">{pledge.member_name}</TableCell>
@@ -92,15 +86,15 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
                   <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
                   <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                   <TableCell className="text-center">
-                    <Badge className={getStatusBadgeClasses(status)}>
-                      {status}
+                    <Badge className={getStatusBadgeClasses(displayStatus)}>
+                      {displayStatus}
                     </Badge>
                   </TableCell>
-                  <TableCell className="max-w-[150px] truncate">{pledge.comments || "-"}</TableCell> {/* Display comments */}
+                  <TableCell className="max-w-[150px] truncate">{pledge.comments || "-"}</TableCell>
                   {canManagePledges && (
                     <TableCell className="text-center">
                       <div className="flex justify-center space-x-2">
-                        {status !== "Paid" && (
+                        {displayStatus !== "Paid" && ( // Only show Mark as Paid if not already Paid
                           <Button variant="outline" size="icon" onClick={() => onMarkAsPaid(pledge.id, pledge.member_name, pledge.amount)}>
                             <CheckCircle className="h-4 w-4 text-green-600" />
                           </Button>

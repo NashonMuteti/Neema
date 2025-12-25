@@ -35,23 +35,17 @@ interface Project {
 type HookProjectPledge = ReturnType<typeof useProjectFinancials>['pledges'][0];
 type HookProjectCollection = ReturnType<typeof useProjectFinancials>['collections'][0];
 
-const getPledgeStatus = (pledge: HookProjectPledge): HookProjectPledge['status'] => {
+// Helper to determine display status
+const getDisplayPledgeStatus = (pledge: HookProjectPledge): "Paid" | "Unpaid" => {
   if (pledge.status === "Paid") return "Paid";
-  const today = startOfDay(new Date());
-  const dueDate = startOfDay(pledge.due_date); // Use due_date which is already a Date object
-  if (isBefore(dueDate, today)) {
-    return "Overdue";
-  }
-  return "Active";
+  return "Unpaid"; // Active and Overdue are now considered Unpaid
 };
 
-const getStatusBadgeClasses = (status: HookProjectPledge['status']) => {
-  switch (status) {
-    case "Active":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
+  switch (displayStatus) {
     case "Paid":
       return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-    case "Overdue":
+    case "Unpaid":
       return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
@@ -251,15 +245,15 @@ const ProjectFinancialsDetail: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {pledges.map((pledge) => {
-                  const status = getPledgeStatus(pledge);
+                  const displayStatus = getDisplayPledgeStatus(pledge);
                   return (
                     <TableRow key={pledge.id}>
                       <TableCell>{pledge.member_name}</TableCell>
                       <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
                       <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-center">
-                        <Badge className={getStatusBadgeClasses(status)}>
-                          {status}
+                        <Badge className={getStatusBadgeClasses(displayStatus)}>
+                          {displayStatus}
                         </Badge>
                       </TableCell>
                     </TableRow>

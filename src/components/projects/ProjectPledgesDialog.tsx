@@ -48,7 +48,7 @@ interface ProjectPledge {
   member_name: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue";
+  status: "Active" | "Paid" | "Overdue"; // Database status
 }
 
 interface ProjectPledgesDialogProps {
@@ -72,6 +72,12 @@ interface PledgeRowWithProfile {
   status: "Active" | "Paid" | "Overdue";
   profiles: { name: string } | null; // Joined profile data
 }
+
+// Helper to determine display status
+const getDisplayPledgeStatus = (pledge: ProjectPledge): "Paid" | "Unpaid" => {
+  if (pledge.status === "Paid") return "Paid";
+  return "Unpaid"; // Active and Overdue are now considered Unpaid
+};
 
 const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
   projectId,
@@ -162,13 +168,11 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     }
   }, [isOpen, fetchPledges, fetchMembers]);
 
-  const getStatusBadgeClasses = (status: ProjectPledge['status']) => {
-    switch (status) {
-      case "Active":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+  const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
+    switch (displayStatus) {
       case "Paid":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Overdue":
+      case "Unpaid":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
@@ -329,45 +333,38 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pledges.map((pledge) => (
-                  <TableRow key={pledge.id}>
-                    <TableCell className="font-medium">{pledge.member_name}</TableCell>
-                    <TableCell>${pledge.amount.toFixed(2)}</TableCell>
-                    <TableCell>{format(pledge.due_date, "PPP")}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge className={getStatusBadgeClasses(pledge.status)}>
-                        {pledge.status}
-                      </Badge>
-                    </TableCell>
-                    {canManagePledges && (
+                {pledges.map((pledge) => {
+                  const displayStatus = getDisplayPledgeStatus(pledge);
+                  return (
+                    <TableRow key={pledge.id}>
+                      <TableCell className="font-medium">{pledge.member_name}</TableCell>
+                      <TableCell>${pledge.amount.toFixed(2)}</TableCell>
+                      <TableCell>{format(pledge.due_date, "PPP")}</TableCell>
                       <TableCell className="text-center">
-                        <div className="flex justify-center space-x-2">
-                          {pledge.status !== "Paid" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleUpdatePledgeStatus(pledge.id, "Paid")}
-                              title="Mark as Paid"
-                            >
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            </Button>
-                          )}
-                          {pledge.status !== "Overdue" && pledge.status !== "Paid" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleUpdatePledgeStatus(pledge.id, "Overdue")}
-                              title="Mark as Overdue"
-                            >
-                              <XCircle className="h-4 w-4 text-red-600" />
-                            </Button>
-                          )}
-                          {/* Optionally add an "Edit" button for amount/due date */}
-                        </div>
+                        <Badge className={getStatusBadgeClasses(displayStatus)}>
+                          {displayStatus}
+                        </Badge>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      {canManagePledges && (
+                        <TableCell className="text-center">
+                          <div className="flex justify-center space-x-2">
+                            {displayStatus !== "Paid" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleUpdatePledgeStatus(pledge.id, "Paid")}
+                                title="Mark as Paid"
+                              >
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              </Button>
+                            )}
+                            {/* Removed "Mark as Overdue" button */}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
