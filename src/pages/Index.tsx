@@ -48,6 +48,8 @@ const Index = () => {
   const [loadingContributions, setLoadingContributions] = useState(true);
   const [contributionsError, setContributionsError] = useState<string | null>(null);
 
+  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
+
   const fetchFinancialData = useCallback(async () => {
     setLoadingFinancials(true);
     setFinancialsError(null);
@@ -59,28 +61,32 @@ const Index = () => {
 
     try {
       // Fetch income transactions
-      const { data: incomeTransactions, error: incomeError } = await supabase
-        .from('income_transactions')
-        .select('date, amount')
-        .eq('profile_id', currentUser.id);
+      let incomeQuery = supabase.from('income_transactions').select('date, amount');
+      if (!isAdmin) {
+        incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
+      }
+      const { data: incomeTransactions, error: incomeError } = await incomeQuery;
 
       // Fetch expenditure transactions
-      const { data: expenditureTransactions, error: expenditureError } = await supabase
-        .from('expenditure_transactions')
-        .select('date, amount')
-        .eq('profile_id', currentUser.id);
+      let expenditureQuery = supabase.from('expenditure_transactions').select('date, amount');
+      if (!isAdmin) {
+        expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
+      }
+      const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
 
       // Fetch project collections (contributions to projects)
-      const { data: projectCollections, error: collectionsError } = await supabase
-        .from('project_collections')
-        .select('date, amount')
-        .eq('member_id', currentUser.id); // Assuming member_id in project_collections refers to the current user
+      let projectCollectionsQuery = supabase.from('project_collections').select('date, amount');
+      if (!isAdmin) {
+        projectCollectionsQuery = projectCollectionsQuery.eq('member_id', currentUser.id);
+      }
+      const { data: projectCollections, error: collectionsError } = await projectCollectionsQuery;
 
       // Fetch project pledges
-      const { data: projectPledges, error: pledgesError } = await supabase
-        .from('project_pledges')
-        .select('due_date, amount, status')
-        .eq('member_id', currentUser.id); // Assuming member_id in project_pledges refers to the current user
+      let projectPledgesQuery = supabase.from('project_pledges').select('due_date, amount, status');
+      if (!isAdmin) {
+        projectPledgesQuery = projectPledgesQuery.eq('member_id', currentUser.id);
+      }
+      const { data: projectPledges, error: pledgesError } = await projectPledgesQuery;
 
       if (incomeError || expenditureError || collectionsError || pledgesError) {
         console.error("Error fetching financial data:", incomeError || expenditureError || collectionsError || pledgesError);
@@ -157,7 +163,7 @@ const Index = () => {
     } finally {
       setLoadingFinancials(false);
     }
-  }, [currentUser]);
+  }, [currentUser, isAdmin]);
 
   const fetchDashboardProjects = useCallback(async () => {
     setLoadingProjects(true);
@@ -169,11 +175,16 @@ const Index = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('projects')
         .select('id, name, due_date, status')
-        .eq('profile_id', currentUser.id) // Use profile_id
         .neq('status', 'Deleted'); // Exclude deleted projects
+      
+      if (!isAdmin) {
+        query = query.eq('profile_id', currentUser.id); // Use profile_id for non-admins
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching dashboard projects:", error);
@@ -194,7 +205,7 @@ const Index = () => {
     } finally {
       setLoadingProjects(false);
     }
-  }, [currentUser]);
+  }, [currentUser, isAdmin]);
 
   const fetchContributionsProgress = useCallback(async () => {
     setLoadingContributions(true);
@@ -206,11 +217,16 @@ const Index = () => {
     }
 
     try {
-      const { data: projectsData, error: projectsError } = await supabase
+      let projectsQuery = supabase
         .from('projects')
         .select('id, name, member_contribution_amount')
-        .eq('profile_id', currentUser.id) // Use profile_id
         .eq('status', 'Open'); // Only consider open projects for contributions progress
+      
+      if (!isAdmin) {
+        projectsQuery = projectsQuery.eq('profile_id', currentUser.id); // Use profile_id for non-admins
+      }
+
+      const { data: projectsData, error: projectsError } = await projectsQuery;
 
       if (projectsError) {
         console.error("Error fetching projects for contributions progress:", projectsError);
@@ -225,24 +241,30 @@ const Index = () => {
         // For simplicity, let's assume member_contribution_amount is the *total* expected for the project
         // If it's per member, we'd need to fetch member count for the project.
 
-        const { data: collectionsData, error: collectionsError } = await supabase
+        let collectionsQuery = supabase
           .from('project_collections')
           .select('amount')
           .eq('project_id', project.id);
+        // RLS on project_collections will handle member_id filtering if not admin
+
+        const { data: collectionsData, error: collectionsError } = await collectionsQuery;
 
         if (collectionsError) {
           console.error(`Error fetching collections for project ${project.name}:`, collectionsError);
           // Continue with 0 actual if error
         }
 
-        const actual = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
+        const actualCollections = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
 
         // Fetch pledges for the project
-        const { data: pledgesData, error: pledgesError } = await supabase
+        let pledgesQuery = supabase
           .from('project_pledges')
           .select('amount')
           .eq('project_id', project.id)
           .eq('status', 'Paid'); // Only count paid pledges as actual contributions
+        // RLS on project_pledges will handle member_id filtering if not admin
+
+        const { data: pledgesData, error: pledgesError } = await pledgesQuery;
 
         if (pledgesError) {
           console.error(`Error fetching pledges for project ${project.name}:`, pledgesError);
@@ -253,7 +275,7 @@ const Index = () => {
         projectContributions.push({
           name: project.name,
           expected: expected,
-          actual: actual + actualPledges, // Sum collections and paid pledges for actual
+          actual: actualCollections + actualPledges, // Sum collections and paid pledges for actual
         });
       }
       setContributionsProgressData(projectContributions);
@@ -263,7 +285,7 @@ const Index = () => {
     } finally {
       setLoadingContributions(false);
     }
-  }, [currentUser]);
+  }, [currentUser, isAdmin]);
 
   useEffect(() => {
     if (currentUser && !authLoading) {
