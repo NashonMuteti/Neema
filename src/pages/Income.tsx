@@ -37,7 +37,7 @@ interface IncomeTransaction {
 const Income = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-  const { currency } = useSystemSettings(); // Use currency from context
+  const { currency } = useSystemSettings();
   
   const { canManageIncome } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -79,10 +79,16 @@ const Income = () => {
   }));
 
   const fetchFinancialAccounts = React.useCallback(async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('financial_accounts')
-      .select('id, name, current_balance')
-      .eq('profile_id', currentUser?.id); // Filter by profile_id
+      .select('id, name, current_balance');
+      
+    const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
+    if (!isAdmin && currentUser) {
+      query = query.eq('profile_id', currentUser.id); // Filter by profile_id for non-admins
+    }
+      
+    const { data, error } = await query;
       
     if (error) {
       console.error("Error fetching financial accounts:", error);
@@ -110,9 +116,14 @@ const Income = () => {
     let query = supabase
       .from('income_transactions')
       .select('*, financial_accounts(name)')
-      .eq('profile_id', currentUser.id) // Use profile_id
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString());
+      
+    // Conditionally apply profile_id filter based on admin status
+    const isAdmin = currentUser.role === "Admin" || currentUser.role === "Super Admin";
+    if (!isAdmin) {
+      query = query.eq('profile_id', currentUser.id); // Use profile_id
+    }
       
     if (searchQuery) {
       query = query.ilike('source', `%${searchQuery}%`);
