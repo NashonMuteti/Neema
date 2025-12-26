@@ -100,13 +100,15 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
                 <TableHead>Date</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Account</TableHead>
+                <TableHead>Account/Project</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Due Date</TableHead> {/* New column */}
               </TableRow>
             </TableHeader>
             <TableBody>
               {memberContributions.map((contribution) => {
-                const status = getContributionStatus(contribution.type);
+                const status = getContributionStatus(contribution.type, contribution.status);
+                const isIncomeOrPaidPledge = contribution.type === 'income' || (contribution.type === 'pledge' && contribution.status === 'Paid');
                 return (
                   <TableRow key={contribution.id}>
                     <TableCell>{format(contribution.date, "MMM dd, yyyy")}</TableCell>
@@ -116,7 +118,10 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
                     <TableCell className="font-medium">{contribution.sourceOrPurpose}</TableCell>
                     <TableCell>{contribution.accountName}</TableCell>
                     <TableCell className="text-right">
-                      {contribution.type === 'income' ? '+' : '-'}{currency.symbol}{contribution.amount.toFixed(2)}
+                      {isIncomeOrPaidPledges ? '+' : '-'}{currency.symbol}{contribution.amount.toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      {contribution.type === 'pledge' && contribution.dueDate ? format(contribution.dueDate, "MMM dd, yyyy") : '-'}
                     </TableCell>
                   </TableRow>
                 );

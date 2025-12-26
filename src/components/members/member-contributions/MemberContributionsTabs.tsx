@@ -5,6 +5,12 @@ import MemberContributionsOverview from "./MemberContributionsOverview";
 import MemberContributionsDetailed from "./MemberContributionsDetailed";
 import { MemberContribution } from "./types";
 
+interface UserProject {
+  id: string;
+  name: string;
+  member_contribution_amount: number | null;
+}
+
 interface MemberContributionsTabsProps {
   selectedDate: Date | undefined;
   setSelectedDate: (date: Date | undefined) => void;
@@ -16,9 +22,12 @@ interface MemberContributionsTabsProps {
   years: { value: string; label: string }[];
   memberContributions: MemberContribution[];
   contributionsByDate: Record<string, MemberContribution[]>;
-  totalIncome: number;
-  totalExpenditure: number;
-  netBalance: number;
+  totalIncome: number; // Kept for now, but will be 0
+  totalExpenditure: number; // Kept for now, but will be 0
+  netBalance: number; // Kept for now, but will be 0
+  totalPaidPledges: number; // New prop
+  totalPendingPledges: number; // New prop
+  memberProjects: UserProject[]; // New prop
   renderDay: (day: Date) => JSX.Element;
   memberName: string;
   searchQuery: string;
@@ -39,6 +48,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
   totalIncome,
   totalExpenditure,
   netBalance,
+  totalPaidPledges, // Destructure new prop
+  totalPendingPledges, // Destructure new prop
+  memberProjects, // Destructure new prop
   renderDay,
   memberName,
   searchQuery,
@@ -66,6 +78,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
           totalIncome={totalIncome}
           totalExpenditure={totalExpenditure}
           netBalance={netBalance}
+          totalPaidPledges={totalPaidPledges} // Pass new prop
+          totalPendingPledges={totalPendingPledges} // Pass new prop
+          memberProjects={memberProjects} // Pass new prop
           renderDay={renderDay}
         />
       </TabsContent>

@@ -16,8 +16,15 @@ import {
   MemberContribution, 
   IncomeTxRow, 
   ExpenditureTxRow, 
-  PettyCashTxRow 
+  PettyCashTxRow,
+  PledgeTxRow // New import
 } from "@/components/members/member-contributions/types";
+
+interface UserProject {
+  id: string;
+  name: string;
+  member_contribution_amount: number | null;
+}
 
 const MemberContributionsDetail: React.FC = () => {
   const { memberId } = useParams<{ memberId: string }>();
@@ -32,6 +39,7 @@ const MemberContributionsDetail: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([]);
   const [memberName, setMemberName] = useState("Unknown Member");
+  const [memberProjects, setMemberProjects] = useState<UserProject[]>([]); // New state for member's projects
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -96,68 +104,97 @@ const MemberContributionsDetail: React.FC = () => {
     const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
     const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
+    const allContributions: MemberContribution[] = [];
+      
+    // Fetch Income Transactions
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
       .select('id, date, amount, source, financial_accounts(name)')
-      .eq('profile_id', memberId) // Changed to profile_id
+      .eq('profile_id', memberId)
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString()) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
+    if (incomeError) console.error("Error fetching income:", incomeError);
+    incomeData?.forEach(tx => allContributions.push({
+      id: tx.id,
+      type: 'income',
+      date: parseISO(tx.date),
+      amount: tx.amount,
+      sourceOrPurpose: tx.source,
+      accountName: tx.financial_accounts?.name || 'Unknown Account',
+    }));
+
+    // Fetch Expenditure Transactions
     const { data: expenditureData, error: expenditureError } = await supabase
       .from('expenditure_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('profile_id', memberId) // Changed to profile_id
+      .eq('profile_id', memberId)
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString()) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
 
+    if (expenditureError) console.error("Error fetching expenditure:", expenditureError);
+    expenditureData?.forEach(tx => allContributions.push({
+      id: tx.id,
+      type: 'expenditure',
+      date: parseISO(tx.date),
+      amount: tx.amount,
+      sourceOrPurpose: tx.purpose,
+      accountName: tx.financial_accounts?.name || 'Unknown Account',
+    }));
+
+    // Fetch Petty Cash Transactions
     const { data: pettyCashData, error: pettyCashError } = await supabase
       .from('petty_cash_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('profile_id', memberId) // Changed to profile_id
+      .eq('profile_id', memberId)
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString()) as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
 
-    if (incomeError || expenditureError || pettyCashError) {
-      console.error("Error fetching contributions:", incomeError || expenditureError || pettyCashError);
-      setError("Failed to load member's contributions.");
-      setMemberContributions([]);
-    } else {
-      const allContributions: MemberContribution[] = [];
-      
-      incomeData?.forEach(tx => allContributions.push({
-        id: tx.id,
-        type: 'income',
-        sourceOrPurpose: tx.source,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        accountName: tx.financial_accounts?.name || 'Unknown Account'
-      }));
-      
-      expenditureData?.forEach(tx => allContributions.push({
-        id: tx.id,
-        type: 'expenditure',
-        sourceOrPurpose: tx.purpose,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        accountName: tx.financial_accounts?.name || 'Unknown Account'
-      }));
-      
-      pettyCashData?.forEach(tx => allContributions.push({
-        id: tx.id,
-        type: 'petty_cash',
-        sourceOrPurpose: tx.purpose,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        accountName: tx.financial_accounts?.name || 'Unknown Account'
-      }));
+    if (pettyCashError) console.error("Error fetching petty cash:", pettyCashError);
+    pettyCashData?.forEach(tx => allContributions.push({
+      id: tx.id,
+      type: 'petty_cash',
+      date: parseISO(tx.date),
+      amount: tx.amount,
+      sourceOrPurpose: tx.purpose,
+      accountName: tx.financial_accounts?.name || 'Unknown Account',
+    }));
 
-      const filteredAndSorted = allContributions
-        .filter(c => c.sourceOrPurpose.toLowerCase().includes(searchQuery.toLowerCase()))
-        .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+    // Fetch Project Pledges
+    const { data: pledgesData, error: pledgesError } = await supabase
+      .from('project_pledges')
+      .select('id, due_date, amount, status, comments, projects(name)')
+      .eq('member_id', memberId)
+      .gte('due_date', startOfMonth.toISOString())
+      .lte('due_date', endOfMonth.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
+
+    if (pledgesError) console.error("Error fetching pledges:", pledgesError);
+    pledgesData?.forEach(pledge => allContributions.push({
+      id: pledge.id,
+      type: 'pledge',
+      date: parseISO(pledge.due_date), // Use due_date as the transaction date for pledges
+      amount: pledge.amount,
+      sourceOrPurpose: pledge.comments || pledge.projects?.name || 'Project Pledge',
+      accountName: pledge.projects?.name || 'Unknown Project',
+      status: pledge.status,
+      dueDate: parseISO(pledge.due_date),
+    }));
+
+    // Fetch projects where this member is the creator
+    const { data: projectsData, error: projectsError } = await supabase
+      .from('projects')
+      .select('id, name, member_contribution_amount')
+      .eq('profile_id', memberId)
+      .eq('status', 'Open'); // Only open projects
+
+    if (projectsError) console.error("Error fetching member's projects:", projectsError);
+    setMemberProjects(projectsData || []);
+
+    const filteredAndSorted = allContributions
+      .filter(c => c.sourceOrPurpose.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
       
-      setMemberContributions(filteredAndSorted);
-    }
-    
+    setMemberContributions(filteredAndSorted);
     setLoading(false);
   }, [memberId, currentUser, authLoading, filterMonth, filterYear, searchQuery, setViewingMemberName]);
 
@@ -169,9 +206,9 @@ const MemberContributionsDetail: React.FC = () => {
     };
   }, [fetchMemberData, setViewingMemberName]);
 
-  const totalIncome = memberContributions.filter(c => c.type === 'income').reduce((sum, c) => sum + c.amount, 0);
-  const totalExpenditure = memberContributions.filter(c => c.type === 'expenditure' || c.type === 'petty_cash').reduce((sum, c) => sum + c.amount, 0);
-  const netBalance = totalIncome - totalExpenditure;
+  // Calculations now only reflect pledges
+  const totalPaidPledges = memberContributions.filter(t => t.type === 'pledge' && t.status === 'Paid').reduce((sum, t) => sum + t.amount, 0);
+  const totalPendingPledges = memberContributions.filter(t => t.type === 'pledge' && (t.status === 'Active' || t.status === 'Overdue')).reduce((sum, t) => sum + t.amount, 0);
 
   const contributionsByDate = memberContributions.reduce((acc, contribution) => {
     const dateKey = format(contribution.date, "yyyy-MM-dd");
@@ -249,9 +286,12 @@ const MemberContributionsDetail: React.FC = () => {
         years={years}
         memberContributions={memberContributions}
         contributionsByDate={contributionsByDate}
-        totalIncome={totalIncome}
-        totalExpenditure={totalExpenditure}
-        netBalance={netBalance}
+        totalIncome={0} // Removed from overview, set to 0
+        totalExpenditure={0} // Removed from overview, set to 0
+        netBalance={0} // Removed from overview, set to 0
+        totalPaidPledges={totalPaidPledges} // New prop
+        totalPendingPledges={totalPendingPledges} // New prop
+        memberProjects={memberProjects} // New prop
         renderDay={renderDay}
         memberName={memberName}
         searchQuery={searchQuery}
