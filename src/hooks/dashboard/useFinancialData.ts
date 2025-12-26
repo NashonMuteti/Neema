@@ -33,16 +33,22 @@ export const useFinancialData = () => {
     }
 
     try {
-      let incomeQuery = supabase.from('income_transactions').select('date, amount');
+      let incomeQuery = supabase.from('income_transactions').select('date, amount, source');
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
+      // Exclude income from transfers
+      incomeQuery = incomeQuery.neq('source', `Funds Transfer from %`); // Use ilike for partial match if needed, but exact is better
+
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
 
-      let expenditureQuery = supabase.from('expenditure_transactions').select('date, amount');
+      let expenditureQuery = supabase.from('expenditure_transactions').select('date, amount, purpose');
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
+      // Exclude expenditure from transfers
+      expenditureQuery = expenditureQuery.neq('purpose', `Funds Transfer to %`); // Use ilike for partial match if needed, but exact is better
+
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
 
       let projectCollectionsQuery = supabase.from('project_collections').select('date, amount');

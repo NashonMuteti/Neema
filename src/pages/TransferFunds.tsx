@@ -139,6 +139,31 @@ const TransferFunds = () => {
 
       if (destError) throw destError;
 
+      // Record as an expenditure transaction from the source account
+      const { error: expenditureTxError } = await supabase
+        .from('expenditure_transactions')
+        .insert({
+          profile_id: currentUser!.id,
+          account_id: sourceAccount,
+          amount: amount,
+          purpose: `Funds Transfer to ${destAcc.name}`,
+          date: new Date().toISOString(),
+        });
+      if (expenditureTxError) throw expenditureTxError;
+
+      // Record as an income transaction to the destination account
+      const { error: incomeTxError } = await supabase
+        .from('income_transactions')
+        .insert({
+          profile_id: currentUser!.id,
+          account_id: destinationAccount,
+          amount: amount,
+          source: `Funds Transfer from ${sourceAcc.name}`,
+          date: new Date().toISOString(),
+        });
+      if (incomeTxError) throw incomeTxError;
+
+
       showSuccess("Funds transferred successfully!");
       setTransferAmount("");
       fetchFinancialAccounts(); // Re-fetch to update balances

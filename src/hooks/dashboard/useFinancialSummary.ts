@@ -74,10 +74,12 @@ export const useFinancialSummary = () => {
       let totalIncomeAllTime = 0;
       let totalExpenditureAllTime = 0;
 
-      let incomeQuery = supabase.from('income_transactions').select('amount');
+      let incomeQuery = supabase.from('income_transactions').select('amount', 'source');
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
+      // Exclude income from transfers
+      incomeQuery = incomeQuery.neq('source', `Funds Transfer from %`);
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
       if (incomeError) throw incomeError;
       totalIncomeAllTime += (incomeTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
@@ -98,10 +100,12 @@ export const useFinancialSummary = () => {
       if (paidPledgesError) throw paidPledgesError;
       totalIncomeAllTime += (paidPledges || []).reduce((sum, p) => sum + p.amount, 0);
 
-      let expenditureQuery = supabase.from('expenditure_transactions').select('amount');
+      let expenditureQuery = supabase.from('expenditure_transactions').select('amount', 'purpose');
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
+      // Exclude expenditure from transfers
+      expenditureQuery = expenditureQuery.neq('purpose', `Funds Transfer to %`);
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
       if (expenditureError) throw expenditureError;
       totalExpenditureAllTime += (expenditureTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
