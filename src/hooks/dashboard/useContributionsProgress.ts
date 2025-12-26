@@ -9,6 +9,7 @@ interface ProjectContributionData {
   name: string;
   expected: number;
   actual: number;
+  pledged: number; // New: Total pledged amount
 }
 
 export const useContributionsProgress = () => {
@@ -76,24 +77,39 @@ export const useContributionsProgress = () => {
 
         const actualCollections = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
 
-        let pledgesQuery = supabase
+        // Fetch all pledges for the project to get the total pledged amount
+        let allPledgesQuery = supabase
+          .from('project_pledges')
+          .select('amount')
+          .eq('project_id', project.id);
+
+        const { data: allPledgesData, error: allPledgesError } = await allPledgesQuery;
+
+        if (allPledgesError) {
+          console.error(`Error fetching all pledges for project ${project.name}:`, allPledgesError);
+        }
+        const totalPledged = (allPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
+
+        // Fetch only paid pledges for the 'actual' calculation
+        let paidPledgesQuery = supabase
           .from('project_pledges')
           .select('amount')
           .eq('project_id', project.id)
           .eq('status', 'Paid');
 
-        const { data: pledgesData, error: pledgesError } = await pledgesQuery;
+        const { data: paidPledgesData, error: paidPledgesError } = await paidPledgesQuery;
 
-        if (pledgesError) {
-          console.error(`Error fetching pledges for project ${project.name}:`, pledgesError);
+        if (paidPledgesError) {
+          console.error(`Error fetching paid pledges for project ${project.name}:`, paidPledgesError);
         }
 
-        const actualPledges = (pledgesData || []).reduce((sum, p) => sum + p.amount, 0);
+        const actualPaidPledges = (paidPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
 
         projectContributions.push({
           name: project.name,
           expected: expected,
-          actual: actualCollections + actualPledges,
+          actual: actualCollections + actualPaidPledges, // Actual is sum of collections and paid pledges
+          pledged: totalPledged, // Total pledged (active + paid)
         });
       }
       setContributionsProgressData(projectContributions);

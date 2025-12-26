@@ -18,6 +18,7 @@ interface ProjectContributionData {
   name: string;
   expected: number;
   actual: number;
+  pledged: number; // New: Total pledged amount
 }
 
 interface ContributionsProgressGraphProps {
@@ -73,10 +74,11 @@ const ContributionsProgressGraph: React.FC<ContributionsProgressGraphProps> = ({
             <Legend />
             <Bar dataKey="expected" fill="hsl(var(--primary))" name="Expected" />
             <Bar dataKey="actual" fill="hsl(var(--secondary))" name="Actual" />
+            <Bar dataKey="pledged" fill="hsl(var(--ring))" name="Pledged" /> {/* New Pledged Bar */}
           </BarChart>
         </ResponsiveContainer>
         <p className="text-sm text-muted-foreground mt-4 text-center">
-          Comparison of actual contributions against expected targets for active projects.
+          Comparison of actual collections, total pledges, and expected targets for active projects.
         </p>
       </CardContent>
     </Card>
