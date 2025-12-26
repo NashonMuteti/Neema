@@ -62,6 +62,7 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "sky-blue-header": "hsl(var(--sky-blue-header))", // New color for header
       },
       borderRadius: {
         lg: "var(--radius)",
