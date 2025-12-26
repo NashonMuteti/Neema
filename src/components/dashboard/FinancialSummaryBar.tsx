@@ -26,7 +26,7 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
   const { currency } = useSystemSettings();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6"> {/* Changed lg:grid-cols-4 to lg:grid-cols-6 */}
       {/* Total Unpaid Pledges Card */}
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl bg-destructive/10 border-destructive">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -58,7 +58,7 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
       ))}
 
       {/* Grand Total for All Accounts Card */}
-      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl col-span-full lg:col-span-1">
+      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl col-span-full lg:col-span-2"> {/* Changed lg:col-span-1 to lg:col-span-2 */}
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Grand Total (All Accounts)</CardTitle>
           <Banknote className="h-4 w-4 text-muted-foreground" />
