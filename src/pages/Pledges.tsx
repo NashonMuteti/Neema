@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, getMonth, getYear, parseISO, isBefore, startOfDay } from "date-fns";
+import { format, getMonth, getYear, parseISO } from "date-fns";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
@@ -11,8 +11,8 @@ import { PostgrestError } from "@supabase/supabase-js";
 import PledgeForm from "@/components/pledges/PledgeForm";
 import PledgeFilters from "@/components/pledges/PledgeFilters";
 import PledgeTable from "@/components/pledges/PledgeTable";
-import { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import Pledge type from dialog
-import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog";
+import { useSystemSettings } from "@/context/SystemSettingsContext";
 import {
   Select,
   SelectContent,
@@ -21,8 +21,8 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"; // Import Select components
-import { Label } from "@/components/ui/label"; // Import Label
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface Member {
   id: string;
@@ -47,29 +47,28 @@ interface Pledge {
   project_id: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid"; // Updated: Removed "Overdue"
+  status: "Active" | "Paid";
   member_name: string;
   project_name: string;
-  comments?: string; // Added comments
+  comments?: string;
 }
 
-// Define the expected structure of a pledge row with joined profile and project data
 interface PledgeRowWithJoinedData {
   id: string;
   member_id: string;
   project_id: string;
   amount: number;
-  due_date: string; // ISO string from DB
-  status: "Active" | "Paid"; // Updated: Removed "Overdue"
-  profiles: { name: string; email: string } | null; // Joined profile data, added email
-  projects: { name: string } | null; // Joined project data
-  comments?: string; // Added comments
+  due_date: string;
+  status: "Active" | "Paid";
+  profiles: { name: string; email: string } | null;
+  projects: { name: string } | null;
+  comments?: string;
 }
 
 const Pledges = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-  const { currency } = useSystemSettings(); // Use currency from context
+  const { currency } = useSystemSettings();
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -81,19 +80,16 @@ const Pledges = () => {
     return { canManagePledges };
   }, [currentUser, definedRoles]);
 
-  // Data states
   const [members, setMembers] = React.useState<Member[]>([]);
   const [projects, setProjects] = React.useState<Project[]>([]);
-  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]); // New state for financial accounts
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
   const [pledges, setPledges] = React.useState<Pledge[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [paidIntoAccount, setPaidIntoAccount] = React.useState<string | undefined>(undefined); // New state for account when marking paid
 
-  // Filter State
   const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date()); // 0-indexed
-  const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All"); // Updated filter options
+  const currentMonth = getMonth(new Date());
+  const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All");
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -107,7 +103,6 @@ const Pledges = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  // Helper to determine display status (Unpaid for Active/Overdue)
   const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
     if (pledge.status === "Paid") return "Paid";
     return "Unpaid";
@@ -127,7 +122,6 @@ const Pledges = () => {
       .select('id, name')
       .order('name', { ascending: true });
 
-    // Fetch financial accounts for the current user
     let financialAccountsData: FinancialAccount[] = [];
     if (currentUser) {
       const { data: accountsData, error: accountsError } = await supabase
@@ -141,30 +135,19 @@ const Pledges = () => {
         showError("Failed to load financial accounts.");
       } else {
         financialAccountsData = accountsData || [];
-        if (financialAccountsData.length > 0 && !paidIntoAccount) {
-          setPaidIntoAccount(financialAccountsData[0].id); // Default to first account
-        }
       }
     }
 
-    if (membersError) {
-      console.error("Error fetching members:", membersError);
-      setError("Failed to load members.");
-    } else {
-      setMembers(membersData || []);
-    }
+    if (membersError) { console.error("Error fetching members:", membersError); setError("Failed to load members."); }
+    else { setMembers(membersData || []); }
 
-    if (projectsError) {
-      console.error("Error fetching projects:", projectsError);
-      setError("Failed to load projects.");
-    } else {
-      // Ensure unique projects by ID before setting state
+    if (projectsError) { console.error("Error fetching projects:", projectsError); setError("Failed to load projects."); }
+    else {
       const uniqueProjects = Array.from(new Map((projectsData || []).map(p => [p.id, p])).values());
       setProjects(uniqueProjects);
     }
     setFinancialAccounts(financialAccountsData);
 
-    // Fetch pledges based on filters
     const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
     const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
@@ -189,7 +172,6 @@ const Pledges = () => {
     } else if (filterStatus === "Unpaid") {
       query = query.in('status', ['Active', 'Overdue']);
     }
-    // If filterStatus is "All", no status filter is applied to the DB query
 
     const { data: pledgesData, error: pledgesError } = (await query.order('due_date', { ascending: false })) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null };
 
@@ -204,16 +186,16 @@ const Pledges = () => {
         project_id: p.project_id,
         amount: p.amount,
         due_date: parseISO(p.due_date),
-        status: p.status as "Active" | "Paid", // Updated: Removed "Overdue"
-        member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
-        project_name: p.projects?.name || 'Unknown Project', // Access name directly from typed projects
-        comments: p.comments || undefined, // Include comments
+        status: p.status as "Active" | "Paid",
+        member_name: p.profiles?.name || 'Unknown Member',
+        project_name: p.projects?.name || 'Unknown Project',
+        comments: p.comments || undefined,
       }));
 
       const filteredBySearch = fetchedPledges.filter(pledge => {
         const memberName = (pledge.member_name || "").toLowerCase();
         const projectName = (pledge.project_name || "").toLowerCase();
-        const comments = (pledge.comments || "").toLowerCase(); // Include comments in search
+        const comments = (pledge.comments || "").toLowerCase();
         const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || 
                               projectName.includes(searchQuery.toLowerCase()) ||
                               comments.includes(searchQuery.toLowerCase());
@@ -222,7 +204,7 @@ const Pledges = () => {
       setPledges(filteredBySearch);
     }
     setLoading(false);
-  }, [filterMonth, filterYear, filterStatus, searchQuery, currentUser, paidIntoAccount]);
+  }, [filterMonth, filterYear, filterStatus, searchQuery, currentUser]);
 
   React.useEffect(() => {
     fetchInitialData();
@@ -233,7 +215,7 @@ const Pledges = () => {
     project_id: string;
     amount: number;
     due_date: Date;
-    comments?: string; // Added comments
+    comments?: string;
   }) => {
     if (!currentUser) {
       showError("You must be logged in to record a pledge.");
@@ -247,8 +229,8 @@ const Pledges = () => {
         project_id: pledgeData.project_id,
         amount: pledgeData.amount,
         due_date: pledgeData.due_date.toISOString(),
-        status: "Active", // New pledges are active by default
-        comments: pledgeData.comments, // Insert comments
+        status: "Active",
+        comments: pledgeData.comments,
       });
 
     if (insertError) {
@@ -256,13 +238,11 @@ const Pledges = () => {
       showError("Failed to record pledge.");
     } else {
       showSuccess("Pledge recorded successfully!");
-      fetchInitialData(); // Re-fetch all data to update lists
+      fetchInitialData();
     }
   };
 
-  const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => { // Changed to use EditPledgeDialogPledge
-    // This function is called by the EditPledgeDialog on successful save
-    // We just need to re-fetch the data to update the table
+  const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => {
     fetchInitialData();
   };
 
@@ -281,41 +261,47 @@ const Pledges = () => {
       showError("Failed to delete pledge.");
     } else {
       showSuccess("Pledge deleted successfully!");
-      fetchInitialData(); // Re-fetch all data to update lists
+      fetchInitialData();
     }
   };
 
-  const handleMarkAsPaid = async (id: string, memberName: string, amount: number) => {
+  const handleMarkAsPaid = async (pledgeId: string, receivedIntoAccountId: string, paymentMethod: string) => {
     if (!canManagePledges) {
       showError("You do not have permission to mark pledges as paid.");
       return;
     }
-    if (!paidIntoAccount) {
-      showError("Please select an account where the pledge was received.");
+    if (!currentUser) {
+      showError("You must be logged in to mark pledges as paid.");
+      return;
+    }
+
+    const pledgeToMark = pledges.find(p => p.id === pledgeId);
+    if (!pledgeToMark) {
+      showError("Pledge not found.");
       return;
     }
 
     // Use the atomic transfer function for marking as paid
     const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
-      p_source_account_id: null, // No source account for pledges
-      p_destination_account_id: paidIntoAccount,
-      p_amount: amount,
-      p_profile_id: currentUser?.id,
-      p_purpose: `Pledge Payment from Member: ${memberName}`,
-      p_source: `Pledge Payment from Member: ${memberName}`,
-      p_is_transfer: false, // Not a transfer, it's a direct income
-      p_project_id: null, // Not directly tied to a project collection
-      p_member_id: null, // Not directly tied to a project collection
-      p_payment_method: 'N/A', // Payment method is not tracked for pledges in this context
-      p_pledge_id: id, // Pass pledge ID to update its status
+      p_source_account_id: null,
+      p_destination_account_id: receivedIntoAccountId,
+      p_amount: pledgeToMark.amount,
+      p_profile_id: currentUser.id,
+      p_purpose: `Pledge Payment for Project: ${pledgeToMark.project_name}`,
+      p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
+      p_is_transfer: false,
+      p_project_id: pledgeToMark.project_id,
+      p_member_id: pledgeToMark.member_id,
+      p_payment_method: paymentMethod,
+      p_pledge_id: pledgeId,
     });
 
     if (transactionError) {
       console.error("Error marking pledge as paid and updating balance:", transactionError);
       showError(`Failed to mark pledge as paid: ${transactionError.message}`);
     } else {
-      showSuccess(`Payment initiated for ${memberName}'s pledge of ${currency.symbol}${amount.toFixed(2)}.`);
-      fetchInitialData(); // Re-fetch all data to update lists
+      showSuccess(`Pledge payment of ${currency.symbol}${pledgeToMark.amount.toFixed(2)} recorded successfully!`);
+      fetchInitialData();
     }
   };
 
@@ -345,7 +331,6 @@ const Pledges = () => {
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Record New Pledge Card */}
         <PledgeForm
           members={members}
           projects={projects}
@@ -353,7 +338,6 @@ const Pledges = () => {
           canManagePledges={canManagePledges}
         />
 
-        {/* Recent Pledges Card */}
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
           <CardHeader>
             <CardTitle>Recent Pledges</CardTitle>
@@ -371,35 +355,17 @@ const Pledges = () => {
               months={months}
               years={years}
             />
-            <div className="grid gap-1.5 mb-4">
-              <Label htmlFor="paid-into-account-filter">Pledge Payments Received Into</Label>
-              <Select value={paidIntoAccount} onValueChange={setPaidIntoAccount} disabled={!canManagePledges || financialAccounts.length === 0}>
-                <SelectTrigger id="paid-into-account-filter">
-                  <SelectValue placeholder="Select account for payments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Financial Accounts</SelectLabel>
-                    {financialAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              {financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
-            </div>
+            {/* Removed global paidIntoAccount select, now handled by dialog */}
 
             <PledgeTable
               pledges={pledges}
               canManagePledges={canManagePledges}
               onMarkAsPaid={handleMarkAsPaid}
-              onEditPledge={handleEditPledge} // Pass the updated handler
+              onEditPledge={handleEditPledge}
               onDeletePledge={handleDeletePledge}
               members={members}
               projects={projects}
-              financialAccounts={financialAccounts} // Pass financial accounts
+              financialAccounts={financialAccounts}
             />
           </CardContent>
         </Card>

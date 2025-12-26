@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, CheckCircle } from "lucide-react";
-import { format, isBefore, startOfDay } from "date-fns";
+import { Edit, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "./EditPledgeDialog"; // Import the new dialog and its Pledge type
+import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "./EditPledgeDialog";
+import MarkPledgeAsPaidDialog from "./MarkPledgeAsPaidDialog"; // New import
 
 interface Pledge {
   id: string;
@@ -22,24 +23,24 @@ interface Pledge {
   project_id: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid"; // Updated: Removed "Overdue"
+  status: "Active" | "Paid";
   member_name: string;
   project_name: string;
-  comments?: string; // Added comments
+  comments?: string;
 }
 
-interface Member { // Define Member interface for EditPledgeDialog
+interface Member {
   id: string;
   name: string;
   email: string;
 }
 
-interface Project { // Define Project interface for EditPledgeDialog
+interface Project {
   id: string;
   name: string;
 }
 
-interface FinancialAccount { // Define FinancialAccount interface for EditPledgeDialog
+interface FinancialAccount {
   id: string;
   name: string;
   current_balance: number;
@@ -48,18 +49,17 @@ interface FinancialAccount { // Define FinancialAccount interface for EditPledge
 interface PledgeTableProps {
   pledges: Pledge[];
   canManagePledges: boolean;
-  onMarkAsPaid: (id: string, memberName: string, amount: number) => void;
-  onEditPledge: (updatedPledge: EditPledgeDialogPledge) => void; // Changed to use EditPledgeDialogPledge
+  onMarkAsPaid: (pledgeId: string, receivedIntoAccountId: string, paymentMethod: string) => void; // Updated signature
+  onEditPledge: (updatedPledge: EditPledgeDialogPledge) => void;
   onDeletePledge: (id: string) => void;
-  members: Member[]; // Pass members to the dialog
-  projects: Project[]; // Pass projects to the dialog
-  financialAccounts: FinancialAccount[]; // New prop: Pass financial accounts to the dialog
+  members: Member[];
+  projects: Project[];
+  financialAccounts: FinancialAccount[];
 }
 
-// Helper to determine display status
 const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
   if (pledge.status === "Paid") return "Paid";
-  return "Unpaid"; // Active/Overdue now red for Unpaid
+  return "Unpaid";
 };
 
 const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
@@ -67,7 +67,7 @@ const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
     case "Paid":
       return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
     case "Unpaid":
-      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"; // Active/Overdue now red for Unpaid
+      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
   }
@@ -81,7 +81,7 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
   onDeletePledge,
   members,
   projects,
-  financialAccounts, // Destructure new prop
+  financialAccounts,
 }) => {
   const { currency } = useSystemSettings();
 
@@ -118,17 +118,20 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
                   {canManagePledges && (
                     <TableCell className="text-center">
                       <div className="flex justify-center space-x-2">
-                        {displayStatus !== "Paid" && ( // Only show Mark as Paid if not already Paid
-                          <Button variant="outline" size="icon" onClick={() => onMarkAsPaid(pledge.id, pledge.member_name, pledge.amount)}>
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          </Button>
+                        {displayStatus !== "Paid" && (
+                          <MarkPledgeAsPaidDialog
+                            pledge={pledge}
+                            onConfirmPayment={onMarkAsPaid}
+                            financialAccounts={financialAccounts}
+                            canManagePledges={canManagePledges}
+                          />
                         )}
                         <EditPledgeDialog
-                          initialData={pledge as EditPledgeDialogPledge} // Cast to the dialog's Pledge type
+                          initialData={pledge as EditPledgeDialogPledge}
                           onSave={onEditPledge}
                           members={members}
                           projects={projects}
-                          financialAccounts={financialAccounts} // Pass financial accounts
+                          financialAccounts={financialAccounts}
                         />
                         <Button variant="ghost" size="icon" onClick={() => onDeletePledge(pledge.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />

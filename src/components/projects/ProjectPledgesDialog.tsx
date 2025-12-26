@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Edit, CheckCircle, XCircle, PlusCircle } from "lucide-react";
+import { Edit, PlusCircle } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { format, parseISO } from "date-fns";
 import {
@@ -41,7 +41,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
-import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useSystemSettings } from "@/context/SystemSettingsContext";
+import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog"; // New import
 
 interface ProjectPledge {
   id: string;
@@ -49,7 +50,9 @@ interface ProjectPledge {
   member_name: string;
   amount: number;
   due_date: Date;
-  status: "Active" | "Paid"; // Changed: Removed "Overdue"
+  status: "Active" | "Paid";
+  project_name: string; // Added for dialog context
+  comments?: string; // Added for dialog context
 }
 
 interface ProjectPledgesDialogProps {
@@ -70,20 +73,30 @@ interface FinancialAccount {
   current_balance: number;
 }
 
-// Define the expected structure of a pledge row with joined profile data
 interface PledgeRowWithProfile {
   id: string;
   member_id: string;
   amount: number;
-  due_date: string; // ISO string from DB
-  status: "Active" | "Paid" | "Overdue"; // Keep "Overdue" for fetching, but map to "Active"
-  profiles: { name: string } | null; // Joined profile data
+  due_date: string;
+  status: "Active" | "Paid" | "Overdue";
+  profiles: { name: string } | null;
+  comments?: string; // Added comments
 }
 
-// Helper to determine display status
 const getDisplayPledgeStatus = (pledge: ProjectPledge): "Paid" | "Unpaid" => {
   if (pledge.status === "Paid") return "Paid";
-  return "Unpaid"; // Active is now considered Unpaid
+  return "Unpaid";
+};
+
+const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
+  switch (displayStatus) {
+    case "Paid":
+      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+    case "Unpaid":
+      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+  }
 };
 
 const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
@@ -93,7 +106,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-  const { currency } = useSystemSettings(); // Use currency from context
+  const { currency } = useSystemSettings();
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -110,15 +123,13 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
   const [loadingPledges, setLoadingPledges] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // New Pledge Form State
   const [newPledgeAmount, setNewPledgeAmount] = React.useState("");
   const [newPledgeMember, setNewPledgeMember] = React.useState<string | undefined>(undefined);
   const [newPledgeDueDate, setNewPledgeDueDate] = React.useState<Date | undefined>(new Date());
   const [members, setMembers] = React.useState<Member[]>([]);
-  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]); // New state for financial accounts
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
   const [loadingMembers, setLoadingMembers] = React.useState(true);
   const [loadingAccounts, setLoadingAccounts] = React.useState(true);
-  const [paidIntoAccount, setPaidIntoAccount] = React.useState<string | undefined>(undefined); // New state for account when marking paid
 
   const fetchPledges = React.useCallback(async () => {
     setLoadingPledges(true);
@@ -131,6 +142,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         amount,
         due_date,
         status,
+        comments,
         profiles ( name )
       `)
       .eq('project_id', projectId)) as { data: PledgeRowWithProfile[] | null, error: PostgrestError | null };
@@ -144,20 +156,21 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
       setPledges((data || []).map(p => ({
         id: p.id,
         member_id: p.member_id,
-        member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
+        member_name: p.profiles?.name || 'Unknown Member',
         amount: p.amount,
         due_date: parseISO(p.due_date),
-        status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid", // Map "Overdue" to "Active"
+        status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid",
+        project_name: projectName, // Add project name for dialog context
+        comments: p.comments || undefined,
       })));
     }
     setLoadingPledges(false);
-  }, [projectId]);
+  }, [projectId, projectName]);
 
   const fetchMembersAndAccounts = React.useCallback(async () => {
     setLoadingMembers(true);
     setLoadingAccounts(true);
 
-    // Fetch members
     const { data: membersData, error: membersError } = await supabase
       .from('profiles')
       .select('id, name, email')
@@ -169,12 +182,11 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     } else {
       setMembers(membersData || []);
       if (membersData && membersData.length > 0 && !newPledgeMember) {
-        setNewPledgeMember(membersData[0].id); // Default to first member
+        setNewPledgeMember(membersData[0].id);
       }
     }
     setLoadingMembers(false);
 
-    // Fetch financial accounts for the current user
     if (currentUser) {
       const { data: accountsData, error: accountsError } = await supabase
         .from('financial_accounts')
@@ -187,13 +199,10 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         showError("Failed to load financial accounts for pledges.");
       } else {
         setFinancialAccounts(accountsData || []);
-        if (accountsData && accountsData.length > 0 && !paidIntoAccount) {
-          setPaidIntoAccount(accountsData[0].id); // Default to first account
-        }
       }
     }
     setLoadingAccounts(false);
-  }, [newPledgeMember, paidIntoAccount, currentUser]);
+  }, [newPledgeMember, currentUser]);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -202,40 +211,34 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     }
   }, [isOpen, fetchPledges, fetchMembersAndAccounts]);
 
-  const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
-    switch (displayStatus) {
-      case "Paid":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Unpaid":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"; // Active/Overdue now red for Unpaid
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-    }
-  };
-
-  const handleMarkPledgeAsPaid = async (pledge: ProjectPledge) => {
+  const handleMarkPledgeAsPaid = async (pledgeId: string, receivedIntoAccountId: string, paymentMethod: string) => {
     if (!canManagePledges) {
       showError("You do not have permission to update pledge status.");
       return;
     }
-    if (!paidIntoAccount) {
-      showError("Please select an account where the pledge was received.");
+    if (!currentUser) {
+      showError("You must be logged in to mark pledges as paid.");
       return;
     }
 
-    // Use the atomic transfer function for marking as paid
+    const pledgeToMark = pledges.find(p => p.id === pledgeId);
+    if (!pledgeToMark) {
+      showError("Pledge not found.");
+      return;
+    }
+
     const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
-      p_source_account_id: null, // No source account for pledges
-      p_destination_account_id: paidIntoAccount,
-      p_amount: pledge.amount,
-      p_profile_id: currentUser?.id,
+      p_source_account_id: null,
+      p_destination_account_id: receivedIntoAccountId,
+      p_amount: pledgeToMark.amount,
+      p_profile_id: currentUser.id,
       p_purpose: `Pledge Payment for Project: ${projectName}`,
-      p_source: `Pledge Payment from Member: ${pledge.member_name}`,
-      p_is_transfer: false, // Not a transfer, it's a direct income
+      p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
+      p_is_transfer: false,
       p_project_id: projectId,
-      p_member_id: pledge.member_id,
-      p_payment_method: 'N/A', // Payment method is not tracked for pledges in this context
-      p_pledge_id: pledge.id, // Pass pledge ID to update its status
+      p_member_id: pledgeToMark.member_id,
+      p_payment_method: paymentMethod,
+      p_pledge_id: pledgeId,
     });
 
     if (transactionError) {
@@ -244,7 +247,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     } else {
       showSuccess("Pledge marked as paid and account balance updated successfully!");
       fetchPledges();
-      onPledgesUpdated(); // Notify parent to refresh financials
+      onPledgesUpdated();
     }
   };
 
@@ -267,7 +270,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         member_id: newPledgeMember,
         amount: parsedAmount,
         due_date: newPledgeDueDate.toISOString(),
-        status: "Active", // New pledges are active by default
+        status: "Active",
       });
 
     if (error) {
@@ -276,8 +279,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     } else {
       showSuccess("New pledge added successfully!");
       fetchPledges();
-      onPledgesUpdated(); // Notify parent to refresh financials
-      // Reset form
+      onPledgesUpdated();
       setNewPledgeAmount("");
       setNewPledgeMember(members.length > 0 ? members[0].id : undefined);
       setNewPledgeDueDate(new Date());
@@ -286,6 +288,11 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" disabled={!canManagePledges}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Manage Pledges
+        </Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle>Manage Pledges for {projectName}</DialogTitle>
@@ -294,7 +301,6 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-4">
-          {/* Add New Pledge Section */}
           <div className="border p-4 rounded-lg space-y-4">
             <h3 className="text-lg font-semibold flex items-center">
               <PlusCircle className="mr-2 h-5 w-5" /> Add New Pledge
@@ -363,28 +369,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
             </Button>
           </div>
 
-          {/* Existing Pledges Table */}
           <h3 className="text-lg font-semibold">Existing Pledges</h3>
-          <div className="grid gap-1.5 mb-4">
-            <Label htmlFor="paid-into-account">Pledge Payments Received Into</Label>
-            <Select value={paidIntoAccount} onValueChange={setPaidIntoAccount} disabled={!canManagePledges || loadingAccounts || financialAccounts.length === 0}>
-              <SelectTrigger id="paid-into-account">
-                <SelectValue placeholder="Select account for payments" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Financial Accounts</SelectLabel>
-                  {financialAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            {loadingAccounts && <p className="text-sm text-muted-foreground">Loading accounts...</p>}
-            {!loadingAccounts && financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
-          </div>
           {loadingPledges ? (
             <p className="text-muted-foreground">Loading pledges...</p>
           ) : error ? (
@@ -417,15 +402,12 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
                             {displayStatus !== "Paid" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleMarkPledgeAsPaid(pledge)}
-                                title="Mark as Paid"
-                                disabled={!paidIntoAccount}
-                              >
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              </Button>
+                              <MarkPledgeAsPaidDialog
+                                pledge={pledge}
+                                onConfirmPayment={handleMarkPledgeAsPaid}
+                                financialAccounts={financialAccounts}
+                                canManagePledges={canManagePledges}
+                              />
                             )}
                             {/* Removed "Mark as Overdue" button */}
                           </div>
