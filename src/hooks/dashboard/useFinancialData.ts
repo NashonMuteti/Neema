@@ -37,8 +37,9 @@ export const useFinancialData = () => {
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude income from transfers
-      incomeQuery = incomeQuery.neq('source', `Funds Transfer from %`); // Use ilike for partial match if needed, but exact is better
+      // Exclude income from transfers AND initial account balances
+      incomeQuery = incomeQuery.not('source', 'ilike', `Funds Transfer from %`);
+      incomeQuery = incomeQuery.neq('source', 'Initial Account Balance');
 
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
 
@@ -47,7 +48,7 @@ export const useFinancialData = () => {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
       // Exclude expenditure from transfers
-      expenditureQuery = expenditureQuery.neq('purpose', `Funds Transfer to %`); // Use ilike for partial match if needed, but exact is better
+      expenditureQuery = expenditureQuery.not('purpose', 'ilike', `Funds Transfer to %`);
 
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
 

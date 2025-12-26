@@ -78,8 +78,9 @@ export const useFinancialSummary = () => {
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude income from transfers
-      incomeQuery = incomeQuery.neq('source', `Funds Transfer from %`);
+      // Exclude income from transfers AND initial account balances
+      incomeQuery = incomeQuery.not('source', 'ilike', `Funds Transfer from %`);
+      incomeQuery = incomeQuery.neq('source', 'Initial Account Balance');
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
       if (incomeError) throw incomeError;
       totalIncomeAllTime += (incomeTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
@@ -105,7 +106,7 @@ export const useFinancialSummary = () => {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
       // Exclude expenditure from transfers
-      expenditureQuery = expenditureQuery.neq('purpose', `Funds Transfer to %`);
+      expenditureQuery = expenditureQuery.not('purpose', 'ilike', `Funds Transfer to %`);
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
       if (expenditureError) throw expenditureError;
       totalExpenditureAllTime += (expenditureTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
