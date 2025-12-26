@@ -13,6 +13,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
 
 interface Project {
   id: string;
@@ -22,9 +34,23 @@ interface Project {
 }
 
 const DeletedProjectsReport = () => {
+  const { currentUser } = useAuth();
+  const { userRoles: definedRoles } = useUserRoles();
+
+  const { canManageProjects } = React.useMemo(() => {
+    if (!currentUser || !definedRoles) {
+      return { canManageProjects: false };
+    }
+    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
+    const canManageProjects = currentUserPrivileges.includes("Manage Projects");
+    return { canManageProjects };
+  }, [currentUser, definedRoles]);
+
   const [deletedProjects, setDeletedProjects] = React.useState<Project[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [projectToDeletePermanently, setProjectToDeletePermanently] = React.useState<{ id: string; name: string } | null>(null);
 
   const fetchDeletedProjects = useCallback(async () => {
     setLoading(true);
@@ -55,6 +81,10 @@ const DeletedProjectsReport = () => {
   }, [fetchDeletedProjects]);
 
   const handleRestoreProject = async (projectId: string, projectName: string) => {
+    if (!canManageProjects) {
+      showError("You do not have permission to restore projects.");
+      return;
+    }
     const { error } = await supabase
       .from('projects')
       .update({ status: "Open" }) // Restore to "Open" status
@@ -66,6 +96,30 @@ const DeletedProjectsReport = () => {
     } else {
       showSuccess(`Project '${projectName}' restored successfully.`);
       fetchDeletedProjects(); // Re-fetch to update the list
+    }
+  };
+
+  const handlePermanentDeleteProject = async () => {
+    if (!canManageProjects) {
+      showError("You do not have permission to permanently delete projects.");
+      setProjectToDeletePermanently(null); // Close dialog
+      return;
+    }
+    if (projectToDeletePermanently) {
+      const { id, name } = projectToDeletePermanently;
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("Error permanently deleting project:", error);
+        showError(`Failed to permanently delete project '${name}'.`);
+      } else {
+        showSuccess(`Project '${name}' permanently deleted.`);
+        fetchDeletedProjects(); // Re-fetch to update the list
+      }
+      setProjectToDeletePermanently(null); // Close dialog
     }
   };
 
@@ -105,7 +159,7 @@ const DeletedProjectsReport = () => {
                   <TableHead>Project Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
+                  {canManageProjects && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -114,15 +168,26 @@ const DeletedProjectsReport = () => {
                     <TableCell className="font-medium">{project.name}</TableCell>
                     <TableCell>{project.description}</TableCell>
                     <TableCell className="text-center">{project.status}</TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRestoreProject(project.id, project.name)}
-                      >
-                        Restore
-                      </Button>
-                    </TableCell>
+                    {canManageProjects && (
+                      <TableCell className="text-center">
+                        <div className="flex justify-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRestoreProject(project.id, project.name)}
+                          >
+                            Restore
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setProjectToDeletePermanently({ id: project.id, name: project.name })}
+                          >
+                            Permanent Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -132,6 +197,25 @@ const DeletedProjectsReport = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Permanent Delete Confirmation Dialog */}
+      <AlertDialog open={!!projectToDeletePermanently} onOpenChange={(open) => !open && setProjectToDeletePermanently(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the project "
+              <span className="font-semibold">{projectToDeletePermanently?.name}</span>" and all its associated data from the database.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePermanentDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

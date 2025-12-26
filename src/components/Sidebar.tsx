@@ -160,12 +160,6 @@ export const navItems: SidebarItem[] = [
         icon: Activity,
         requiredPrivileges: ["View User Activity Report"],
       },
-      {
-        name: "Deleted Projects Report",
-        href: "/reports/deleted-projects",
-        icon: FolderX,
-        requiredPrivileges: ["View Deleted Projects Report"],
-      },
     ],
   },
   {
@@ -184,6 +178,12 @@ export const navItems: SidebarItem[] = [
         href: "/transfer-funds",
         icon: ArrowRightLeft,
         requiredPrivileges: ["Manage Funds Transfer"], // New privilege
+      },
+      {
+        name: "Deleted Projects Report", // Moved here
+        href: "/reports/deleted-projects",
+        icon: FolderX,
+        requiredPrivileges: ["View Deleted Projects Report"],
       },
     ],
   },
