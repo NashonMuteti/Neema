@@ -65,6 +65,11 @@ const Index = () => {
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
+  // New state for Cumulative Net Operating Balance
+  const [cumulativeNetOperatingBalance, setCumulativeNetOperatingBalance] = useState(0);
+  const [loadingCumulativeNet, setLoadingCumulativeNet] = useState(true);
+  const [cumulativeNetError, setCumulativeNetError] = useState<string | null>(null);
+
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
   const fetchFinancialData = useCallback(async () => {
@@ -376,16 +381,85 @@ const Index = () => {
     }
   }, [currentUser, isAdmin]);
 
+  const fetchCumulativeNetOperatingBalance = useCallback(async () => {
+    setLoadingCumulativeNet(true);
+    setCumulativeNetError(null);
+
+    if (!currentUser) {
+      setLoadingCumulativeNet(false);
+      return;
+    }
+
+    try {
+      let totalIncomeAllTime = 0;
+      let totalExpenditureAllTime = 0;
+
+      // Fetch all income transactions
+      let incomeQuery = supabase.from('income_transactions').select('amount');
+      if (!isAdmin) {
+        incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
+      }
+      const { data: incomeTransactions, error: incomeError } = await incomeQuery;
+      if (incomeError) throw incomeError;
+      totalIncomeAllTime += (incomeTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
+
+      // Fetch all project collections
+      let projectCollectionsQuery = supabase.from('project_collections').select('amount');
+      if (!isAdmin) {
+        projectCollectionsQuery = projectCollectionsQuery.eq('member_id', currentUser.id);
+      }
+      const { data: projectCollections, error: collectionsError } = await projectCollectionsQuery;
+      if (collectionsError) throw collectionsError;
+      totalIncomeAllTime += (projectCollections || []).reduce((sum, c) => sum + c.amount, 0);
+
+      // Fetch all paid project pledges
+      let paidPledgesQuery = supabase.from('project_pledges').select('amount').eq('status', 'Paid');
+      if (!isAdmin) {
+        paidPledgesQuery = paidPledgesQuery.eq('member_id', currentUser.id);
+      }
+      const { data: paidPledges, error: paidPledgesError } = await paidPledgesQuery;
+      if (paidPledgesError) throw paidPledgesError;
+      totalIncomeAllTime += (paidPledges || []).reduce((sum, p) => sum + p.amount, 0);
+
+      // Fetch all expenditure transactions
+      let expenditureQuery = supabase.from('expenditure_transactions').select('amount');
+      if (!isAdmin) {
+        expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
+      }
+      const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
+      if (expenditureError) throw expenditureError;
+      totalExpenditureAllTime += (expenditureTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
+
+      // Fetch all petty cash transactions
+      let pettyCashQuery = supabase.from('petty_cash_transactions').select('amount');
+      if (!isAdmin) {
+        pettyCashQuery = pettyCashQuery.eq('profile_id', currentUser.id);
+      }
+      const { data: pettyCashTransactions, error: pettyCashError } = await pettyCashQuery;
+      if (pettyCashError) throw pettyCashError;
+      totalExpenditureAllTime += (pettyCashTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
+
+      setCumulativeNetOperatingBalance(totalIncomeAllTime - totalExpenditureAllTime);
+
+    } catch (err) {
+      console.error("Unexpected error in fetchCumulativeNetOperatingBalance:", err);
+      setCumulativeNetError("An unexpected error occurred while loading cumulative net balance.");
+    } finally {
+      setLoadingCumulativeNet(false);
+    }
+  }, [currentUser, isAdmin]);
+
   useEffect(() => {
     if (currentUser && !authLoading) {
       fetchFinancialData();
       fetchDashboardProjects();
       fetchContributionsProgress();
       fetchFinancialSummary(); // Fetch new summary data
+      fetchCumulativeNetOperatingBalance(); // Fetch the new cumulative net operating balance
     }
-  }, [currentUser, authLoading, fetchFinancialData, fetchDashboardProjects, fetchContributionsProgress, fetchFinancialSummary]);
+  }, [currentUser, authLoading, fetchFinancialData, fetchDashboardProjects, fetchContributionsProgress, fetchFinancialSummary, fetchCumulativeNetOperatingBalance]);
 
-  if (authLoading || loadingFinancials || loadingProjects || loadingContributions || loadingSummary) {
+  if (authLoading || loadingFinancials || loadingProjects || loadingContributions || loadingSummary || loadingCumulativeNet) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
@@ -394,11 +468,11 @@ const Index = () => {
     );
   }
 
-  if (financialsError || projectsError || contributionsError || summaryError) {
+  if (financialsError || projectsError || contributionsError || summaryError || cumulativeNetError) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-lg text-destructive">Error loading dashboard: {financialsError || projectsError || contributionsError || summaryError}</p>
+        <p className="text-lg text-destructive">Error loading dashboard: {financialsError || projectsError || contributionsError || summaryError || cumulativeNetError}</p>
       </div>
     );
   }
@@ -415,6 +489,7 @@ const Index = () => {
         totalUnpaidPledges={totalUnpaidPledges}
         activeFinancialAccounts={activeFinancialAccounts}
         grandTotalAccountsBalance={grandTotalAccountsBalance}
+        cumulativeNetOperatingBalance={cumulativeNetOperatingBalance} // Pass new prop
       />
 
       {/* Main Financial Overview */}

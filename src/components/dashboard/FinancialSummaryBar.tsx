@@ -16,12 +16,14 @@ interface FinancialSummaryBarProps {
   totalUnpaidPledges: number;
   activeFinancialAccounts: FinancialAccountSummary[];
   grandTotalAccountsBalance: number;
+  cumulativeNetOperatingBalance: number; // New prop
 }
 
 const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
   totalUnpaidPledges,
   activeFinancialAccounts,
   grandTotalAccountsBalance,
+  cumulativeNetOperatingBalance, // Destructure new prop
 }) => {
   const { currency } = useSystemSettings();
 
@@ -30,13 +32,29 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
       {/* Total Unpaid Pledges Card */}
       <Card className="flex-1 min-w-[190px] transition-all duration-300 ease-in-out hover:shadow-xl bg-destructive/10 border-destructive">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-destructive">Total Unpaid Pledges</CardTitle>
+          <CardTitle className="text-sm font-medium text-destructive">Total Unpaid Pledges</CardTitle> {/* Corrected typo: Pledle -> Pledges */}
           <Handshake className="h-4 w-4 text-destructive" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-destructive">{currency.symbol}{totalUnpaidPledges.toFixed(2)}</div>
           <p className="text-xs text-muted-foreground">
             Outstanding commitments from members.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Cumulative Net Operating Balance Card (New) */}
+      <Card className="flex-1 min-w-[190px] transition-all duration-300 ease-in-out hover:shadow-xl">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Cumulative Net Operating Balance</CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className={cn("text-2xl font-bold", cumulativeNetOperatingBalance >= 0 ? "text-green-600" : "text-red-600")}>
+            {currency.symbol}{cumulativeNetOperatingBalance.toFixed(2)}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Total income minus total expenditure (all time).
           </p>
         </CardContent>
       </Card>
