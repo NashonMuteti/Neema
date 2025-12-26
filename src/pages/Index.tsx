@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { getYear, format, parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
+import { useBranding } from "@/context/BrandingContext"; // New import
 
 // Define a simplified Project interface for the dashboard's dummy data
 interface DashboardProject {
@@ -43,6 +44,7 @@ interface FinancialAccountSummary {
 
 const Index = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
+  const { headerTitle } = useBranding(); // Use headerTitle from branding context
   const [monthlyFinancialData, setMonthlyFinancialData] = useState<MonthlyFinancialData[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [loadingFinancials, setLoadingFinancials] = useState(true);
@@ -392,7 +394,7 @@ const Index = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
       <p className="text-lg text-muted-foreground">
-        Welcome to your cinematic financial management hub.
+        Welcome to {headerTitle} Financial Hub.
       </p>
 
       {/* New Financial Summary Bar */}
