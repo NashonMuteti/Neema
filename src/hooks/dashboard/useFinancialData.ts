@@ -37,9 +37,8 @@ export const useFinancialData = () => {
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude income from transfers AND initial account balances
+      // Exclude income from transfers, but now INCLUDE initial account balances
       incomeQuery = incomeQuery.not('source', 'ilike', `Funds Transfer from %`);
-      incomeQuery = incomeQuery.neq('source', 'Initial Account Balance');
 
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
 
