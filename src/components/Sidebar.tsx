@@ -23,7 +23,8 @@ import {
   Banknote,
   ShoppingCart,
   Package,
-  Scale
+  Scale,
+  ArrowRightLeft // New import
 } from "lucide-react";
 import {
   Collapsible,
@@ -116,7 +117,7 @@ export const navItems: SidebarItem[] = [
     name: "Members",
     href: "/members",
     icon: Users,
-    requiredPrivileges: ["View Members", "Manage Members"], // Added "Manage Members" for broader access check
+    requiredPrivileges: ["View Members", "Manage Members"],
   },
   {
     name: "Board Members",
@@ -178,6 +179,12 @@ export const navItems: SidebarItem[] = [
         icon: RefreshCcw,
         requiredPrivileges: ["Initialize Balances"],
       },
+      {
+        name: "Transfer Funds", // New menu item
+        href: "/transfer-funds",
+        icon: ArrowRightLeft,
+        requiredPrivileges: ["Manage Funds Transfer"], // New privilege
+      },
     ],
   },
   {
@@ -199,7 +206,6 @@ const Sidebar = () => {
   const { currentUser, isLoading } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
-  // These hooks must be called unconditionally at the top level of the component
   const [isReportsOpen, setIsReportsOpen] = React.useState(false);
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
   const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false);
@@ -207,13 +213,11 @@ const Sidebar = () => {
   const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
 
-  // Memoize hasAccess function for stability
   const hasAccess = React.useCallback((requiredPrivileges?: string[]) => {
     if (!requiredPrivileges || requiredPrivileges.length === 0) return true;
     return requiredPrivileges.some(privilege => currentUserPrivileges.includes(privilege));
   }, [currentUserPrivileges]);
 
-  // Memoize accessibleNavItems to ensure consistent rendering logic
   const accessibleNavItems = React.useMemo(() => {
     return navItems.filter(item => {
       if (!hasAccess(item.requiredPrivileges)) {
@@ -228,7 +232,6 @@ const Sidebar = () => {
   }, [hasAccess]);
 
   React.useEffect(() => {
-    // Update collapsible states based on current path and accessible items
     const checkAndSetOpen = (headingName: string, setter: React.Dispatch<React.SetStateAction<boolean>>) => {
       const headingItem = accessibleNavItems.find(item => item.type === "heading" && item.name === headingName) as NavHeading | undefined;
       if (headingItem) {
@@ -264,7 +267,6 @@ const Sidebar = () => {
               let isOpen = false;
               let setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 
-              // Determine which state setter to use for the collapsible
               if (headingItem.name === "Reports") {
                 isOpen = isReportsOpen;
                 setIsOpen = setIsReportsOpen;
@@ -275,7 +277,6 @@ const Sidebar = () => {
                 isOpen = isSalesManagementOpen;
                 setIsOpen = setIsSalesManagementOpen;
               } else {
-                // Fallback for any other heading type
                 isOpen = false;
                 setIsOpen = () => {};
               }

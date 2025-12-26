@@ -35,6 +35,7 @@ export const allPrivilegeNames = [
   "Manage Reports Templates",
   "Perform Admin Actions",
   "Initialize Balances",
+  "Manage Funds Transfer", // New privilege
   "View My Contributions",
   "Access Admin Settings",
   "Manage User Profiles",
@@ -44,5 +45,5 @@ export const allPrivilegeNames = [
   "Manage Member Fields",
   "Manage Database Maintenance",
   "Manage Financial Accounts",
-  "Manage Header Customization", // New privilege
+  "Manage Header Customization",
 ];

@@ -10,9 +10,9 @@ import { AuthProvider } from "./context/AuthContext";
 import { BrandingProvider } from "./context/BrandingContext";
 import { UserRolesProvider } from "./context/UserRolesContext";
 import { ViewingMemberProvider } from "./context/ViewingMemberContext";
-import { SystemSettingsProvider } from "./context/SystemSettingsContext"; // New import
-import Login from "./pages/Login"; // Import the new Login page
-import ProtectedRoute from "./components/ProtectedRoute"; // Import ProtectedRoute
+import { SystemSettingsProvider } from "./context/SystemSettingsContext";
+import Login from "./pages/Login";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 // Placeholder pages
 import Projects from "./pages/Projects";
@@ -34,6 +34,7 @@ import MyContributions from "./pages/MyContributions";
 import MemberContributionsDetail from "./pages/MemberContributionsDetail";
 import ProjectFinancialsDetail from "./pages/ProjectFinancialsDetail";
 import TableBankingSummary from "./pages/TableBankingSummary";
+import TransferFunds from "./pages/TransferFunds"; // New import
 
 // Sales Management Pages
 import Stocks from "./pages/SalesManagement/Stocks";
@@ -52,10 +53,10 @@ const App = () => (
           <BrandingProvider>
             <UserRolesProvider>
               <ViewingMemberProvider>
-                <SystemSettingsProvider> {/* Wrap with SystemSettingsProvider */}
+                <SystemSettingsProvider>
                   <Routes>
-                    <Route path="/login" element={<Login />} /> {/* Public login route */}
-                    <Route element={<ProtectedRoute />}> {/* All routes inside here are protected */}
+                    <Route path="/login" element={<Login />} />
+                    <Route element={<ProtectedRoute />}>
                       <Route element={<Layout />}>
                         <Route path="/" element={<Index />} />
                         <Route path="/projects" element={<Projects />} />
@@ -85,6 +86,7 @@ const App = () => (
                         <Route path="/reports/deleted-projects" element={<DeletedProjectsReport />} />
                         
                         <Route path="/initialize-balances" element={<InitializeBalances />} />
+                        <Route path="/transfer-funds" element={<TransferFunds />} /> {/* New route */}
                         <Route path="/admin/settings" element={<AdminSettings />} />
                       </Route>
                     </Route>
