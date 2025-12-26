@@ -30,26 +30,35 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
-import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useSystemSettings } from "@/context/SystemSettingsContext";
 
-interface UserContribution {
+// Unified Transaction interface
+interface Transaction {
   id: string;
-  type: 'income' | 'expenditure' | 'petty_cash';
-  sourceOrPurpose: string;
-  date: Date;
+  type: 'income' | 'expenditure' | 'petty_cash' | 'pledge';
+  date: Date; // For sorting and calendar display
   amount: number;
-  accountName: string;
+  description: string; // sourceOrPurpose for financial, project_name for pledge
+  accountOrProjectName: string; // accountName for financial, project_name for pledge
+  status?: "Active" | "Paid" | "Overdue"; // Only for pledges
+  dueDate?: Date; // Only for pledges
 }
 
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
-const getContributionStatus = (type: UserContribution['type']): { text: string; variant: BadgeVariant } => {
+const getContributionStatus = (type: Transaction['type'], status?: Transaction['status']): { text: string; variant: BadgeVariant } => {
   if (type === 'income') {
     return { text: "Income", variant: "default" };
   } else if (type === 'expenditure') {
     return { text: "Expenditure", variant: "destructive" };
   } else if (type === 'petty_cash') {
     return { text: "Petty Cash", variant: "secondary" };
+  } else if (type === 'pledge') {
+    if (status === 'Paid') {
+      return { text: "Pledge (Paid)", variant: "default" };
+    } else if (status === 'Active' || status === 'Overdue') {
+      return { text: "Pledge (Pending)", variant: "destructive" };
+    }
   }
   return { text: "Unknown", variant: "outline" };
 };
@@ -83,16 +92,32 @@ interface PettyCashTxRow {
   financial_accounts: FinancialAccountName | null;
 }
 
+interface PledgeTxRow {
+  id: string;
+  due_date: string;
+  amount: number;
+  status: "Active" | "Paid" | "Overdue";
+  comments?: string;
+  projects: { name: string } | null;
+}
+
+interface UserProject {
+  id: string;
+  name: string;
+  member_contribution_amount: number | null;
+}
+
 const MyContributions: React.FC = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
-  const { currency } = useSystemSettings(); // Use currency from context
+  const { currency } = useSystemSettings();
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [myContributions, setMyContributions] = useState<UserContribution[]>([]);
+  const [myTransactions, setMyTransactions] = useState<Transaction[]>([]);
+  const [myProjects, setMyProjects] = useState<UserProject[]>([]); // State for user's projects
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,58 +141,100 @@ const MyContributions: React.FC = () => {
     const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
     const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
+    const allTransactions: Transaction[] = [];
+
+    // Fetch Income Transactions
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
-      .select('id, date, amount, source, financial_accounts(name)') as { data: IncomeTxRow[] | null, error: PostgrestError | null };
+      .select('id, date, amount, source, financial_accounts(name)')
+      .eq('profile_id', currentUser.id)
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString()) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
+    if (incomeError) console.error("Error fetching income transactions:", incomeError);
+    incomeData?.forEach(tx => allTransactions.push({
+      id: tx.id,
+      type: 'income',
+      date: parseISO(tx.date),
+      amount: tx.amount,
+      description: tx.source,
+      accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account'
+    }));
+
+    // Fetch Expenditure Transactions
     const { data: expenditureData, error: expenditureError } = await supabase
       .from('expenditure_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)') as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
+      .select('id, date, amount, purpose, financial_accounts(name)')
+      .eq('profile_id', currentUser.id)
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString()) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
 
+    if (expenditureError) console.error("Error fetching expenditure transactions:", expenditureError);
+    expenditureData?.forEach(tx => allTransactions.push({
+      id: tx.id,
+      type: 'expenditure',
+      date: parseISO(tx.date),
+      amount: tx.amount,
+      description: tx.purpose,
+      accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account'
+    }));
+
+    // Fetch Petty Cash Transactions
     const { data: pettyCashData, error: pettyCashError } = await supabase
       .from('petty_cash_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)') as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
+      .select('id, date, amount, purpose, financial_accounts(name)')
+      .eq('profile_id', currentUser.id)
+      .gte('date', startOfMonth.toISOString())
+      .lte('date', endOfMonth.toISOString()) as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
 
-    if (incomeError || expenditureError || pettyCashError) {
-      console.error("Error fetching contributions:", incomeError || expenditureError || pettyCashError);
-      setError("Failed to load your contributions.");
-      setMyContributions([]);
-    } else {
-      const allContributions: UserContribution[] = [];
+    if (pettyCashError) console.error("Error fetching petty cash transactions:", pettyCashError);
+    pettyCashData?.forEach(tx => allTransactions.push({
+      id: tx.id,
+      type: 'petty_cash',
+      date: parseISO(tx.date),
+      amount: tx.amount,
+      description: tx.purpose,
+      accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account'
+    }));
 
-      incomeData?.forEach(tx => allContributions.push({
-        id: tx.id,
-        type: 'income',
-        sourceOrPurpose: tx.source,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        accountName: tx.financial_accounts?.name || 'Unknown Account'
-      }));
+    // Fetch Project Pledges
+    const { data: pledgesData, error: pledgesError } = await supabase
+      .from('project_pledges')
+      .select('id, due_date, amount, status, comments, projects(name)')
+      .eq('member_id', currentUser.id)
+      .gte('due_date', startOfMonth.toISOString())
+      .lte('due_date', endOfMonth.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
 
-      expenditureData?.forEach(tx => allContributions.push({
-        id: tx.id,
-        type: 'expenditure',
-        sourceOrPurpose: tx.purpose,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        accountName: tx.financial_accounts?.name || 'Unknown Account'
-      }));
+    if (pledgesError) console.error("Error fetching pledges:", pledgesError);
+    pledgesData?.forEach(pledge => allTransactions.push({
+      id: pledge.id,
+      type: 'pledge',
+      date: parseISO(pledge.due_date), // Use due_date as the transaction date for pledges
+      amount: pledge.amount,
+      description: pledge.comments || pledge.projects?.name || 'Project Pledge',
+      accountOrProjectName: pledge.projects?.name || 'Unknown Project',
+      status: pledge.status,
+      dueDate: parseISO(pledge.due_date),
+    }));
 
-      pettyCashData?.forEach(tx => allContributions.push({
-        id: tx.id,
-        type: 'petty_cash',
-        sourceOrPurpose: tx.purpose,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        accountName: tx.financial_accounts?.name || 'Unknown Account'
-      }));
+    // Fetch user's projects for expected contributions
+    const { data: projectsData, error: projectsError } = await supabase
+      .from('projects')
+      .select('id, name, member_contribution_amount')
+      .eq('profile_id', currentUser.id)
+      .eq('status', 'Open'); // Only open projects
 
-      const filteredAndSorted = allContributions
-        .filter(c => c.sourceOrPurpose.toLowerCase().includes(searchQuery.toLowerCase()))
-        .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+    if (projectsError) console.error("Error fetching user projects:", projectsError);
+    setMyProjects(projectsData || []);
 
-      setMyContributions(filteredAndSorted);
-    }
+    const filteredAndSorted = allTransactions
+      .filter(t => 
+        t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.accountOrProjectName.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+
+    setMyTransactions(filteredAndSorted);
     setLoading(false);
   }, [currentUser, filterMonth, filterYear, searchQuery]);
 
@@ -177,26 +244,28 @@ const MyContributions: React.FC = () => {
     }
   }, [authLoading, fetchMyContributions]);
 
-  const totalIncome = myContributions.filter(c => c.type === 'income').reduce((sum, c) => sum + c.amount, 0);
-  const totalExpenditure = myContributions.filter(c => c.type === 'expenditure' || c.type === 'petty_cash').reduce((sum, c) => sum + c.amount, 0);
+  const totalIncome = myTransactions.filter(t => t.type === 'income' || (t.type === 'pledge' && t.status === 'Paid')).reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenditure = myTransactions.filter(t => t.type === 'expenditure' || t.type === 'petty_cash').reduce((sum, t) => sum + t.amount, 0);
+  const totalPaidPledges = myTransactions.filter(t => t.type === 'pledge' && t.status === 'Paid').reduce((sum, t) => sum + t.amount, 0);
+  const totalPendingPledges = myTransactions.filter(t => t.type === 'pledge' && (t.status === 'Active' || t.status === 'Overdue')).reduce((sum, t) => sum + t.amount, 0);
   const netBalance = totalIncome - totalExpenditure;
 
-  const myContributionsByDate = myContributions.reduce((acc, contribution) => {
-    const dateKey = format(contribution.date, "yyyy-MM-dd");
+  const transactionsByDate = myTransactions.reduce((acc, transaction) => {
+    const dateKey = format(transaction.date, "yyyy-MM-dd");
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
-    acc[dateKey].push(contribution);
+    acc[dateKey].push(transaction);
     return acc;
-  }, {} as Record<string, UserContribution[]>);
+  }, {} as Record<string, Transaction[]>);
 
   const renderDay = (day: Date) => {
     const dateKey = format(day, "yyyy-MM-dd");
-    const dayContributions = myContributionsByDate[dateKey];
+    const dayTransactions = transactionsByDate[dateKey];
     return (
       <div className="relative text-center">
         {day.getDate()}
-        {dayContributions && dayContributions.length > 0 && (
+        {dayTransactions && dayTransactions.length > 0 && (
           <div className="absolute bottom-0 left-0 right-0 flex justify-center">
             <span className="h-1 w-1 rounded-full bg-primary" />
           </div>
@@ -227,7 +296,7 @@ const MyContributions: React.FC = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">My Contributions</h1>
       <p className="text-lg text-muted-foreground">
-        View your personal financial activities.
+        View your personal financial activities and project pledges.
       </p>
 
       <Tabs defaultValue="my-contributions" className="w-full">
@@ -314,21 +383,48 @@ const MyContributions: React.FC = () => {
                     {currency.symbol}{netBalance.toFixed(2)}
                   </p>
                 </div>
+                
+                <div className="border-t pt-4 space-y-2">
+                  <h3 className="font-semibold text-lg">Pledge Summary</h3>
+                  <div className="flex justify-between items-center text-sm">
+                    <p className="text-muted-foreground">Total Paid Pledges:</p>
+                    <p className="font-bold text-primary">{currency.symbol}{totalPaidPledges.toFixed(2)}</p>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <p className="text-muted-foreground">Total Pending Pledges:</p>
+                    <p className="font-bold text-destructive">{currency.symbol}{totalPendingPledges.toFixed(2)}</p>
+                  </div>
+                </div>
 
-                {selectedDate && myContributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
-                  <div className="mt-6 space-y-2">
-                    <h3 className="font-semibold text-lg">Activity on {format(selectedDate, "PPP")}</h3>
-                    {myContributionsByDate[format(selectedDate, "yyyy-MM-dd")].map((c) => (
-                      <div key={c.id} className="flex justify-between items-center text-sm">
-                        <span>{c.sourceOrPurpose} ({c.accountName})</span>
-                        <Badge variant={getContributionStatus(c.type).variant}>
-                          {c.type === 'income' ? '+' : '-'}{currency.symbol}{c.amount.toFixed(2)}
-                        </Badge>
+                {myProjects.length > 0 && (
+                  <div className="border-t pt-4 space-y-2">
+                    <h3 className="font-semibold text-lg">Expected Project Contributions</h3>
+                    {myProjects.map(project => (
+                      <div key={project.id} className="flex justify-between items-center text-sm">
+                        <span>{project.name}:</span>
+                        <span className="font-medium">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                 )}
-                {selectedDate && !myContributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
+
+                {selectedDate && transactionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
+                  <div className="mt-6 space-y-2">
+                    <h3 className="font-semibold text-lg">Activity on {format(selectedDate, "PPP")}</h3>
+                    {transactionsByDate[format(selectedDate, "yyyy-MM-dd")].map((t) => {
+                      const status = getContributionStatus(t.type, t.status);
+                      return (
+                        <div key={t.id} className="flex justify-between items-center text-sm">
+                          <span>{t.description} ({t.accountOrProjectName})</span>
+                          <Badge variant={status.variant}>
+                            {t.type === 'income' || (t.type === 'pledge' && t.status === 'Paid') ? '+' : '-'}{currency.symbol}{t.amount.toFixed(2)}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {selectedDate && !transactionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
                   <p className="text-muted-foreground text-sm mt-6">No activity on {format(selectedDate, "PPP")}.</p>
                 )}
               </CardContent>
@@ -392,30 +488,34 @@ const MyContributions: React.FC = () => {
                   </div>
                 </div>
 
-              {myContributions.length > 0 ? (
+              {myTransactions.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead>Account</TableHead>
+                      <TableHead>Account/Project</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Due Date</TableHead> {/* New column for pledges */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {myContributions.map((contribution) => {
-                      const status = getContributionStatus(contribution.type);
+                    {myTransactions.map((transaction) => {
+                      const status = getContributionStatus(transaction.type, transaction.status);
                       return (
-                        <TableRow key={contribution.id}>
-                          <TableCell>{format(contribution.date, "MMM dd, yyyy")}</TableCell>
+                        <TableRow key={transaction.id}>
+                          <TableCell>{format(transaction.date, "MMM dd, yyyy")}</TableCell>
                           <TableCell>
                             <Badge variant={status.variant}>{status.text}</Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{contribution.sourceOrPurpose}</TableCell>
-                          <TableCell>{contribution.accountName}</TableCell>
+                          <TableCell className="font-medium">{transaction.description}</TableCell>
+                          <TableCell>{transaction.accountOrProjectName}</TableCell>
                           <TableCell className="text-right">
-                            {contribution.type === 'income' ? '+' : '-'}{currency.symbol}{contribution.amount.toFixed(2)}
+                            {transaction.type === 'income' || (transaction.type === 'pledge' && transaction.status === 'Paid') ? '+' : '-'}{currency.symbol}{transaction.amount.toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            {transaction.dueDate ? format(transaction.dueDate, "MMM dd, yyyy") : '-'}
                           </TableCell>
                         </TableRow>
                       );
