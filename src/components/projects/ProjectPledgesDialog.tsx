@@ -47,6 +47,7 @@ import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog"
 interface ProjectPledge {
   id: string;
   member_id: string;
+  project_id: string; // Added project_id
   member_name: string;
   amount: number;
   due_date: Date;
@@ -156,6 +157,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
       setPledges((data || []).map(p => ({
         id: p.id,
         member_id: p.member_id,
+        project_id: projectId, // Explicitly add project_id here
         member_name: p.profiles?.name || 'Unknown Member',
         amount: p.amount,
         due_date: parseISO(p.due_date),

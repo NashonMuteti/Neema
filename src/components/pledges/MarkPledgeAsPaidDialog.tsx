@@ -22,6 +22,7 @@ import {
 import { CheckCircle, DollarSign } from "lucide-react";
 import { showError } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
+import { Label } from "@/components/ui/label"; // Added this import
 
 interface Member {
   id: string;
