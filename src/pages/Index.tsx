@@ -234,6 +234,20 @@ const Index = () => {
     }
 
     try {
+      // First, fetch the count of active members
+      let activeMembersCount = 0;
+      const { count: membersCount, error: membersCountError } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'Active');
+
+      if (membersCountError) {
+        console.error("Error fetching active members count:", membersCountError);
+        // Proceed with 0 active members if there's an error
+      } else {
+        activeMembersCount = membersCount || 0;
+      }
+
       let projectsQuery = supabase
         .from('projects')
         .select('id, name, member_contribution_amount')
@@ -254,9 +268,8 @@ const Index = () => {
 
       const projectContributions: ProjectContributionData[] = [];
       for (const project of projectsData || []) {
-        const expected = project.member_contribution_amount || 0; // Assuming this is the expected per member, or total
-        // For simplicity, let's assume member_contribution_amount is the *total* expected for the project
-        // If it's per member, we'd need to fetch member count for the project.
+        // Corrected: Multiply member_contribution_amount by activeMembersCount for total expected
+        const expected = (project.member_contribution_amount || 0) * activeMembersCount; 
 
         let collectionsQuery = supabase
           .from('project_collections')
