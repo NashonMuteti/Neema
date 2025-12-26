@@ -164,12 +164,13 @@ const FinancialAccountsSettings = () => {
       return;
     }
 
-    // Update account details
+    // Update account details, including current_balance to match the new initial_balance
     const { error: accountUpdateError } = await supabase
       .from('financial_accounts')
       .update({
         name: editAccountName.trim(),
         initial_balance: initialBalance,
+        current_balance: initialBalance, // Update current balance to reflect new initial balance
       })
       .eq('id', editingAccount.id)
       .eq('profile_id', currentUser.id); // Ensure user owns the account
