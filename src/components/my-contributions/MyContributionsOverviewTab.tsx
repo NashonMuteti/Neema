@@ -32,7 +32,6 @@ interface MyContributionsOverviewTabProps {
   months: MonthYearOption[];
   years: MonthYearOption[];
   transactionsByDate: Record<string, Transaction[]>;
-  // Removed totalIncome, totalExpenditure, netBalance
   totalPaidPledges: number;
   totalPendingPledges: number;
   myProjects: UserProject[];
@@ -50,7 +49,6 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   months,
   years,
   transactionsByDate,
-  // Removed totalIncome, totalExpenditure, netBalance
   totalPaidPledges,
   totalPendingPledges,
   myProjects,
@@ -150,10 +148,8 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
             <CardTitle>Summary for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Net Balance removed */}
-            
             {/* Pledge Summary */}
-            <div className="space-y-2"> {/* Removed border-t pt-4 as it's now the first section */}
+            <div className="space-y-2">
               <h3 className="font-semibold text-lg">Pledge Summary</h3>
               <div className="flex justify-between items-center text-sm">
                 <p className="text-muted-foreground">Total Paid Pledges:</p>

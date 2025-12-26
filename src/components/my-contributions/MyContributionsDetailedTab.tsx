@@ -99,9 +99,10 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
               </Select>
             </div>
             <div className="relative flex items-center">
+              {/* Updated placeholder */}
               <Input
                 type="text"
-                placeholder="Search pledge..." {/* Updated placeholder */}
+                placeholder="Search pledge..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-8"
