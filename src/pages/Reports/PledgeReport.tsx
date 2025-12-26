@@ -220,21 +220,42 @@ const PledgeReport = () => {
     }).sort((a, b) => b.due_date.getTime() - a.due_date.getTime()); // Sort by due date descending
   }, [pledges, filterStatus]);
 
-  const handleMarkAsPaid = async (id: string, memberName: string, amount: number) => {
+  const handleMarkAsPaid = async (id: string, receivedIntoAccountId: string, paymentMethod: string) => {
     if (!canManagePledges) {
       showError("You do not have permission to mark pledges as paid.");
       return;
     }
-    const { error: updateError } = await supabase
-      .from('project_pledges')
-      .update({ status: "Paid" })
-      .eq('id', id);
+    if (!currentUser) {
+      showError("You must be logged in to mark pledges as paid.");
+      return;
+    }
 
-    if (updateError) {
-      console.error("Error marking pledge as paid:", updateError);
-      showError("Failed to mark pledge as paid.");
+    const pledgeToMark = pledges.find(p => p.id === id);
+    if (!pledgeToMark) {
+      showError("Pledge not found.");
+      return;
+    }
+
+    // Use the atomic transfer function for marking as paid
+    const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
+      p_source_account_id: null,
+      p_destination_account_id: receivedIntoAccountId,
+      p_amount: pledgeToMark.amount,
+      p_profile_id: currentUser.id,
+      p_purpose: `Pledge Payment for Project: ${pledgeToMark.project_name}`,
+      p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
+      p_is_transfer: false,
+      p_project_id: pledgeToMark.project_id,
+      p_member_id: pledgeToMark.member_id,
+      p_payment_method: paymentMethod,
+      p_pledge_id: id, // Pass pledge ID to update its status
+    });
+
+    if (transactionError) {
+      console.error("Error marking pledge as paid and updating balance:", transactionError);
+      showError(`Failed to update pledge: ${transactionError.message}`);
     } else {
-      showSuccess(`Payment initiated for ${memberName}'s pledge of ${currency.symbol}${amount.toFixed(2)}.`);
+      showSuccess(`Pledge payment of ${currency.symbol}${pledgeToMark.amount.toFixed(2)} recorded successfully!`);
       fetchReportData(); // Re-fetch all data to update lists
     }
   };
@@ -250,18 +271,45 @@ const PledgeReport = () => {
       showError("You do not have permission to delete pledges.");
       return;
     }
-    const { error: deleteError } = await supabase
-      .from('project_pledges')
-      .delete()
-      .eq('id', id);
-
-    if (deleteError) {
-      console.error("Error deleting pledge:", deleteError);
-      showError("Failed to delete pledge.");
-    } else {
-      showSuccess("Pledge deleted successfully!");
-      fetchReportData(); // Re-fetch all data to update lists
+    if (!currentUser) {
+      showError("You must be logged in to delete pledges.");
+      return;
     }
+
+    const pledgeToDelete = pledges.find(p => p.id === id);
+    if (!pledgeToDelete) {
+      showError("Pledge not found.");
+      return;
+    }
+
+    if (pledgeToDelete.status === "Paid") {
+      // Use the atomic reversal function for paid pledges
+      const { error: rpcError } = await supabase.rpc('reverse_paid_pledge_atomic', {
+        p_pledge_id: id,
+        p_profile_id: currentUser.id,
+      });
+
+      if (rpcError) {
+        console.error("Error reversing paid pledge:", rpcError);
+        showError(`Failed to delete paid pledge: ${rpcError.message}`);
+        return;
+      }
+    } else {
+      // For unpaid pledges, proceed with direct deletion
+      const { error: deleteError } = await supabase
+        .from('project_pledges')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error("Error deleting pledge:", deleteError);
+        showError("Failed to delete pledge.");
+        return;
+      }
+    }
+
+    showSuccess("Pledge deleted successfully!");
+    fetchReportData(); // Re-fetch all data to update lists
   };
 
   const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
@@ -395,9 +443,12 @@ const PledgeReport = () => {
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
                             {displayStatus !== "Paid" && (
-                              <Button variant="outline" size="icon" onClick={() => handleMarkAsPaid(pledge.id, memberName || "Unknown Member", pledge.amount)}>
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              </Button>
+                              <MarkPledgeAsPaidDialog
+                                pledge={pledge}
+                                onConfirmPayment={handleMarkAsPaid}
+                                financialAccounts={financialAccounts}
+                                canManagePledges={canManagePledges}
+                              />
                             )}
                             <EditPledgeDialog
                               initialData={pledge as EditPledgeDialogPledge}

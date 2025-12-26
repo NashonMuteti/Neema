@@ -251,18 +251,45 @@ const Pledges = () => {
       showError("You do not have permission to delete pledges.");
       return;
     }
-    const { error: deleteError } = await supabase
-      .from('project_pledges')
-      .delete()
-      .eq('id', id);
-
-    if (deleteError) {
-      console.error("Error deleting pledge:", deleteError);
-      showError("Failed to delete pledge.");
-    } else {
-      showSuccess("Pledge deleted successfully!");
-      fetchInitialData();
+    if (!currentUser) {
+      showError("You must be logged in to delete pledges.");
+      return;
     }
+
+    const pledgeToDelete = pledges.find(p => p.id === id);
+    if (!pledgeToDelete) {
+      showError("Pledge not found.");
+      return;
+    }
+
+    if (pledgeToDelete.status === "Paid") {
+      // Use the atomic reversal function for paid pledges
+      const { error: rpcError } = await supabase.rpc('reverse_paid_pledge_atomic', {
+        p_pledge_id: id,
+        p_profile_id: currentUser.id,
+      });
+
+      if (rpcError) {
+        console.error("Error reversing paid pledge:", rpcError);
+        showError(`Failed to delete paid pledge: ${rpcError.message}`);
+        return;
+      }
+    } else {
+      // For unpaid pledges, proceed with direct deletion
+      const { error: deleteError } = await supabase
+        .from('project_pledges')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error("Error deleting pledge:", deleteError);
+        showError("Failed to delete pledge.");
+        return;
+      }
+    }
+
+    showSuccess("Pledge deleted successfully!");
+    fetchInitialData();
   };
 
   const handleMarkAsPaid = async (pledgeId: string, receivedIntoAccountId: string, paymentMethod: string) => {
