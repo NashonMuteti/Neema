@@ -30,6 +30,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface CollectionsDialogProps {
   projectId: string;
@@ -41,6 +42,12 @@ interface Member {
   id: string;
   name: string;
   email: string;
+}
+
+interface FinancialAccount {
+  id: string;
+  name: string;
+  current_balance: number;
 }
 
 const paymentMethods = [
@@ -57,6 +64,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
 
   const { canManageProjects } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -73,36 +81,62 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
   const [amount, setAmount] = React.useState("");
   const [selectedMember, setSelectedMember] = React.useState<string | undefined>(undefined);
   const [paymentMethod, setPaymentMethod] = React.useState<string | undefined>(undefined);
+  const [receivedIntoAccount, setReceivedIntoAccount] = React.useState<string | undefined>(undefined); // New state for financial account
   const [members, setMembers] = React.useState<Member[]>([]);
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]); // New state for financial accounts
   const [loadingMembers, setLoadingMembers] = React.useState(true);
+  const [loadingAccounts, setLoadingAccounts] = React.useState(true);
 
   React.useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchMembersAndAccounts = async () => {
       setLoadingMembers(true);
-      const { data, error } = await supabase
+      setLoadingAccounts(true);
+
+      // Fetch members
+      const { data: membersData, error: membersError } = await supabase
         .from('profiles')
         .select('id, name, email')
         .order('name', { ascending: true });
 
-      if (error) {
-        console.error("Error fetching members:", error);
+      if (membersError) {
+        console.error("Error fetching members:", membersError);
         showError("Failed to load members for collection.");
       } else {
-        setMembers(data || []);
-        if (data && data.length > 0 && !selectedMember) {
-          setSelectedMember(data[0].id); // Default to first member
+        setMembers(membersData || []);
+        if (membersData && membersData.length > 0 && !selectedMember) {
+          setSelectedMember(membersData[0].id); // Default to first member
         }
       }
       setLoadingMembers(false);
+
+      // Fetch financial accounts for the current user
+      if (currentUser) {
+        const { data: accountsData, error: accountsError } = await supabase
+          .from('financial_accounts')
+          .select('id, name, current_balance')
+          .eq('profile_id', currentUser.id)
+          .order('name', { ascending: true });
+
+        if (accountsError) {
+          console.error("Error fetching financial accounts:", accountsError);
+          showError("Failed to load financial accounts for collection.");
+        } else {
+          setFinancialAccounts(accountsData || []);
+          if (accountsData && accountsData.length > 0 && !receivedIntoAccount) {
+            setReceivedIntoAccount(accountsData[0].id); // Default to first account
+          }
+        }
+      }
+      setLoadingAccounts(false);
     };
 
     if (isOpen) {
-      fetchMembers();
+      fetchMembersAndAccounts();
     }
-  }, [isOpen, selectedMember]);
+  }, [isOpen, selectedMember, receivedIntoAccount, currentUser]);
 
   const handleSubmit = async () => {
-    if (!collectionDate || !amount || !selectedMember || !paymentMethod) {
+    if (!collectionDate || !amount || !selectedMember || !paymentMethod || !receivedIntoAccount) {
       showError("All fields are required.");
       return;
     }
@@ -113,21 +147,25 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
       return;
     }
 
-    const { error } = await supabase
-      .from('project_collections')
-      .insert({
-        project_id: projectId,
-        member_id: selectedMember,
-        amount: parsedAmount,
-        date: collectionDate.toISOString(),
-        payment_method: paymentMethod,
-      });
+    // Start a transaction for atomicity
+    const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
+      p_source_account_id: null, // No source account for collections
+      p_destination_account_id: receivedIntoAccount,
+      p_amount: parsedAmount,
+      p_profile_id: currentUser?.id,
+      p_purpose: `Project Collection: ${projectName}`,
+      p_source: `Project Collection: ${projectName}`,
+      p_is_transfer: false, // Not a transfer, it's a direct income
+      p_project_id: projectId,
+      p_member_id: selectedMember,
+      p_payment_method: paymentMethod,
+    });
 
-    if (error) {
-      console.error("Error adding collection:", error);
-      showError("Failed to add collection.");
+    if (transactionError) {
+      console.error("Error adding collection and updating balance:", transactionError);
+      showError(`Failed to add collection: ${transactionError.message}`);
     } else {
-      showSuccess("Collection added successfully!");
+      showSuccess("Collection added and account balance updated successfully!");
       onCollectionAdded();
       setIsOpen(false);
       // Reset form
@@ -135,6 +173,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
       setAmount("");
       setSelectedMember(members.length > 0 ? members[0].id : undefined);
       setPaymentMethod(undefined);
+      setReceivedIntoAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
     }
   };
 
@@ -231,9 +270,30 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="received-into-account">Received Into Account</Label>
+            <Select value={receivedIntoAccount} onValueChange={setReceivedIntoAccount} disabled={!canManageProjects || loadingAccounts || financialAccounts.length === 0}>
+              <SelectTrigger id="received-into-account">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Financial Accounts</SelectLabel>
+                  {financialAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {loadingAccounts && <p className="text-sm text-muted-foreground">Loading accounts...</p>}
+            {!loadingAccounts && financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
+          </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManageProjects || !collectionDate || !amount || !selectedMember || !paymentMethod}>
+          <Button onClick={handleSubmit} disabled={!canManageProjects || !collectionDate || !amount || !selectedMember || !paymentMethod || !receivedIntoAccount || financialAccounts.length === 0}>
             Add Collection
           </Button>
         </div>

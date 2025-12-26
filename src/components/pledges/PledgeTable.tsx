@@ -39,6 +39,12 @@ interface Project { // Define Project interface for EditPledgeDialog
   name: string;
 }
 
+interface FinancialAccount { // Define FinancialAccount interface for EditPledgeDialog
+  id: string;
+  name: string;
+  current_balance: number;
+}
+
 interface PledgeTableProps {
   pledges: Pledge[];
   canManagePledges: boolean;
@@ -47,12 +53,13 @@ interface PledgeTableProps {
   onDeletePledge: (id: string) => void;
   members: Member[]; // Pass members to the dialog
   projects: Project[]; // Pass projects to the dialog
+  financialAccounts: FinancialAccount[]; // New prop: Pass financial accounts to the dialog
 }
 
 // Helper to determine display status
 const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
   if (pledge.status === "Paid") return "Paid";
-  return "Unpaid"; // Active is now considered Unpaid
+  return "Unpaid"; // Active/Overdue now red for Unpaid
 };
 
 const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
@@ -74,6 +81,7 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
   onDeletePledge,
   members,
   projects,
+  financialAccounts, // Destructure new prop
 }) => {
   const { currency } = useSystemSettings();
 
@@ -120,6 +128,7 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
                           onSave={onEditPledge}
                           members={members}
                           projects={projects}
+                          financialAccounts={financialAccounts} // Pass financial accounts
                         />
                         <Button variant="ghost" size="icon" onClick={() => onDeletePledge(pledge.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />

@@ -41,6 +41,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface ProjectPledge {
   id: string;
@@ -61,6 +62,12 @@ interface Member {
   id: string;
   name: string;
   email: string;
+}
+
+interface FinancialAccount {
+  id: string;
+  name: string;
+  current_balance: number;
 }
 
 // Define the expected structure of a pledge row with joined profile data
@@ -86,6 +93,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -107,7 +115,10 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
   const [newPledgeMember, setNewPledgeMember] = React.useState<string | undefined>(undefined);
   const [newPledgeDueDate, setNewPledgeDueDate] = React.useState<Date | undefined>(new Date());
   const [members, setMembers] = React.useState<Member[]>([]);
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]); // New state for financial accounts
   const [loadingMembers, setLoadingMembers] = React.useState(true);
+  const [loadingAccounts, setLoadingAccounts] = React.useState(true);
+  const [paidIntoAccount, setPaidIntoAccount] = React.useState<string | undefined>(undefined); // New state for account when marking paid
 
   const fetchPledges = React.useCallback(async () => {
     setLoadingPledges(true);
@@ -142,31 +153,54 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     setLoadingPledges(false);
   }, [projectId]);
 
-  const fetchMembers = React.useCallback(async () => {
+  const fetchMembersAndAccounts = React.useCallback(async () => {
     setLoadingMembers(true);
-    const { data, error } = await supabase
+    setLoadingAccounts(true);
+
+    // Fetch members
+    const { data: membersData, error: membersError } = await supabase
       .from('profiles')
       .select('id, name, email')
       .order('name', { ascending: true });
 
-    if (error) {
-      console.error("Error fetching members:", error);
+    if (membersError) {
+      console.error("Error fetching members:", membersError);
       showError("Failed to load members for pledges.");
     } else {
-      setMembers(data || []);
-      if (data && data.length > 0 && !newPledgeMember) {
-        setNewPledgeMember(data[0].id); // Default to first member
+      setMembers(membersData || []);
+      if (membersData && membersData.length > 0 && !newPledgeMember) {
+        setNewPledgeMember(membersData[0].id); // Default to first member
       }
     }
     setLoadingMembers(false);
-  }, [newPledgeMember]);
+
+    // Fetch financial accounts for the current user
+    if (currentUser) {
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('financial_accounts')
+        .select('id, name, current_balance')
+        .eq('profile_id', currentUser.id)
+        .order('name', { ascending: true });
+
+      if (accountsError) {
+        console.error("Error fetching financial accounts:", accountsError);
+        showError("Failed to load financial accounts for pledges.");
+      } else {
+        setFinancialAccounts(accountsData || []);
+        if (accountsData && accountsData.length > 0 && !paidIntoAccount) {
+          setPaidIntoAccount(accountsData[0].id); // Default to first account
+        }
+      }
+    }
+    setLoadingAccounts(false);
+  }, [newPledgeMember, paidIntoAccount, currentUser]);
 
   React.useEffect(() => {
     if (isOpen) {
       fetchPledges();
-      fetchMembers();
+      fetchMembersAndAccounts();
     }
-  }, [isOpen, fetchPledges, fetchMembers]);
+  }, [isOpen, fetchPledges, fetchMembersAndAccounts]);
 
   const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
     switch (displayStatus) {
@@ -179,22 +213,36 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     }
   };
 
-  const handleUpdatePledgeStatus = async (pledgeId: string, newStatus: ProjectPledge['status']) => {
+  const handleMarkPledgeAsPaid = async (pledge: ProjectPledge) => {
     if (!canManagePledges) {
       showError("You do not have permission to update pledge status.");
       return;
     }
+    if (!paidIntoAccount) {
+      showError("Please select an account where the pledge was received.");
+      return;
+    }
 
-    const { error } = await supabase
-      .from('project_pledges')
-      .update({ status: newStatus })
-      .eq('id', pledgeId);
+    // Use the atomic transfer function for marking as paid
+    const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
+      p_source_account_id: null, // No source account for pledges
+      p_destination_account_id: paidIntoAccount,
+      p_amount: pledge.amount,
+      p_profile_id: currentUser?.id,
+      p_purpose: `Pledge Payment for Project: ${projectName}`,
+      p_source: `Pledge Payment from Member: ${pledge.member_name}`,
+      p_is_transfer: false, // Not a transfer, it's a direct income
+      p_project_id: projectId,
+      p_member_id: pledge.member_id,
+      p_payment_method: 'N/A', // Payment method is not tracked for pledges in this context
+      p_pledge_id: pledge.id, // Pass pledge ID to update its status
+    });
 
-    if (error) {
-      console.error("Error updating pledge status:", error);
-      showError("Failed to update pledge status.");
+    if (transactionError) {
+      console.error("Error marking pledge as paid and updating balance:", transactionError);
+      showError(`Failed to update pledge: ${transactionError.message}`);
     } else {
-      showSuccess("Pledge status updated successfully!");
+      showSuccess("Pledge marked as paid and account balance updated successfully!");
       fetchPledges();
       onPledgesUpdated(); // Notify parent to refresh financials
     }
@@ -317,6 +365,26 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
 
           {/* Existing Pledges Table */}
           <h3 className="text-lg font-semibold">Existing Pledges</h3>
+          <div className="grid gap-1.5 mb-4">
+            <Label htmlFor="paid-into-account">Pledge Payments Received Into</Label>
+            <Select value={paidIntoAccount} onValueChange={setPaidIntoAccount} disabled={!canManagePledges || loadingAccounts || financialAccounts.length === 0}>
+              <SelectTrigger id="paid-into-account">
+                <SelectValue placeholder="Select account for payments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Financial Accounts</SelectLabel>
+                  {financialAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {loadingAccounts && <p className="text-sm text-muted-foreground">Loading accounts...</p>}
+            {!loadingAccounts && financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
+          </div>
           {loadingPledges ? (
             <p className="text-muted-foreground">Loading pledges...</p>
           ) : error ? (
@@ -338,7 +406,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
                   return (
                     <TableRow key={pledge.id}>
                       <TableCell className="font-medium">{pledge.member_name}</TableCell>
-                      <TableCell>${pledge.amount.toFixed(2)}</TableCell>
+                      <TableCell>{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
                       <TableCell>{format(pledge.due_date, "PPP")}</TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClasses(displayStatus)}>
@@ -352,8 +420,9 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleUpdatePledgeStatus(pledge.id, "Paid")}
+                                onClick={() => handleMarkPledgeAsPaid(pledge)}
                                 title="Mark as Paid"
+                                disabled={!paidIntoAccount}
                               >
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               </Button>

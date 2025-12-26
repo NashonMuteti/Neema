@@ -12,6 +12,7 @@ import PledgeForm from "@/components/pledges/PledgeForm";
 import PledgeFilters from "@/components/pledges/PledgeFilters";
 import PledgeTable from "@/components/pledges/PledgeTable";
 import { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import Pledge type from dialog
+import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface Member {
   id: string;
@@ -22,6 +23,12 @@ interface Member {
 interface Project {
   id: string;
   name: string;
+}
+
+interface FinancialAccount {
+  id: string;
+  name: string;
+  current_balance: number;
 }
 
 interface Pledge {
@@ -44,7 +51,7 @@ interface PledgeRowWithJoinedData {
   amount: number;
   due_date: string; // ISO string from DB
   status: "Active" | "Paid"; // Updated: Removed "Overdue"
-  profiles: { name: string } | null; // Joined profile data
+  profiles: { name: string; email: string } | null; // Joined profile data, added email
   projects: { name: string } | null; // Joined project data
   comments?: string; // Added comments
 }
@@ -52,6 +59,7 @@ interface PledgeRowWithJoinedData {
 const Pledges = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { currency } = useSystemSettings(); // Use currency from context
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -66,9 +74,11 @@ const Pledges = () => {
   // Data states
   const [members, setMembers] = React.useState<Member[]>([]);
   const [projects, setProjects] = React.useState<Project[]>([]);
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]); // New state for financial accounts
   const [pledges, setPledges] = React.useState<Pledge[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [paidIntoAccount, setPaidIntoAccount] = React.useState<string | undefined>(undefined); // New state for account when marking paid
 
   // Filter State
   const currentYear = getYear(new Date());
@@ -107,6 +117,26 @@ const Pledges = () => {
       .select('id, name')
       .order('name', { ascending: true });
 
+    // Fetch financial accounts for the current user
+    let financialAccountsData: FinancialAccount[] = [];
+    if (currentUser) {
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('financial_accounts')
+        .select('id, name, current_balance')
+        .eq('profile_id', currentUser.id)
+        .order('name', { ascending: true });
+
+      if (accountsError) {
+        console.error("Error fetching financial accounts:", accountsError);
+        showError("Failed to load financial accounts.");
+      } else {
+        financialAccountsData = accountsData || [];
+        if (financialAccountsData.length > 0 && !paidIntoAccount) {
+          setPaidIntoAccount(financialAccountsData[0].id); // Default to first account
+        }
+      }
+    }
+
     if (membersError) {
       console.error("Error fetching members:", membersError);
       setError("Failed to load members.");
@@ -122,6 +152,7 @@ const Pledges = () => {
       const uniqueProjects = Array.from(new Map((projectsData || []).map(p => [p.id, p])).values());
       setProjects(uniqueProjects);
     }
+    setFinancialAccounts(financialAccountsData);
 
     // Fetch pledges based on filters
     const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
@@ -137,7 +168,7 @@ const Pledges = () => {
         due_date,
         status,
         comments,
-        profiles ( name ),
+        profiles ( name, email ),
         projects ( name )
       `)
       .gte('due_date', startOfMonth.toISOString())
@@ -181,7 +212,7 @@ const Pledges = () => {
       setPledges(filteredBySearch);
     }
     setLoading(false);
-  }, [filterMonth, filterYear, filterStatus, searchQuery]);
+  }, [filterMonth, filterYear, filterStatus, searchQuery, currentUser, paidIntoAccount]);
 
   React.useEffect(() => {
     fetchInitialData();
@@ -249,16 +280,31 @@ const Pledges = () => {
       showError("You do not have permission to mark pledges as paid.");
       return;
     }
-    const { error: updateError } = await supabase
-      .from('project_pledges')
-      .update({ status: "Paid" })
-      .eq('id', id);
+    if (!paidIntoAccount) {
+      showError("Please select an account where the pledge was received.");
+      return;
+    }
 
-    if (updateError) {
-      console.error("Error marking pledge as paid:", updateError);
-      showError("Failed to mark pledge as paid.");
+    // Use the atomic transfer function for marking as paid
+    const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
+      p_source_account_id: null, // No source account for pledges
+      p_destination_account_id: paidIntoAccount,
+      p_amount: amount,
+      p_profile_id: currentUser?.id,
+      p_purpose: `Pledge Payment from Member: ${memberName}`,
+      p_source: `Pledge Payment from Member: ${memberName}`,
+      p_is_transfer: false, // Not a transfer, it's a direct income
+      p_project_id: null, // Not directly tied to a project collection
+      p_member_id: null, // Not directly tied to a project collection
+      p_payment_method: 'N/A', // Payment method is not tracked for pledges in this context
+      p_pledge_id: id, // Pass pledge ID to update its status
+    });
+
+    if (transactionError) {
+      console.error("Error marking pledge as paid and updating balance:", transactionError);
+      showError(`Failed to mark pledge as paid: ${transactionError.message}`);
     } else {
-      showSuccess(`Payment initiated for ${memberName}'s pledge of $${amount.toFixed(2)}.`);
+      showSuccess(`Payment initiated for ${memberName}'s pledge of ${currency.symbol}${amount.toFixed(2)}.`);
       fetchInitialData(); // Re-fetch all data to update lists
     }
   };
@@ -315,6 +361,25 @@ const Pledges = () => {
               months={months}
               years={years}
             />
+            <div className="grid gap-1.5 mb-4">
+              <Label htmlFor="paid-into-account-filter">Pledge Payments Received Into</Label>
+              <Select value={paidIntoAccount} onValueChange={setPaidIntoAccount} disabled={!canManagePledges || financialAccounts.length === 0}>
+                <SelectTrigger id="paid-into-account-filter">
+                  <SelectValue placeholder="Select account for payments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Financial Accounts</SelectLabel>
+                    {financialAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
+            </div>
 
             <PledgeTable
               pledges={pledges}
@@ -324,6 +389,7 @@ const Pledges = () => {
               onDeletePledge={handleDeletePledge}
               members={members}
               projects={projects}
+              financialAccounts={financialAccounts} // Pass financial accounts
             />
           </CardContent>
         </Card>

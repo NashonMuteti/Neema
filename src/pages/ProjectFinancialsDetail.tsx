@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { useProjectFinancials } from "@/hooks/use-project-financials"; // Import the new hook and types
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { showError } from "@/utils/toast"; // Import showError
 
 interface Project {
   id: string;
@@ -29,6 +31,12 @@ interface Project {
   dueDate?: Date;
   memberContributionAmount?: number;
   profile_id: string; // Changed from user_id to profile_id
+}
+
+interface FinancialAccount {
+  id: string;
+  name: string;
+  current_balance: number;
 }
 
 // Use the exported types from the hook
@@ -55,9 +63,12 @@ const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
 const ProjectFinancialsDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const { currency } = useSystemSettings(); // Use currency from context
+  const { currentUser } = useAuth(); // Use currentUser to fetch financial accounts
   const [projectDetails, setProjectDetails] = useState<Project | null>(null);
   const [loadingProjectDetails, setLoadingProjectDetails] = useState(true);
   const [projectDetailsError, setProjectDetailsError] = useState<string | null>(null);
+  const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]); // New state for financial accounts
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
 
   const { financialSummary, loading: financialsLoading, error: financialsError, refreshFinancials } = useProjectFinancials(projectId || "");
 
@@ -93,10 +104,34 @@ const ProjectFinancialsDetail: React.FC = () => {
       }
       setLoadingProjectDetails(false);
     };
-    fetchProjectDetails();
-  }, [projectId]);
 
-  if (loadingProjectDetails || financialsLoading) {
+    const fetchFinancialAccounts = async () => {
+      setLoadingAccounts(true);
+      if (!currentUser) {
+        setLoadingAccounts(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('financial_accounts')
+        .select('id, name, current_balance')
+        .eq('profile_id', currentUser.id)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error("Error fetching financial accounts:", error);
+        showError("Failed to load financial accounts.");
+        setFinancialAccounts([]);
+      } else {
+        setFinancialAccounts(data || []);
+      }
+      setLoadingAccounts(false);
+    };
+
+    fetchProjectDetails();
+    fetchFinancialAccounts();
+  }, [projectId, currentUser]);
+
+  if (loadingProjectDetails || financialsLoading || loadingAccounts) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Loading Project Financials...</h1>
