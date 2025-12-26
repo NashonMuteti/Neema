@@ -33,7 +33,7 @@ export const useFinancialData = () => {
     }
 
     try {
-      let incomeQuery = supabase.from('income_transactions').select('date, amount, source');
+      let incomeQuery = supabase.from('income_transactions').select('date,amount,source');
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
@@ -43,7 +43,7 @@ export const useFinancialData = () => {
 
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
 
-      let expenditureQuery = supabase.from('expenditure_transactions').select('date, amount, purpose');
+      let expenditureQuery = supabase.from('expenditure_transactions').select('date,amount,purpose');
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }

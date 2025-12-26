@@ -35,6 +35,11 @@ import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "@/components
 // Add interfaces for fetched data
 interface Member { id: string; name: string; email: string; } // Added email for dialog
 interface Project { id: string; name: string; }
+interface FinancialAccount {
+  id: string;
+  name: string;
+  current_balance: number;
+}
 interface Pledge {
   id: string;
   member_id: string;
@@ -77,6 +82,7 @@ const PledgeReport = () => {
 
   const [members, setMembers] = React.useState<Member[]>([]);
   const [projects, setProjects] = React.useState<Project[]>([]);
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]); // New state for financial accounts
   const [pledges, setPledges] = React.useState<Pledge[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -117,6 +123,25 @@ const PledgeReport = () => {
       .from('projects')
       .select('id, name')
       .order('name', { ascending: true });
+
+    // Fetch financial accounts for the current user
+    let financialAccountsData: FinancialAccount[] = [];
+    if (currentUser) {
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('financial_accounts')
+        .select('id, name, current_balance')
+        .eq('profile_id', currentUser.id)
+        .order('name', { ascending: true });
+
+      if (accountsError) {
+        console.error("Error fetching financial accounts:", accountsError);
+        showError("Failed to load financial accounts.");
+      } else {
+        financialAccountsData = accountsData || [];
+      }
+    }
+    setFinancialAccounts(financialAccountsData);
+
 
     if (membersError) { console.error("Error fetching members:", membersError); setError("Failed to load members."); }
     else { setMembers(membersData || []); }
@@ -181,7 +206,7 @@ const PledgeReport = () => {
       setPledges(filteredBySearch);
     }
     setLoading(false);
-  }, [filterMonth, filterYear, filterStatus, searchQuery]);
+  }, [filterMonth, filterYear, filterStatus, searchQuery, currentUser]);
 
   useEffect(() => {
     fetchReportData();
@@ -379,6 +404,7 @@ const PledgeReport = () => {
                               onSave={handleEditPledge}
                               members={members}
                               projects={projects}
+                              financialAccounts={financialAccounts} // Pass financial accounts
                             />
                             <Button variant="ghost" size="icon" onClick={() => handleDeletePledge(pledge.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />

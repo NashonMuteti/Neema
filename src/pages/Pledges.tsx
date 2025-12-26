@@ -13,6 +13,16 @@ import PledgeFilters from "@/components/pledges/PledgeFilters";
 import PledgeTable from "@/components/pledges/PledgeTable";
 import { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import Pledge type from dialog
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Import Select components
+import { Label } from "@/components/ui/label"; // Import Label
 
 interface Member {
   id: string;

@@ -74,7 +74,7 @@ export const useFinancialSummary = () => {
       let totalIncomeAllTime = 0;
       let totalExpenditureAllTime = 0;
 
-      let incomeQuery = supabase.from('income_transactions').select('amount', 'source');
+      let incomeQuery = supabase.from('income_transactions').select('amount,source');
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
@@ -101,7 +101,7 @@ export const useFinancialSummary = () => {
       if (paidPledgesError) throw paidPledgesError;
       totalIncomeAllTime += (paidPledges || []).reduce((sum, p) => sum + p.amount, 0);
 
-      let expenditureQuery = supabase.from('expenditure_transactions').select('amount', 'purpose');
+      let expenditureQuery = supabase.from('expenditure_transactions').select('amount,purpose');
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
