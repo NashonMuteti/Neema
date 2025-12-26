@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import the new dialog and its Pledge type
+import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog"; // Added this import
 
 // Add interfaces for fetched data
 interface Member { id: string; name: string; email: string; } // Added email for dialog
