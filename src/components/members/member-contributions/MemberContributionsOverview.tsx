@@ -192,7 +192,7 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
                   <div key={c.id} className="flex justify-between items-center text-sm">
                     <span>{c.sourceOrPurpose} ({c.accountName})</span>
                     <Badge variant={status.variant}>
-                      {isIncomeOrPaidPledges ? '+' : '-'}{currency.symbol}{c.amount.toFixed(2)}
+                      {isIncomeOrPaidPledge ? '+' : '-'}{currency.symbol}{c.amount.toFixed(2)}
                     </Badge>
                   </div>
                 );

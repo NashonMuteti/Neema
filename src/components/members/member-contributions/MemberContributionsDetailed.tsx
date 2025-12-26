@@ -118,7 +118,7 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
                     <TableCell className="font-medium">{contribution.sourceOrPurpose}</TableCell>
                     <TableCell>{contribution.accountName}</TableCell>
                     <TableCell className="text-right">
-                      {isIncomeOrPaidPledges ? '+' : '-'}{currency.symbol}{contribution.amount.toFixed(2)}
+                      {isIncomeOrPaidPledge ? '+' : '-'}{currency.symbol}{contribution.amount.toFixed(2)}
                     </TableCell>
                     <TableCell>
                       {contribution.type === 'pledge' && contribution.dueDate ? format(contribution.dueDate, "MMM dd, yyyy") : '-'}
