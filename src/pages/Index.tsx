@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import SoonDueProjectsGraph from "@/components/dashboard/SoonDueProjectsGraph";
 import ContributionsProgressGraph from "@/components/dashboard/ContributionsProgressGraph";
 import IncomeExpenditureGraph from "@/components/dashboard/IncomeExpenditureGraph";
+import FinancialSummaryBar from "@/components/dashboard/FinancialSummaryBar"; // New import
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { getYear, format, parseISO } from "date-fns";
@@ -33,6 +34,13 @@ interface ProjectContributionData {
   actual: number;
 }
 
+// Define interface for financial account summary
+interface FinancialAccountSummary {
+  id: string;
+  name: string;
+  current_balance: number;
+}
+
 const Index = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
   const [monthlyFinancialData, setMonthlyFinancialData] = useState<MonthlyFinancialData[]>([]);
@@ -47,6 +55,13 @@ const Index = () => {
   const [contributionsProgressData, setContributionsProgressData] = useState<ProjectContributionData[]>([]);
   const [loadingContributions, setLoadingContributions] = useState(true);
   const [contributionsError, setContributionsError] = useState<string | null>(null);
+
+  // New states for FinancialSummaryBar
+  const [totalUnpaidPledges, setTotalUnpaidPledges] = useState(0);
+  const [activeFinancialAccounts, setActiveFinancialAccounts] = useState<FinancialAccountSummary[]>([]);
+  const [grandTotalAccountsBalance, setGrandTotalAccountsBalance] = useState(0);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
@@ -126,7 +141,7 @@ const Index = () => {
       projectPledges?.forEach(pledge => {
         if (pledge.status === 'Paid') {
           aggregateByMonth(pledge.due_date, 'income', pledge.amount); // Paid pledges count as income
-        } else if (pledge.status === 'Active' || pledge.status === 'Overdue') {
+        } else if (pledge.status === 'Active') { // 'Overdue' is now 'Active' in DB
           aggregateByMonth(pledge.due_date, 'outstandingPledges', pledge.amount);
         }
       });
@@ -287,15 +302,75 @@ const Index = () => {
     }
   }, [currentUser, isAdmin]);
 
+  const fetchFinancialSummary = useCallback(async () => {
+    setLoadingSummary(true);
+    setSummaryError(null);
+
+    if (!currentUser) {
+      setLoadingSummary(false);
+      return;
+    }
+
+    try {
+      // Fetch total unpaid pledges
+      let unpaidPledgesQuery = supabase
+        .from('project_pledges')
+        .select('amount')
+        .eq('status', 'Active'); // 'Active' now includes 'Overdue'
+
+      if (!isAdmin) {
+        unpaidPledgesQuery = unpaidPledgesQuery.eq('member_id', currentUser.id);
+      }
+      const { data: unpaidPledgesData, error: unpaidPledgesError } = await unpaidPledgesQuery;
+
+      if (unpaidPledgesError) {
+        console.error("Error fetching unpaid pledges:", unpaidPledgesError);
+        setSummaryError("Failed to load unpaid pledges.");
+        setTotalUnpaidPledges(0);
+      } else {
+        const total = (unpaidPledgesData || []).reduce((sum, pledge) => sum + pledge.amount, 0);
+        setTotalUnpaidPledges(total);
+      }
+
+      // Fetch active financial accounts
+      let accountsQuery = supabase
+        .from('financial_accounts')
+        .select('id, name, current_balance');
+      
+      if (!isAdmin) {
+        accountsQuery = accountsQuery.eq('profile_id', currentUser.id);
+      }
+      const { data: accountsData, error: accountsError } = await accountsQuery;
+
+      if (accountsError) {
+        console.error("Error fetching financial accounts:", accountsError);
+        setSummaryError("Failed to load financial accounts.");
+        setActiveFinancialAccounts([]);
+        setGrandTotalAccountsBalance(0);
+      } else {
+        setActiveFinancialAccounts(accountsData || []);
+        const grandTotal = (accountsData || []).reduce((sum, account) => sum + account.current_balance, 0);
+        setGrandTotalAccountsBalance(grandTotal);
+      }
+
+    } catch (err) {
+      console.error("Unexpected error in fetchFinancialSummary:", err);
+      setSummaryError("An unexpected error occurred while loading financial summary.");
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [currentUser, isAdmin]);
+
   useEffect(() => {
     if (currentUser && !authLoading) {
       fetchFinancialData();
       fetchDashboardProjects();
       fetchContributionsProgress();
+      fetchFinancialSummary(); // Fetch new summary data
     }
-  }, [currentUser, authLoading, fetchFinancialData, fetchDashboardProjects, fetchContributionsProgress]);
+  }, [currentUser, authLoading, fetchFinancialData, fetchDashboardProjects, fetchContributionsProgress, fetchFinancialSummary]);
 
-  if (authLoading || loadingFinancials || loadingProjects || loadingContributions) {
+  if (authLoading || loadingFinancials || loadingProjects || loadingContributions || loadingSummary) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
@@ -304,11 +379,11 @@ const Index = () => {
     );
   }
 
-  if (financialsError || projectsError || contributionsError) {
+  if (financialsError || projectsError || contributionsError || summaryError) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-lg text-destructive">Error loading dashboard: {financialsError || projectsError || contributionsError}</p>
+        <p className="text-lg text-destructive">Error loading dashboard: {financialsError || projectsError || contributionsError || summaryError}</p>
       </div>
     );
   }
@@ -319,6 +394,13 @@ const Index = () => {
       <p className="text-lg text-muted-foreground">
         Welcome to your cinematic financial management hub.
       </p>
+
+      {/* New Financial Summary Bar */}
+      <FinancialSummaryBar
+        totalUnpaidPledges={totalUnpaidPledges}
+        activeFinancialAccounts={activeFinancialAccounts}
+        grandTotalAccountsBalance={grandTotalAccountsBalance}
+      />
 
       {/* Main Financial Overview */}
       <IncomeExpenditureGraph allFinancialData={monthlyFinancialData} availableYears={availableYears} />
