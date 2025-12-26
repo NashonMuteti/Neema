@@ -13,9 +13,6 @@ import MyContributionsOverviewTab from "@/components/my-contributions/MyContribu
 import MyContributionsDetailedTab from "@/components/my-contributions/MyContributionsDetailedTab";
 import {
   Transaction,
-  IncomeTxRow,
-  ExpenditureTxRow,
-  PettyCashTxRow,
   PledgeTxRow,
   UserProject,
   MonthYearOption,
@@ -30,7 +27,7 @@ const MyContributions: React.FC = () => {
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [myTransactions, setMyTransactions] = useState<Transaction[]>([]);
+  const [myTransactions, setMyTransactions] = useState<Transaction[]>([]); // Now only pledges
   const [myProjects, setMyProjects] = useState<UserProject[]>([]); // State for user's projects
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,61 +54,7 @@ const MyContributions: React.FC = () => {
 
     const allTransactions: Transaction[] = [];
 
-    // Fetch Income Transactions
-    const { data: incomeData, error: incomeError } = await supabase
-      .from('income_transactions')
-      .select('id, date, amount, source, financial_accounts(name)')
-      .eq('profile_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString()) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
-
-    if (incomeError) console.error("Error fetching income transactions:", incomeError);
-    incomeData?.forEach(tx => allTransactions.push({
-      id: tx.id,
-      type: 'income',
-      date: parseISO(tx.date),
-      amount: tx.amount,
-      description: tx.source,
-      accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account'
-    }));
-
-    // Fetch Expenditure Transactions
-    const { data: expenditureData, error: expenditureError } = await supabase
-      .from('expenditure_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('profile_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString()) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
-
-    if (expenditureError) console.error("Error fetching expenditure transactions:", expenditureError);
-    expenditureData?.forEach(tx => allTransactions.push({
-      id: tx.id,
-      type: 'expenditure',
-      date: parseISO(tx.date),
-      amount: tx.amount,
-      description: tx.purpose,
-      accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account'
-    }));
-
-    // Fetch Petty Cash Transactions
-    const { data: pettyCashData, error: pettyCashError } = await supabase
-      .from('petty_cash_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('profile_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString()) as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
-
-    if (pettyCashError) console.error("Error fetching petty cash transactions:", pettyCashError);
-    pettyCashData?.forEach(tx => allTransactions.push({
-      id: tx.id,
-      type: 'petty_cash',
-      date: parseISO(tx.date),
-      amount: tx.amount,
-      description: tx.purpose,
-      accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account'
-    }));
-
-    // Fetch Project Pledges
+    // Fetch Project Pledges ONLY
     const { data: pledgesData, error: pledgesError } = await supabase
       .from('project_pledges')
       .select('id, due_date, amount, status, comments, projects(name)')
@@ -158,11 +101,10 @@ const MyContributions: React.FC = () => {
     }
   }, [authLoading, fetchMyContributions]);
 
-  const totalIncome = myTransactions.filter(t => t.type === 'income' || (t.type === 'pledge' && t.status === 'Paid')).reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenditure = myTransactions.filter(t => t.type === 'expenditure' || t.type === 'petty_cash').reduce((sum, t) => sum + t.amount, 0);
+  // Calculations now only reflect pledges
   const totalPaidPledges = myTransactions.filter(t => t.type === 'pledge' && t.status === 'Paid').reduce((sum, t) => sum + t.amount, 0);
   const totalPendingPledges = myTransactions.filter(t => t.type === 'pledge' && (t.status === 'Active' || t.status === 'Overdue')).reduce((sum, t) => sum + t.amount, 0);
-  const netBalance = totalIncome - totalExpenditure;
+  // Net balance is removed as requested, so no need for totalIncome/totalExpenditure
 
   const transactionsByDate = myTransactions.reduce((acc, transaction) => {
     const dateKey = format(transaction.date, "yyyy-MM-dd");
@@ -230,9 +172,7 @@ const MyContributions: React.FC = () => {
             months={months}
             years={years}
             transactionsByDate={transactionsByDate}
-            totalIncome={totalIncome}
-            totalExpenditure={totalExpenditure}
-            netBalance={netBalance}
+            // Removed totalIncome, totalExpenditure, netBalance
             totalPaidPledges={totalPaidPledges}
             totalPendingPledges={totalPendingPledges}
             myProjects={myProjects}
@@ -251,7 +191,7 @@ const MyContributions: React.FC = () => {
             setSearchQuery={setSearchQuery}
             months={months}
             years={years}
-            myTransactions={myTransactions}
+            myTransactions={myTransactions} // Now only pledges
             currency={currency}
           />
         </TabsContent>

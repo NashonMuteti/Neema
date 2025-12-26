@@ -32,9 +32,7 @@ interface MyContributionsOverviewTabProps {
   months: MonthYearOption[];
   years: MonthYearOption[];
   transactionsByDate: Record<string, Transaction[]>;
-  totalIncome: number;
-  totalExpenditure: number;
-  netBalance: number;
+  // Removed totalIncome, totalExpenditure, netBalance
   totalPaidPledges: number;
   totalPendingPledges: number;
   myProjects: UserProject[];
@@ -52,7 +50,7 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   months,
   years,
   transactionsByDate,
-  netBalance,
+  // Removed totalIncome, totalExpenditure, netBalance
   totalPaidPledges,
   totalPendingPledges,
   myProjects,
@@ -152,16 +150,10 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
             <CardTitle>Summary for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Net Balance */}
-            <div className="flex justify-between items-center">
-              <p className="text-muted-foreground">Net Balance:</p>
-              <p className={cn("text-xl font-bold", netBalance >= 0 ? "text-green-600" : "text-red-600")}>
-                {currency.symbol}{netBalance.toFixed(2)}
-              </p>
-            </div>
+            {/* Net Balance removed */}
             
             {/* Pledge Summary */}
-            <div className="border-t pt-4 space-y-2">
+            <div className="space-y-2"> {/* Removed border-t pt-4 as it's now the first section */}
               <h3 className="font-semibold text-lg">Pledge Summary</h3>
               <div className="flex justify-between items-center text-sm">
                 <p className="text-muted-foreground">Total Paid Pledges:</p>

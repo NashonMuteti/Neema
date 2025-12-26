@@ -39,7 +39,7 @@ interface MyContributionsDetailedTabProps {
   setSearchQuery: (query: string) => void;
   months: MonthYearOption[];
   years: MonthYearOption[];
-  myTransactions: Transaction[];
+  myTransactions: Transaction[]; // Now only pledges
   currency: { code: string; symbol: string };
 }
 
@@ -58,7 +58,7 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
-        <CardTitle>My Detailed Transactions for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
+        <CardTitle>My Detailed Pledges for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle> {/* Updated title */}
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
@@ -101,7 +101,7 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
             <div className="relative flex items-center">
               <Input
                 type="text"
-                placeholder="Search description..."
+                placeholder="Search pledge..." {/* Updated placeholder */}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-8"
@@ -114,10 +114,10 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Account/Project</TableHead>
+                <TableHead>Pledge Date</TableHead> {/* Updated header */}
+                <TableHead>Status</TableHead> {/* Updated header */}
+                <TableHead>Project</TableHead> {/* Updated header */}
+                <TableHead>Description</TableHead> {/* Updated header */}
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Due Date</TableHead>
               </TableRow>
@@ -131,10 +131,10 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
                     <TableCell>
                       <Badge variant={status.variant}>{status.text}</Badge>
                     </TableCell>
-                    <TableCell className="font-medium">{transaction.description}</TableCell>
-                    <TableCell>{transaction.accountOrProjectName}</TableCell>
+                    <TableCell className="font-medium">{transaction.accountOrProjectName}</TableCell> {/* Project name */}
+                    <TableCell>{transaction.description}</TableCell> {/* Comments/Description */}
                     <TableCell className="text-right">
-                      {transaction.type === 'income' || (transaction.type === 'pledge' && transaction.status === 'Paid') ? '+' : '-'}{currency.symbol}{transaction.amount.toFixed(2)}
+                      {transaction.type === 'pledge' && transaction.status === 'Paid' ? '+' : '-'}{currency.symbol}{transaction.amount.toFixed(2)}
                     </TableCell>
                     <TableCell>
                       {transaction.dueDate ? format(transaction.dueDate, "MMM dd, yyyy") : '-'}
@@ -145,7 +145,7 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
             </TableBody>
           </Table>
         ) : (
-          <p className="text-muted-foreground text-center mt-4">No transactions found for the selected period or matching your search.</p>
+          <p className="text-muted-foreground text-center mt-4">No pledges found for the selected period or matching your search.</p>
         )}
       </CardContent>
     </Card>
