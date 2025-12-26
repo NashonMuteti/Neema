@@ -37,7 +37,7 @@ interface PettyCashTransaction {
 const PettyCash = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-  const { currency } = useSystemSettings(); // Use currency from context
+  const { currency } = useSystemSettings();
   
   const { canManagePettyCash } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -110,9 +110,14 @@ const PettyCash = () => {
     let query = supabase
       .from('petty_cash_transactions')
       .select('*, financial_accounts(name)')
-      .eq('profile_id', currentUser.id) // Changed to profile_id
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString());
+      
+    // Conditionally apply profile_id filter based on admin status
+    const isAdmin = currentUser.role === "Admin" || currentUser.role === "Super Admin";
+    if (!isAdmin) {
+      query = query.eq('profile_id', currentUser.id);
+    }
       
     if (searchQuery) {
       query = query.ilike('purpose', `%${searchQuery}%`);
