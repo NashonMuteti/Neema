@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Wallet, Banknote } from "lucide-react";
+import { DollarSign, Wallet, Banknote, Handshake } from "lucide-react"; // Added Handshake
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
       {/* Total Unpaid Pledges Card */}
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl bg-destructive/10 border-destructive">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-destructive">Total Unpaid Pledges</CardTitle>
+          <CardTitle className="text-sm font-medium text-destructive">Total Unpaid Pledle</CardTitle>
           <Handshake className="h-4 w-4 text-destructive" />
         </CardHeader>
         <CardContent>
