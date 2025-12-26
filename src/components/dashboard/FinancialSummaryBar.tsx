@@ -26,11 +26,11 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
   const { currency } = useSystemSettings();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6"> {/* Changed lg:grid-cols-4 to lg:grid-cols-6 */}
+    <div className="flex flex-wrap gap-6"> {/* Changed to flexbox for dynamic wrapping */}
       {/* Total Unpaid Pledges Card */}
-      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl bg-destructive/10 border-destructive">
+      <Card className="flex-1 min-w-[190px] transition-all duration-300 ease-in-out hover:shadow-xl bg-destructive/10 border-destructive">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-destructive">Total Unpaid Pledle</CardTitle>
+          <CardTitle className="text-sm font-medium text-destructive">Total Unpaid Pledges</CardTitle>
           <Handshake className="h-4 w-4 text-destructive" />
         </CardHeader>
         <CardContent>
@@ -43,7 +43,7 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
 
       {/* Individual Active Financial Accounts */}
       {activeFinancialAccounts.map((account) => (
-        <Card key={account.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">
+        <Card key={account.id} className="flex-1 min-w-[190px] transition-all duration-300 ease-in-out hover:shadow-xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
@@ -58,7 +58,7 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
       ))}
 
       {/* Grand Total for All Accounts Card */}
-      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl col-span-full lg:col-span-2"> {/* Changed lg:col-span-1 to lg:col-span-2 */}
+      <Card className="flex-[2_1_0%] min-w-[380px] transition-all duration-300 ease-in-out hover:shadow-xl"> {/* flex-[2_1_0%] makes it grow twice as much */}
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Grand Total (All Accounts)</CardTitle>
           <Banknote className="h-4 w-4 text-muted-foreground" />
