@@ -50,6 +50,7 @@ const TransferFunds = () => {
   const [sourceAccount, setSourceAccount] = useState<string | undefined>(undefined);
   const [destinationAccount, setDestinationAccount] = useState<string | undefined>(undefined);
   const [transferAmount, setTransferAmount] = useState("");
+  const [transactionCost, setTransactionCost] = useState(""); // New state for transaction cost
   const [isTransferring, setIsTransferring] = useState(false);
 
   const fetchFinancialAccounts = useCallback(async () => {
@@ -91,7 +92,7 @@ const TransferFunds = () => {
       return;
     }
     if (!sourceAccount || !destinationAccount || !transferAmount) {
-      showError("All fields are required for the transfer.");
+      showError("Transfer amount, source, and destination accounts are required.");
       return;
     }
     if (sourceAccount === destinationAccount) {
@@ -100,9 +101,18 @@ const TransferFunds = () => {
     }
 
     const amount = parseFloat(transferAmount);
+    const parsedTransactionCost = parseFloat(transactionCost || "0"); // Parse transaction cost, default to 0 if empty
+
+    // Validate main transfer amount
     const validation = validateFinancialTransaction(amount, sourceAccount, currentUser?.id || '');
     if (!validation.isValid) {
       showError(validation.error || "Invalid transfer amount.");
+      return;
+    }
+
+    // Validate transaction cost
+    if (isNaN(parsedTransactionCost) || parsedTransactionCost < 0) {
+      showError("Transaction cost must be a non-negative number.");
       return;
     }
 
@@ -114,58 +124,52 @@ const TransferFunds = () => {
       return;
     }
 
-    if (sourceAcc.current_balance < amount) {
-      showError("Insufficient balance in the source account.");
+    const totalDeductionFromSource = amount + parsedTransactionCost;
+    if (sourceAcc.current_balance < totalDeductionFromSource) {
+      showError("Insufficient balance in the source account to cover transfer and transaction cost.");
       return;
     }
 
     setIsTransferring(true);
     try {
-      // Deduct from source account
-      const { error: sourceError } = await supabase
-        .from('financial_accounts')
-        .update({ current_balance: sourceAcc.current_balance - amount })
-        .eq('id', sourceAccount)
-        .eq('profile_id', currentUser?.id);
+      // 1. Perform the main fund transfer using the atomic function
+      const { error: transferError } = await supabase.rpc('transfer_funds_atomic', {
+        p_source_account_id: sourceAccount,
+        p_destination_account_id: destinationAccount,
+        p_amount: amount,
+        p_profile_id: currentUser?.id,
+        p_purpose: `Funds Transfer to ${destAcc.name}`,
+        p_source: `Funds Transfer from ${sourceAcc.name}`,
+        p_is_transfer: true,
+        p_project_id: null,
+        p_member_id: null,
+        p_payment_method: null,
+        p_pledge_id: null,
+      });
 
-      if (sourceError) throw sourceError;
+      if (transferError) throw transferError;
 
-      // Add to destination account
-      const { error: destError } = await supabase
-        .from('financial_accounts')
-        .update({ current_balance: destAcc.current_balance + amount })
-        .eq('id', destinationAccount)
-        .eq('profile_id', currentUser?.id);
-
-      if (destError) throw destError;
-
-      // Record as an expenditure transaction from the source account
-      const { error: expenditureTxError } = await supabase
-        .from('expenditure_transactions')
-        .insert({
-          profile_id: currentUser!.id,
-          account_id: sourceAccount,
-          amount: amount,
-          purpose: `Funds Transfer to ${destAcc.name}`,
-          date: new Date().toISOString(),
+      // 2. If there's a transaction cost, record it as a separate expenditure
+      if (parsedTransactionCost > 0) {
+        const { error: costError } = await supabase.rpc('transfer_funds_atomic', {
+          p_source_account_id: sourceAccount,
+          p_destination_account_id: null, // No destination for a standalone expenditure
+          p_amount: parsedTransactionCost,
+          p_profile_id: currentUser?.id,
+          p_purpose: `Transaction Cost for Transfer to ${destAcc.name}`,
+          p_source: `Transaction Cost`, // This field is for income, but required by RPC. Will be ignored.
+          p_is_transfer: false, // This is a standalone expenditure, not a transfer
+          p_project_id: null,
+          p_member_id: null,
+          p_payment_method: null,
+          p_pledge_id: null,
         });
-      if (expenditureTxError) throw expenditureTxError;
-
-      // Record as an income transaction to the destination account
-      const { error: incomeTxError } = await supabase
-        .from('income_transactions')
-        .insert({
-          profile_id: currentUser!.id,
-          account_id: destinationAccount,
-          amount: amount,
-          source: `Funds Transfer from ${sourceAcc.name}`,
-          date: new Date().toISOString(),
-        });
-      if (incomeTxError) throw incomeTxError;
-
+        if (costError) throw costError;
+      }
 
       showSuccess("Funds transferred successfully!");
       setTransferAmount("");
+      setTransactionCost(""); // Reset transaction cost
       fetchFinancialAccounts(); // Re-fetch to update balances
     } catch (err: any) {
       console.error("Error during fund transfer:", err);
@@ -256,6 +260,20 @@ const TransferFunds = () => {
               placeholder="0.00"
               value={transferAmount}
               onChange={(e) => setTransferAmount(e.target.value)}
+              disabled={!canManageFundsTransfer || isTransferring}
+            />
+          </div>
+
+          {/* New Transaction Cost Field */}
+          <div className="grid gap-1.5">
+            <Label htmlFor="transaction-cost">Transaction Cost ({currency.symbol})</Label>
+            <Input
+              id="transaction-cost"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              value={transactionCost}
+              onChange={(e) => setTransactionCost(e.target.value)}
               disabled={!canManageFundsTransfer || isTransferring}
             />
           </div>
