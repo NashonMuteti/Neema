@@ -35,7 +35,7 @@ export const useFinancialSummary = () => {
       let unpaidPledgesQuery = supabase
         .from('project_pledges')
         .select('amount')
-        .eq('status', 'Active');
+        .eq('status', 'Active'); // Only count 'Active' pledges as unpaid
 
       if (!isAdmin) {
         unpaidPledgesQuery = unpaidPledgesQuery.eq('member_id', currentUser.id);
@@ -74,42 +74,30 @@ export const useFinancialSummary = () => {
       let totalIncomeAllTime = 0;
       let totalExpenditureAllTime = 0;
 
+      // Fetch all income transactions, including initial balances, collections, and paid pledges
+      // The transfer_funds_atomic function ensures these are recorded as income_transactions.
       let incomeQuery = supabase.from('income_transactions').select('amount,source');
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude income from transfers, but now INCLUDE initial account balances
+      // Exclude income from transfers to avoid counting internal movements as new income
       incomeQuery = incomeQuery.not('source', 'ilike', `Funds Transfer from %`);
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
       if (incomeError) throw incomeError;
       totalIncomeAllTime += (incomeTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
 
-      let projectCollectionsQuery = supabase.from('project_collections').select('amount');
-      if (!isAdmin) {
-        projectCollectionsQuery = projectCollectionsQuery.eq('member_id', currentUser.id);
-      }
-      const { data: projectCollections, error: collectionsError } = await projectCollectionsQuery;
-      if (collectionsError) throw collectionsError;
-      totalIncomeAllTime += (projectCollections || []).reduce((sum, c) => sum + c.amount, 0);
-
-      let paidPledgesQuery = supabase.from('project_pledges').select('amount').eq('status', 'Paid');
-      if (!isAdmin) {
-        paidPledgesQuery = paidPledgesQuery.eq('member_id', currentUser.id);
-      }
-      const { data: paidPledges, error: paidPledgesError } = await paidPledgesQuery;
-      if (paidPledgesError) throw paidPledgesError;
-      totalIncomeAllTime += (paidPledges || []).reduce((sum, p) => sum + p.amount, 0);
-
+      // Fetch all expenditure transactions
       let expenditureQuery = supabase.from('expenditure_transactions').select('amount,purpose');
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude expenditure from transfers
+      // Exclude expenditure from transfers to avoid counting internal movements as new expenditure
       expenditureQuery = expenditureQuery.not('purpose', 'ilike', `Funds Transfer to %`);
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
       if (expenditureError) throw expenditureError;
       totalExpenditureAllTime += (expenditureTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
 
+      // Fetch all petty cash transactions (which are also expenditures)
       let pettyCashQuery = supabase.from('petty_cash_transactions').select('amount');
       if (!isAdmin) {
         pettyCashQuery = pettyCashQuery.eq('profile_id', currentUser.id);

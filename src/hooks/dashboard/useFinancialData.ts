@@ -33,11 +33,13 @@ export const useFinancialData = () => {
     }
 
     try {
+      // Fetch all income transactions, including initial balances, collections, and paid pledges
+      // The transfer_funds_atomic function ensures these are recorded as income_transactions.
       let incomeQuery = supabase.from('income_transactions').select('date,amount,source');
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude income from transfers, but now INCLUDE initial account balances
+      // Exclude income from transfers to avoid counting internal movements as new income
       incomeQuery = incomeQuery.not('source', 'ilike', `Funds Transfer from %`);
 
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
@@ -46,25 +48,20 @@ export const useFinancialData = () => {
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude expenditure from transfers
+      // Exclude expenditure from transfers to avoid counting internal movements as new expenditure
       expenditureQuery = expenditureQuery.not('purpose', 'ilike', `Funds Transfer to %`);
 
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
 
-      let projectCollectionsQuery = supabase.from('project_collections').select('date, amount');
-      if (!isAdmin) {
-        projectCollectionsQuery = projectCollectionsQuery.eq('member_id', currentUser.id);
-      }
-      const { data: projectCollections, error: collectionsError } = await projectCollectionsQuery;
-
+      // Fetch project pledges for outstanding amounts (not income)
       let projectPledgesQuery = supabase.from('project_pledges').select('due_date, amount, status');
       if (!isAdmin) {
         projectPledgesQuery = projectPledgesQuery.eq('member_id', currentUser.id);
       }
       const { data: projectPledges, error: pledgesError } = await projectPledgesQuery;
 
-      if (incomeError || expenditureError || collectionsError || pledgesError) {
-        console.error("Error fetching financial data:", incomeError || expenditureError || collectionsError || pledgesError);
+      if (incomeError || expenditureError || pledgesError) {
+        console.error("Error fetching financial data:", incomeError || expenditureError || pledgesError);
         setFinancialsError("Failed to load financial data.");
         setMonthlyFinancialData([]);
         setAvailableYears([]);
@@ -89,11 +86,10 @@ export const useFinancialData = () => {
 
       incomeTransactions?.forEach(tx => aggregateByMonth(tx.date, 'income', tx.amount));
       expenditureTransactions?.forEach(tx => aggregateByMonth(tx.date, 'expenditure', tx.amount));
-      projectCollections?.forEach(collection => aggregateByMonth(collection.date, 'income', collection.amount));
+      
+      // Only aggregate outstanding pledges here, paid pledges are already in income_transactions
       projectPledges?.forEach(pledge => {
-        if (pledge.status === 'Paid') {
-          aggregateByMonth(pledge.due_date, 'income', pledge.amount);
-        } else if (pledge.status === 'Active') {
+        if (pledge.status === 'Active') { // Only count 'Active' pledges as outstanding
           aggregateByMonth(pledge.due_date, 'outstandingPledges', pledge.amount);
         }
       });
