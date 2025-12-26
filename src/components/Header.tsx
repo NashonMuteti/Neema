@@ -26,7 +26,7 @@ const Header = () => {
   };
 
   return (
-    <header className="flex items-center justify-between h-16 px-6 border-b-2 border-yellow-500 bg-sky-blue-header shadow-sm transition-all duration-300 ease-in-out">
+    <header className="flex items-center justify-between h-16 px-6 border-b-4 border-yellow-500 bg-sky-blue-header shadow-sm transition-all duration-300 ease-in-out">
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           Loading header...
