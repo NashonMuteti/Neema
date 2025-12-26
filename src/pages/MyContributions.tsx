@@ -307,9 +307,9 @@ const MyContributions: React.FC = () => {
 
         {/* My Contributions Overview Tab Content */}
         <TabsContent value="my-contributions" className="space-y-6 mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Calendar and Filters */}
-            <Card className="lg:col-span-2 transition-all duration-300 ease-in-out hover:shadow-xl">
+            <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
               <CardHeader>
                 <CardTitle>Activity Calendar</CardTitle>
               </CardHeader>
@@ -363,54 +363,14 @@ const MyContributions: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Financial Summary */}
+            {/* NEW CARD: Activity on Selected Date */}
             <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
               <CardHeader>
-                <CardTitle>Summary for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
+                <CardTitle>Activity on {selectedDate ? format(selectedDate, "PPP") : "Selected Date"}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <p className="text-muted-foreground">Total Income:</p>
-                  <p className="text-xl font-bold text-primary">{currency.symbol}{totalIncome.toFixed(2)}</p>
-                </div>
-                <div className="flex justify-between items-center">
-                  <p className="text-muted-foreground">Total Expenditure:</p>
-                  <p className="text-xl font-bold text-destructive">{currency.symbol}{totalExpenditure.toFixed(2)}</p>
-                </div>
-                <div className="flex justify-between items-center border-t pt-4">
-                  <p className="text-muted-foreground">Net Balance:</p>
-                  <p className={cn("text-xl font-bold", netBalance >= 0 ? "text-green-600" : "text-red-600")}>
-                    {currency.symbol}{netBalance.toFixed(2)}
-                  </p>
-                </div>
-                
-                <div className="border-t pt-4 space-y-2">
-                  <h3 className="font-semibold text-lg">Pledge Summary</h3>
-                  <div className="flex justify-between items-center text-sm">
-                    <p className="text-muted-foreground">Total Paid Pledges:</p>
-                    <p className="font-bold text-primary">{currency.symbol}{totalPaidPledges.toFixed(2)}</p>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <p className="text-muted-foreground">Total Pending Pledges:</p>
-                    <p className="font-bold text-destructive">{currency.symbol}{totalPendingPledges.toFixed(2)}</p>
-                  </div>
-                </div>
-
-                {myProjects.length > 0 && (
-                  <div className="border-t pt-4 space-y-2">
-                    <h3 className="font-semibold text-lg">Expected Project Contributions</h3>
-                    {myProjects.map(project => (
-                      <div key={project.id} className="flex justify-between items-center text-sm">
-                        <span>{project.name}:</span>
-                        <span className="font-medium">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
+              <CardContent className="space-y-2">
                 {selectedDate && transactionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
-                  <div className="mt-6 space-y-2">
-                    <h3 className="font-semibold text-lg">Activity on {format(selectedDate, "PPP")}</h3>
+                  <>
                     {transactionsByDate[format(selectedDate, "yyyy-MM-dd")].map((t) => {
                       const status = getContributionStatus(t.type, t.status);
                       return (
@@ -422,14 +382,59 @@ const MyContributions: React.FC = () => {
                         </div>
                       );
                     })}
-                  </div>
+                  </>
                 )}
                 {selectedDate && !transactionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
-                  <p className="text-muted-foreground text-sm mt-6">No activity on {format(selectedDate, "PPP")}.</p>
+                  <p className="text-muted-foreground text-sm">No activity on {format(selectedDate, "PPP")}.</p>
+                )}
+                {!selectedDate && (
+                  <p className="text-muted-foreground text-sm">Select a date on the calendar to view activity.</p>
                 )}
               </CardContent>
             </Card>
           </div>
+
+          {/* MODIFIED CARD: Financial Summary (now only Net Balance, Pledge Summary and Expected Project Contributions) */}
+          <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+            <CardHeader>
+              <CardTitle>Summary for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Net Balance */}
+              <div className="flex justify-between items-center">
+                <p className="text-muted-foreground">Net Balance:</p>
+                <p className={cn("text-xl font-bold", netBalance >= 0 ? "text-green-600" : "text-red-600")}>
+                  {currency.symbol}{netBalance.toFixed(2)}
+                </p>
+              </div>
+              
+              {/* Pledge Summary */}
+              <div className="border-t pt-4 space-y-2">
+                <h3 className="font-semibold text-lg">Pledge Summary</h3>
+                <div className="flex justify-between items-center text-sm">
+                  <p className="text-muted-foreground">Total Paid Pledges:</p>
+                  <p className="font-bold text-primary">{currency.symbol}{totalPaidPledges.toFixed(2)}</p>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <p className="text-muted-foreground">Total Pending Pledges:</p>
+                  <p className="font-bold text-destructive">{currency.symbol}{totalPendingPledges.toFixed(2)}</p>
+                </div>
+              </div>
+
+              {/* Expected Project Contributions */}
+              {myProjects.length > 0 && (
+                <div className="border-t pt-4 space-y-2">
+                  <h3 className="font-semibold text-lg">Expected Project Contributions</h3>
+                  {myProjects.map(project => (
+                    <div key={project.id} className="flex justify-between items-center text-sm">
+                      <span>{project.name}:</span>
+                      <span className="font-medium">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* My Detailed Contributions Tab Content */}
