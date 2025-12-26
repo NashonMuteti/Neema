@@ -95,7 +95,20 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
               setFilterYear(getYear(month).toString());
             }}
             components={{
-              DayContent: ({ date }) => renderDay(date),
+              DayContent: ({ date }) => {
+                const dateKey = format(date, "yyyy-MM-dd");
+                const dayContributions = contributionsByDate[dateKey];
+                return (
+                  <div
+                    className={cn(
+                      "relative text-center w-full h-full flex items-center justify-center",
+                      dayContributions && dayContributions.length > 0 && "bg-primary/20 rounded-full"
+                    )}
+                  >
+                    {date.getDate()}
+                  </div>
+                );
+              },
             }}
           />
         </CardContent>
