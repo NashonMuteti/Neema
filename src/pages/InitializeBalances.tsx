@@ -57,22 +57,69 @@ const InitializeBalances = () => {
   }, [fetchFinancialAccounts]);
 
   const handleInitialize = async (balances: Record<string, number>) => {
-    // In a real application, this would trigger a backend process
-    // to reset or set default values for all account balances.
-    console.log("Initializing all account balances with:", balances);
+    if (!currentUser) {
+      showError("You must be logged in to initialize balances.");
+      return;
+    }
 
     let hasError = false;
     for (const accountId in balances) {
       const newBalance = balances[accountId];
-      const { error } = await supabase
+      
+      // 1. Update the financial account's current_balance
+      const { error: updateAccountError } = await supabase
         .from('financial_accounts')
         .update({ current_balance: newBalance })
-        .eq('id', accountId);
+        .eq('id', accountId)
+        .eq('profile_id', currentUser.id); // Ensure user owns the account
 
-      if (error) {
-        console.error(`Error updating balance for account ${accountId}:`, error);
+      if (updateAccountError) {
+        console.error(`Error updating balance for account ${accountId}:`, updateAccountError);
         showError(`Failed to update balance for ${financialAccounts.find(acc => acc.id === accountId)?.name || accountId}.`);
         hasError = true;
+        continue;
+      }
+
+      // 2. Update or create the corresponding "Initial Account Balance" income transaction
+      const { data: existingIncomeTx, error: fetchTxError } = await supabase
+        .from('income_transactions')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('profile_id', currentUser.id)
+        .eq('source', 'Initial Account Balance')
+        .single();
+
+      if (fetchTxError && fetchTxError.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error("Error checking for existing initial balance transaction:", fetchTxError);
+        showError("Account balance updated, but failed to verify initial balance income transaction.");
+        hasError = true;
+      } else if (existingIncomeTx) {
+        // Update existing transaction
+        const { error: updateTxError } = await supabase
+          .from('income_transactions')
+          .update({ amount: newBalance })
+          .eq('id', existingIncomeTx.id);
+        if (updateTxError) {
+          console.error("Error updating initial balance income transaction:", updateTxError);
+          showError("Account balance updated, but failed to update initial balance income transaction.");
+          hasError = true;
+        }
+      } else {
+        // Create new transaction if not found
+        const { error: createTxError } = await supabase
+          .from('income_transactions')
+          .insert({
+            profile_id: currentUser.id,
+            account_id: accountId,
+            amount: newBalance,
+            source: "Initial Account Balance",
+            date: new Date().toISOString(),
+          });
+        if (createTxError) {
+          console.error("Error creating initial balance income transaction:", createTxError);
+          showError("Account balance updated, but failed to create initial balance income transaction.");
+          hasError = true;
+        }
       }
     }
 
@@ -80,7 +127,7 @@ const InitializeBalances = () => {
       showSuccess("Account balances initialized successfully!");
       fetchFinancialAccounts(); // Re-fetch to update the displayed balances
     } else {
-      showError("Some account balances failed to update. Check console for details.");
+      showError("Some account balances or their corresponding income transactions failed to update. Check console for details.");
     }
   };
 

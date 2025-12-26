@@ -109,24 +109,44 @@ const FinancialAccountsSettings = () => {
       return;
     }
 
-    const { error } = await supabase
+    const { data: newAccount, error: accountError } = await supabase
       .from('financial_accounts')
       .insert({
         profile_id: currentUser.id,
         name: newAccountName.trim(),
         initial_balance: initialBalance,
         current_balance: initialBalance, // Current balance starts as initial balance
+      })
+      .select()
+      .single();
+
+    if (accountError) {
+      console.error("Error adding account:", accountError);
+      showError("Failed to add financial account.");
+      return;
+    }
+
+    // Also create an income transaction for the initial balance
+    const { error: incomeTxError } = await supabase
+      .from('income_transactions')
+      .insert({
+        profile_id: currentUser.id,
+        account_id: newAccount.id,
+        amount: initialBalance,
+        source: "Initial Account Balance",
+        date: new Date().toISOString(),
       });
 
-    if (error) {
-      console.error("Error adding account:", error);
-      showError("Failed to add financial account.");
+    if (incomeTxError) {
+      console.error("Error adding initial balance income transaction:", incomeTxError);
+      showError("Financial account added, but failed to record initial balance as income.");
     } else {
-      showSuccess("Financial account added successfully!");
-      setNewAccountName("");
-      setNewAccountInitialBalance("0");
-      fetchAccounts();
+      showSuccess("Financial account added and initial balance recorded successfully!");
     }
+    
+    setNewAccountName("");
+    setNewAccountInitialBalance("0");
+    fetchAccounts();
   };
 
   const handleEditAccount = async () => {
@@ -144,27 +164,67 @@ const FinancialAccountsSettings = () => {
       return;
     }
 
-    // Note: Updating initial_balance might imply a recalculation of current_balance
-    // For simplicity, we'll just update initial_balance and name.
-    // A more complex system might require a separate "adjust balance" function.
-    const { error } = await supabase
+    // Update account details
+    const { error: accountUpdateError } = await supabase
       .from('financial_accounts')
       .update({
         name: editAccountName.trim(),
         initial_balance: initialBalance,
-        // current_balance is not directly editable here, it's transaction-driven
       })
       .eq('id', editingAccount.id)
       .eq('profile_id', currentUser.id); // Ensure user owns the account
 
-    if (error) {
-      console.error("Error updating account:", error);
+    if (accountUpdateError) {
+      console.error("Error updating account:", accountUpdateError);
       showError("Failed to update financial account.");
-    } else {
-      showSuccess("Financial account updated successfully!");
-      setEditingAccount(null);
-      fetchAccounts();
+      return;
     }
+
+    // Update or create the corresponding "Initial Account Balance" income transaction
+    const { data: existingIncomeTx, error: fetchTxError } = await supabase
+      .from('income_transactions')
+      .select('id')
+      .eq('account_id', editingAccount.id)
+      .eq('profile_id', currentUser.id)
+      .eq('source', 'Initial Account Balance')
+      .single();
+
+    if (fetchTxError && fetchTxError.code !== 'PGRST116') { // PGRST116 means no rows found
+      console.error("Error checking for existing initial balance transaction:", fetchTxError);
+      showError("Account updated, but failed to verify initial balance income transaction.");
+    } else if (existingIncomeTx) {
+      // Update existing transaction
+      const { error: updateTxError } = await supabase
+        .from('income_transactions')
+        .update({ amount: initialBalance })
+        .eq('id', existingIncomeTx.id);
+      if (updateTxError) {
+        console.error("Error updating initial balance income transaction:", updateTxError);
+        showError("Account updated, but failed to update initial balance income transaction.");
+      } else {
+        showSuccess("Financial account and initial balance income updated successfully!");
+      }
+    } else {
+      // Create new transaction if not found
+      const { error: createTxError } = await supabase
+        .from('income_transactions')
+        .insert({
+          profile_id: currentUser.id,
+          account_id: editingAccount.id,
+          amount: initialBalance,
+          source: "Initial Account Balance",
+          date: new Date().toISOString(),
+        });
+      if (createTxError) {
+        console.error("Error creating initial balance income transaction:", createTxError);
+        showError("Account updated, but failed to create initial balance income transaction.");
+      } else {
+        showSuccess("Financial account updated and initial balance income created successfully!");
+      }
+    }
+
+    setEditingAccount(null);
+    fetchAccounts();
   };
 
   const handleDeleteAccount = async () => {
@@ -173,17 +233,32 @@ const FinancialAccountsSettings = () => {
       return;
     }
 
-    const { error } = await supabase
+    // First, delete associated "Initial Account Balance" income transaction
+    const { error: deleteIncomeTxError } = await supabase
+      .from('income_transactions')
+      .delete()
+      .eq('account_id', deletingAccountId)
+      .eq('profile_id', currentUser.id)
+      .eq('source', 'Initial Account Balance');
+
+    if (deleteIncomeTxError) {
+      console.error("Error deleting initial balance income transaction:", deleteIncomeTxError);
+      showError("Failed to delete associated initial balance income transaction.");
+      return;
+    }
+
+    // Then, delete the financial account
+    const { error: deleteAccountError } = await supabase
       .from('financial_accounts')
       .delete()
       .eq('id', deletingAccountId)
       .eq('profile_id', currentUser.id); // Ensure user owns the account
 
-    if (error) {
-      console.error("Error deleting account:", error);
+    if (deleteAccountError) {
+      console.error("Error deleting account:", deleteAccountError);
       showError("Failed to delete financial account.");
     } else {
-      showSuccess("Financial account deleted successfully!");
+      showSuccess("Financial account and associated initial balance income deleted successfully!");
       setDeletingAccountId(null);
       fetchAccounts();
     }
