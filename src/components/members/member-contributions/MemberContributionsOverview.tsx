@@ -7,7 +7,7 @@ import { format, getMonth, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { MemberContribution, Project } from "./types";
-import { getContributionStatus } from "@/utils/contributionUtils"; // Corrected import path
+import { getContributionStatus } from "@/utils/contributionUtils"; // Updated import
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import {
   Table,
@@ -62,11 +62,6 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
     { projectId: string; projectName: string; expected: number; paid: number }[]
   >([]);
   const [loadingMemberProjectContributions, setLoadingMemberProjectContributions] = useState(true);
-
-  // Calculate total expected contributions from ALL active projects (system-wide)
-  const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
-    sum + ((project.member_contribution_amount || 0) * activeMembersCount)
-  , 0);
 
   // Fetch member's specific contributions to each active project
   useEffect(() => {
@@ -201,18 +196,6 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
               <p className="text-muted-foreground">Total Pending Pledges:</p>
               <p className="font-bold text-destructive">{currency.symbol}{totalPendingPledges.toFixed(2)}</p>
             </div>
-          </div>
-
-          {/* Total Expected Contributions from All Active Projects (System-wide) */}
-          <div className="border-t pt-4 space-y-2">
-            <h3 className="font-semibold text-lg">Total Expected from All Active Projects</h3>
-            <div className="flex justify-between items-center text-sm">
-              <p className="text-muted-foreground">Total Expected:</p>
-              <p className="font-bold text-primary">{currency.symbol}{totalExpectedAllProjectsContributions.toFixed(2)}</p>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              (Based on {activeMembersCount} active members and 'member contribution amount' for all active projects)
-            </p>
           </div>
 
           {/* My Contributions to Active Projects (Member-specific breakdown) */}
