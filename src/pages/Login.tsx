@@ -54,7 +54,6 @@ const Login: React.FC = () => {
             theme="light" // Use light theme, or dynamically set based on app theme
             redirectTo={window.location.origin + '/'} // Redirect to home after auth
             view="sign_in" // Only show the sign-in form
-            signUp={{ disabled: true }} // Explicitly disable the sign-up option
           />
         </CardContent>
       </Card>
