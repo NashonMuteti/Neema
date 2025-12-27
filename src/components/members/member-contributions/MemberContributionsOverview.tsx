@@ -61,6 +61,9 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   const currentMonthExpenditure = memberContributions.filter(c => c.type === 'expenditure' || c.type === 'petty_cash').reduce((sum, c) => sum + c.amount, 0);
   const currentMonthNetBalance = currentMonthIncome - currentMonthExpenditure;
 
+  // Calculate total expected contributions from active projects
+  const totalExpectedProjectContributions = memberProjects.reduce((sum, project) => sum + (project.member_contribution_amount || 0), 0);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Calendar and Filters */}
@@ -137,22 +140,16 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
           <CardTitle>Summary for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Income/Expenditure Summary */}
+          {/* Financial Overview (Updated) */}
           <div className="space-y-2">
             <h3 className="font-semibold text-lg">Financial Overview</h3>
-            <div className="flex justify-between items-center">
-              <p className="text-muted-foreground">Total Income:</p>
-              <p className="text-xl font-bold text-primary">{currency.symbol}{currentMonthIncome.toFixed(2)}</p>
+            <div className="flex justify-between items-center text-sm">
+              <p className="text-muted-foreground">Active Projects Expected Amount:</p>
+              <p className="font-bold text-primary">{currency.symbol}{totalExpectedProjectContributions.toFixed(2)}</p>
             </div>
-            <div className="flex justify-between items-center">
-              <p className="text-muted-foreground">Total Expenditure:</p>
-              <p className="text-xl font-bold text-destructive">{currency.symbol}{currentMonthExpenditure.toFixed(2)}</p>
-            </div>
-            <div className="flex justify-between items-center border-t pt-4">
-              <p className="text-muted-foreground">Net Balance:</p>
-              <p className={cn("text-xl font-bold", currentMonthNetBalance >= 0 ? "text-green-600" : "text-red-600")}>
-                {currency.symbol}{currentMonthNetBalance.toFixed(2)}
-              </p>
+            <div className="flex justify-between items-center text-sm">
+              <p className="text-muted-foreground">Paid Amount (Pledges):</p>
+              <p className="font-bold text-primary">{currency.symbol}{totalPaidPledges.toFixed(2)}</p>
             </div>
           </div>
 
