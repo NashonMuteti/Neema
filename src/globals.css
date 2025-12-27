@@ -267,4 +267,9 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Hide the "Don't have an account? Sign up" link in Supabase Auth UI */
+  .supabase-auth-ui_ui-label > a[href*="sign_up"] {
+    display: none !important;
+  }
 }
