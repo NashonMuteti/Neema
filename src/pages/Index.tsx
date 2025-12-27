@@ -15,10 +15,12 @@ import { useFinancialData } from "@/hooks/dashboard/useFinancialData";
 import { useDashboardProjects } from "@/hooks/dashboard/useDashboardProjects";
 import { useContributionsProgress } from "@/hooks/dashboard/useContributionsProgress";
 import { useFinancialSummary } from "@/hooks/dashboard/useFinancialSummary";
+import { useTranslation } from 'react-i18next'; // New import
 
 const Index = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
   const { headerTitle } = useBranding();
+  const { t } = useTranslation(); // Use the useTranslation hook
   
   const isAdmin = useMemo(() => currentUser?.role === "Admin" || currentUser?.role === "Super Admin", [currentUser]);
 
@@ -41,7 +43,7 @@ const Index = () => {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-foreground">{t("dashboard_title")}</h1>
         <p className="text-lg text-muted-foreground">Loading dashboard data...</p>
       </div>
     );
@@ -50,7 +52,7 @@ const Index = () => {
   if (anyError) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-foreground">{t("dashboard_title")}</h1>
         <p className="text-lg text-destructive">Error loading dashboard: {anyError}</p>
       </div>
     );
@@ -58,9 +60,9 @@ const Index = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+      <h1 className="text-3xl font-bold text-foreground">{t("dashboard_title")}</h1>
       <p className="text-lg text-muted-foreground">
-        Welcome to {headerTitle} Financial Hub.
+        {t("welcome_message")}
       </p>
 
       <FinancialSummaryBar

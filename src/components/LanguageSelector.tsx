@@ -11,31 +11,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Globe } from "lucide-react";
+import { useTranslation } from 'react-i18next'; // New import
 
 export function LanguageSelector() {
-  const [selectedLanguage, setSelectedLanguage] = React.useState("en"); // Default to English
+  const { i18n, t } = useTranslation(); // Use the useTranslation hook
 
-  // In a real application, this would trigger a change in i18n library
+  // Get the current language from i18n instance
+  const selectedLanguage = i18n.language;
+
   const handleLanguageChange = (value: string) => {
-    setSelectedLanguage(value);
+    i18n.changeLanguage(value); // Change the language using i18n instance
     console.log("Language changed to:", value);
-    // Here you would typically update your i18n library's language setting
   };
 
   return (
     <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
       <SelectTrigger className="w-[120px] h-8">
         <Globe className="mr-2 h-4 w-4" />
-        <SelectValue placeholder="Select language" />
+        <SelectValue placeholder={t("select_language")} />
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>
-          <SelectLabel>Languages</SelectLabel>
-          <SelectItem value="en">English</SelectItem>
-          <SelectItem value="es">Español</SelectItem>
-          <SelectItem value="fr">Français</SelectItem>
-          <SelectItem value="de">Deutsch</SelectItem>
-          <SelectItem value="sw">Kiswahili</SelectItem> {/* Added Swahili */}
+          <SelectLabel>{t("select_language")}</SelectLabel>
+          <SelectItem value="en">{t("language_english")}</SelectItem>
+          <SelectItem value="es">{t("language_spanish")}</SelectItem>
+          <SelectItem value="fr">{t("language_french")}</SelectItem>
+          <SelectItem value="de">{t("language_german")}</SelectItem>
+          <SelectItem value="sw">{t("language_swahili")}</SelectItem>
         </SelectGroup>
       </SelectContent>
     </Select>
