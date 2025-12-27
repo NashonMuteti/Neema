@@ -36,7 +36,7 @@ const MemberContributionsDetail: React.FC = () => {
   const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([]);
   const [memberName, setMemberName] = useState("Unknown Member");
   const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // ALL active projects in the system
-  const [activeMembersCount, setActiveMembersCount] = useState(0); // Total active members in the system
+  // Removed: [activeMembersCount, setActiveMembersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -186,18 +186,18 @@ const MemberContributionsDetail: React.FC = () => {
     if (allProjectsError) console.error("Error fetching all active projects:", allProjectsError);
     setAllActiveProjects(allProjectsData || []);
 
-    // Fetch active members count (for system-wide expected contributions)
-    const { count: membersCount, error: membersCountError } = await supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'Active');
+    // Removed: Fetch active members count (for system-wide expected contributions)
+    // const { count: membersCount, error: membersCountError } = await supabase
+    //   .from('profiles')
+    //   .select('id', { count: 'exact', head: true })
+    //   .eq('status', 'Active');
 
-    if (membersCountError) {
-      console.error("Error fetching active members count:", membersCountError);
-      setActiveMembersCount(0);
-    } else {
-      setActiveMembersCount(membersCount || 0);
-    }
+    // if (membersCountError) {
+    //   console.error("Error fetching active members count:", membersCountError);
+    //   setActiveMembersCount(0);
+    // } else {
+    //   setActiveMembersCount(membersCount || 0);
+    // }
 
     const filteredAndSorted = allContributions
       .filter(c => c.sourceOrPurpose.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -298,7 +298,7 @@ const MemberContributionsDetail: React.FC = () => {
         totalPaidPledges={totalPaidPledges}
         totalPendingPledges={totalPendingPledges}
         allActiveProjects={allActiveProjects} // Pass ALL active projects
-        activeMembersCount={activeMembersCount} // Pass active members count
+        // Removed: activeMembersCount={activeMembersCount} // Pass active members count
         memberId={memberId} // Pass memberId for specific collections
         renderDay={renderDay}
         memberName={memberName}

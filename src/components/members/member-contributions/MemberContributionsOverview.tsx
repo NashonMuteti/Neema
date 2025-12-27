@@ -34,7 +34,7 @@ interface MemberContributionsOverviewProps {
   totalPaidPledges: number;
   totalPendingPledges: number;
   allActiveProjects: Project[]; // ALL active projects in the system
-  activeMembersCount: number; // Total active members in the system
+  // Removed: activeMembersCount: number;
   memberId: string; // New prop: ID of the member being viewed
   renderDay: (day: Date) => JSX.Element;
 }
@@ -53,7 +53,7 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   totalPaidPledges,
   totalPendingPledges,
   allActiveProjects, // Use ALL active projects
-  activeMembersCount, // Use activeMembersCount
+  // Removed: activeMembersCount,
   memberId, // Use memberId
   renderDay
 }) => {
@@ -62,6 +62,11 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
     { projectId: string; projectName: string; expected: number; paid: number }[]
   >([]);
   const [loadingMemberProjectContributions, setLoadingMemberProjectContributions] = useState(true);
+
+  // Removed: Calculate total expected contributions from ALL active projects (system-wide)
+  // const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
+  //   sum + ((project.member_contribution_amount || 0) * activeMembersCount)
+  // , 0);
 
   // Fetch member's specific contributions to each active project
   useEffect(() => {

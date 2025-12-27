@@ -32,7 +32,7 @@ const MyContributions: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [myTransactions, setMyTransactions] = useState<Transaction[]>([]);
   const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // ALL active projects in the system
-  const [activeMembersCount, setActiveMembersCount] = useState(0); // Total active members in the system
+  // Removed: [activeMembersCount, setActiveMembersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,18 +141,18 @@ const MyContributions: React.FC = () => {
     if (allProjectsError) console.error("Error fetching all active projects:", allProjectsError);
     setAllActiveProjects(allProjectsData || []);
 
-    // Fetch active members count (for system-wide expected contributions)
-    const { count: membersCount, error: membersCountError } = await supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'Active');
+    // Removed: Fetch active members count (for system-wide expected contributions)
+    // const { count: membersCount, error: membersCountError } = await supabase
+    //   .from('profiles')
+    //   .select('id', { count: 'exact', head: true })
+    //   .eq('status', 'Active');
 
-    if (membersCountError) {
-      console.error("Error fetching active members count:", membersCountError);
-      setActiveMembersCount(0);
-    } else {
-      setActiveMembersCount(membersCount || 0);
-    }
+    // if (membersCountError) {
+    //   console.error("Error fetching active members count:", membersCountError);
+    //   setActiveMembersCount(0);
+    // } else {
+    //   setActiveMembersCount(membersCount || 0);
+    // }
 
     const filteredAndSorted = allTransactions
       .filter(t =>
@@ -245,7 +245,7 @@ const MyContributions: React.FC = () => {
             totalPaidPledges={totalPaidPledges}
             totalPendingPledges={totalPendingPledges}
             allActiveProjects={allActiveProjects} // Pass ALL active projects
-            activeMembersCount={activeMembersCount} // Pass active members count
+            // Removed: activeMembersCount={activeMembersCount}
             currentUserId={currentUser?.id || ''} // Pass current user ID for specific collections
             renderDay={renderDay}
             currency={currency}

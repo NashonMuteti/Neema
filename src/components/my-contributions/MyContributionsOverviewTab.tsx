@@ -46,7 +46,7 @@ interface MyContributionsOverviewTabProps {
   totalPaidPledges: number;
   totalPendingPledges: number;
   allActiveProjects: Project[]; // ALL active projects in the system
-  activeMembersCount: number; // Total active members in the system
+  // Removed: activeMembersCount: number; // Total active members in the system
   currentUserId: string; // New prop: ID of the current user
   renderDay: (day: Date) => JSX.Element;
   currency: { code: string; symbol: string };
@@ -65,7 +65,7 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   totalPaidPledges,
   totalPendingPledges,
   allActiveProjects, // Use ALL active projects
-  activeMembersCount, // Use activeMembersCount
+  // Removed: activeMembersCount,
   currentUserId, // Use currentUserId
   renderDay,
   currency,
@@ -75,10 +75,10 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   >([]);
   const [loadingMyProjectContributions, setLoadingMyProjectContributions] = useState(true);
 
-  // Calculate total expected contributions from ALL active projects (system-wide)
-  const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
-    sum + ((project.member_contribution_amount || 0) * activeMembersCount)
-  , 0);
+  // Removed: Calculate total expected contributions from ALL active projects (system-wide)
+  // const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
+  //   sum + ((project.member_contribution_amount || 0) * activeMembersCount)
+  // , 0);
 
   // Fetch user's specific contributions to each active project
   useEffect(() => {
@@ -207,11 +207,12 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
               <>
                 {transactionsByDate[format(selectedDate, "yyyy-MM-dd")].map((t) => {
                   const status = getContributionStatus(t.type, t.status);
+                  const isIncomeOrPaidPledge = t.type === 'income' || (t.type === 'pledge' && t.status === 'Paid');
                   return (
                     <div key={t.id} className="flex justify-between items-center text-sm">
                       <span>{t.description} ({t.accountOrProjectName})</span>
                       <Badge variant={status.variant}>
-                        {t.type === 'income' || (t.type === 'pledge' && t.status === 'Paid') ? '+' : '-'}{currency.symbol}{t.amount.toFixed(2)}
+                        {isIncomeOrPaidPledge ? '+' : '-'}{currency.symbol}{t.amount.toFixed(2)}
                       </Badge>
                     </div>
                   );
@@ -243,18 +244,6 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
                 <p className="text-muted-foreground">Total Pending Pledges:</p>
                 <p className="font-bold text-destructive">{currency.symbol}{totalPendingPledges.toFixed(2)}</p>
               </div>
-            </div>
-
-            {/* Total Expected Contributions from All Active Projects (System-wide) */}
-            <div className="border-t pt-4 space-y-2">
-              <h3 className="font-semibold text-lg">Total Expected from All Active Projects</h3>
-              <div className="flex justify-between items-center text-sm">
-                <p className="text-muted-foreground">Total Expected:</p>
-                <p className="font-bold text-primary">{currency.symbol}{totalExpectedAllProjectsContributions.toFixed(2)}</p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                (Based on {activeMembersCount} active members and 'member contribution amount' for all active projects)
-              </p>
             </div>
 
             {/* My Contributions to Active Projects (User-specific breakdown) */}
