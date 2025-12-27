@@ -1,12 +1,13 @@
 "use client";
-import React, { useState, useEffect } from "react"; // Added useState and useEffect
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, getMonth, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { getContributionStatus, MemberContribution, Project } from "./types";
+import { MemberContribution, Project } from "./types";
+import { getContributionStatus } from "@/utils/contributionUtils"; // Corrected import path
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import {
   Table,
