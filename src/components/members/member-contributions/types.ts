@@ -50,29 +50,14 @@ export interface PledgeTxRow {
   projects: { name: string } | null;
 }
 
-// Interface for projects created by the member, including their collections
-export interface MemberProjectWithCollections {
+// Generic Project interface for all active projects (system-wide)
+export interface Project { 
   id: string;
   name: string;
   member_contribution_amount: number | null;
-  totalCollections: number; // Amount actually collected for this project
 }
 
-type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
-
-export const getContributionStatus = (type: MemberContribution['type'], status?: MemberContribution['status']): { text: string; variant: BadgeVariant } => {
-  if (type === 'income') {
-    return { text: "Income", variant: "default" };
-  } else if (type === 'expenditure') {
-    return { text: "Expenditure", variant: "destructive" };
-  } else if (type === 'petty_cash') {
-    return { text: "Petty Cash", variant: "secondary" };
-  } else if (type === 'pledge') {
-    if (status === 'Paid') {
-      return { text: "Pledge (Paid)", variant: "default" };
-    } else if (status === 'Active' || status === 'Overdue') {
-      return { text: "Pledge (Pending)", variant: "destructive" };
-    }
-  }
-  return { text: "Unknown", variant: "outline" };
-};
+export interface MonthYearOption {
+  value: string;
+  label: string;
+}

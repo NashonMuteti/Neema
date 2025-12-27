@@ -18,7 +18,6 @@ import {
   ExpenditureTxRow, 
   PettyCashTxRow,
   PledgeTxRow,
-  MemberProjectWithCollections, // New import
   Project // Generic Project interface for all active projects
 } from "@/components/members/member-contributions/types";
 
@@ -36,7 +35,6 @@ const MemberContributionsDetail: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([]);
   const [memberName, setMemberName] = useState("Unknown Member");
-  const [memberProjectsWithCollections, setMemberProjectsWithCollections] = useState<MemberProjectWithCollections[]>([]); // Projects CREATED BY THIS MEMBER
   const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // ALL active projects in the system
   const [activeMembersCount, setActiveMembersCount] = useState(0); // Total active members in the system
   const [loading, setLoading] = useState(true);
@@ -179,41 +177,7 @@ const MemberContributionsDetail: React.FC = () => {
       dueDate: parseISO(pledge.due_date),
     }));
 
-    // Fetch projects where this member is the creator AND their collections
-    const { data: memberCreatedProjectsData, error: memberCreatedProjectsError } = await supabase
-      .from('projects')
-      .select('id, name, member_contribution_amount')
-      .eq('profile_id', memberId)
-      .eq('status', 'Open'); // Only open projects
-
-    if (memberCreatedProjectsError) {
-      console.error("Error fetching member's created projects:", memberCreatedProjectsError);
-      setError("Failed to load member's created projects.");
-      setMemberProjectsWithCollections([]);
-    } else {
-      const projectsWithCollections: MemberProjectWithCollections[] = [];
-      for (const project of memberCreatedProjectsData || []) {
-        const { data: collectionsData, error: collectionsError } = await supabase
-          .from('project_collections')
-          .select('amount')
-          .eq('project_id', project.id);
-
-        if (collectionsError) {
-          console.error(`Error fetching collections for project ${project.name}:`, collectionsError);
-          // Continue even if collections fail for one project
-        }
-        const totalCollections = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
-        projectsWithCollections.push({
-          id: project.id,
-          name: project.name,
-          member_contribution_amount: project.member_contribution_amount,
-          totalCollections: totalCollections,
-        });
-      }
-      setMemberProjectsWithCollections(projectsWithCollections);
-    }
-
-    // Fetch ALL active projects (for system-wide expected contributions)
+    // Fetch ALL active projects (for system-wide expected contributions AND member-specific project breakdown)
     const { data: allProjectsData, error: allProjectsError } = await supabase
       .from('projects')
       .select('id, name, member_contribution_amount')
@@ -333,9 +297,9 @@ const MemberContributionsDetail: React.FC = () => {
         contributionsByDate={contributionsByDate}
         totalPaidPledges={totalPaidPledges}
         totalPendingPledges={totalPendingPledges}
-        memberProjectsWithCollections={memberProjectsWithCollections} // Pass projects CREATED BY THIS MEMBER
         allActiveProjects={allActiveProjects} // Pass ALL active projects
         activeMembersCount={activeMembersCount} // Pass active members count
+        memberId={memberId} // Pass memberId for specific collections
         renderDay={renderDay}
         memberName={memberName}
         searchQuery={searchQuery}

@@ -3,7 +3,7 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MemberContributionsOverview from "./MemberContributionsOverview";
 import MemberContributionsDetailed from "./MemberContributionsDetailed";
-import { MemberContribution, MemberProjectWithCollections, Project } from "./types";
+import { MemberContribution, Project } from "./types";
 
 interface MemberContributionsTabsProps {
   selectedDate: Date | undefined;
@@ -18,9 +18,9 @@ interface MemberContributionsTabsProps {
   contributionsByDate: Record<string, MemberContribution[]>;
   totalPaidPledges: number;
   totalPendingPledges: number;
-  memberProjectsWithCollections: MemberProjectWithCollections[]; // Projects CREATED BY THIS MEMBER
   allActiveProjects: Project[]; // ALL active projects in the system
   activeMembersCount: number; // Total active members in the system
+  memberId: string; // New prop: ID of the member being viewed
   renderDay: (day: Date) => JSX.Element;
   memberName: string;
   searchQuery: string;
@@ -40,9 +40,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
   contributionsByDate,
   totalPaidPledges,
   totalPendingPledges,
-  memberProjectsWithCollections, // Use projects CREATED BY THIS MEMBER
   allActiveProjects, // Use ALL active projects
   activeMembersCount, // Use activeMembersCount
+  memberId, // Use memberId
   renderDay,
   memberName,
   searchQuery,
@@ -69,9 +69,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
           contributionsByDate={contributionsByDate}
           totalPaidPledges={totalPaidPledges}
           totalPendingPledges={totalPendingPledges}
-          memberProjectsWithCollections={memberProjectsWithCollections} // Pass projects CREATED BY THIS MEMBER
           allActiveProjects={allActiveProjects} // Pass ALL active projects
           activeMembersCount={activeMembersCount} // Pass active members count
+          memberId={memberId} // Pass memberId
           renderDay={renderDay}
         />
       </TabsContent>

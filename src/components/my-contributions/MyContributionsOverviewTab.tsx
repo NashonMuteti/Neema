@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -19,7 +19,6 @@ import {
   Transaction,
   getContributionStatus,
   MonthYearOption,
-  MemberProjectWithCollections, // New import
   Project // Generic Project interface for all active projects
 } from "./types";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
@@ -31,6 +30,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { showError } from "@/utils/toast";
 
 interface MyContributionsOverviewTabProps {
   selectedDate: Date | undefined;
@@ -44,9 +45,9 @@ interface MyContributionsOverviewTabProps {
   transactionsByDate: Record<string, Transaction[]>;
   totalPaidPledges: number;
   totalPendingPledges: number;
-  myProjectsWithCollections: MemberProjectWithCollections[]; // Projects CREATED BY THIS USER
   allActiveProjects: Project[]; // ALL active projects in the system
   activeMembersCount: number; // Total active members in the system
+  currentUserId: string; // New prop: ID of the current user
   renderDay: (day: Date) => JSX.Element;
   currency: { code: string; symbol: string };
 }
@@ -63,21 +64,67 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   transactionsByDate,
   totalPaidPledges,
   totalPendingPledges,
-  myProjectsWithCollections, // Use projects CREATED BY THIS USER
   allActiveProjects, // Use ALL active projects
   activeMembersCount, // Use activeMembersCount
+  currentUserId, // Use currentUserId
   renderDay,
   currency,
 }) => {
+  const [myProjectContributions, setMyProjectContributions] = useState<
+    { projectId: string; projectName: string; expected: number; paid: number }[]
+  >([]);
+  const [loadingMyProjectContributions, setLoadingMyProjectContributions] = useState(true);
+
   // Calculate total expected contributions from ALL active projects (system-wide)
   const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
     sum + ((project.member_contribution_amount || 0) * activeMembersCount)
   , 0);
 
-  // Calculate totals for projects created by the member (for the specific breakdown)
-  const totalExpectedFromMyProjects = myProjectsWithCollections.reduce((sum, project) => sum + (project.member_contribution_amount || 0), 0);
-  const totalPaidForMyProjects = myProjectsWithCollections.reduce((sum, project) => sum + project.totalCollections, 0);
-  const balanceToPayForMyProjects = totalExpectedFromMyProjects - totalPaidForMyProjects;
+  // Fetch user's specific contributions to each active project
+  useEffect(() => {
+    const fetchMyProjectContributions = async () => {
+      setLoadingMyProjectContributions(true);
+      const contributions: { projectId: string; projectName: string; expected: number; paid: number }[] = [];
+
+      for (const project of allActiveProjects) {
+        const expected = project.member_contribution_amount || 0;
+
+        // Fetch collections specifically from this user for this project
+        const { data: collectionsData, error: collectionsError } = await supabase
+          .from('project_collections')
+          .select('amount')
+          .eq('project_id', project.id)
+          .eq('member_id', currentUserId); // Filter by the current user
+
+        if (collectionsError) {
+          console.error(`Error fetching collections for project ${project.name} by user ${currentUserId}:`, collectionsError);
+          showError(`Failed to load collections for project ${project.name}.`);
+        }
+        const paid = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
+
+        contributions.push({
+          projectId: project.id,
+          projectName: project.name,
+          expected: expected,
+          paid: paid,
+        });
+      }
+      setMyProjectContributions(contributions);
+      setLoadingMyProjectContributions(false);
+    };
+
+    if (allActiveProjects.length > 0 && currentUserId) {
+      fetchMyProjectContributions();
+    } else {
+      setMyProjectContributions([]);
+      setLoadingMyProjectContributions(false);
+    }
+  }, [allActiveProjects, currentUserId]);
+
+  // Calculate totals for the "My Contributions to Active Projects" table
+  const totalExpectedFromUserToAllProjects = myProjectContributions.reduce((sum, p) => sum + p.expected, 0);
+  const totalPaidFromUserToAllProjects = myProjectContributions.reduce((sum, p) => sum + p.paid, 0);
+  const balanceToPayFromUserToAllProjects = totalExpectedFromUserToAllProjects - totalPaidFromUserToAllProjects;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -210,10 +257,15 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
               </p>
             </div>
 
-            {/* Projects Created by Member Summary (Member-specific breakdown) */}
-            {myProjectsWithCollections.length > 0 && (
+            {/* My Contributions to Active Projects (User-specific breakdown) */}
+            {loadingMyProjectContributions ? (
               <div className="border-t pt-4 space-y-2">
-                <h3 className="font-semibold text-lg">Projects Created by Me</h3>
+                <h3 className="font-semibold text-lg">My Contributions to Active Projects</h3>
+                <p className="text-muted-foreground">Loading project contributions...</p>
+              </div>
+            ) : myProjectContributions.length > 0 ? (
+              <div className="border-t pt-4 space-y-2">
+                <h3 className="font-semibold text-lg">My Contributions to Active Projects</h3>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -223,24 +275,29 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {myProjectsWithCollections.map(project => (
-                      <TableRow key={project.id}>
-                        <TableCell>{project.name}</TableCell>
-                        <TableCell className="text-right">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)}</TableCell>
-                        <TableCell className="text-right">{currency.symbol}{project.totalCollections.toFixed(2)}</TableCell>
+                    {myProjectContributions.map(project => (
+                      <TableRow key={project.projectId}>
+                        <TableCell>{project.projectName}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{project.expected.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{project.paid.toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{totalExpectedFromMyProjects.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{totalPaidForMyProjects.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{totalExpectedFromUserToAllProjects.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{totalPaidFromUserToAllProjects.toFixed(2)}</TableCell>
                     </TableRow>
                     <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                       <TableCell colSpan={2}>Balance to Pay</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{balanceToPayForMyProjects.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{balanceToPayFromUserToAllProjects.toFixed(2)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
+              </div>
+            ) : (
+              <div className="border-t pt-4 space-y-2">
+                <h3 className="font-semibold text-lg">My Contributions to Active Projects</h3>
+                <p className="text-muted-foreground">No active projects found for you to contribute to.</p>
               </div>
             )}
           </CardContent>
