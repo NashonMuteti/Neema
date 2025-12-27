@@ -16,8 +16,8 @@ interface MemberContributionsTabsProps {
   years: { value: string; label: string }[];
   memberContributions: MemberContribution[];
   contributionsByDate: Record<string, MemberContribution[]>;
-  totalYearlyPledgedAmount: number; // New prop
-  totalYearlyPaidAmount: number;     // New prop
+  totalYearlyPledgedAmount: number;
+  totalYearlyPaidAmount: number;
   allActiveProjects: Project[]; // ALL active projects in the system
   memberId: string; // New prop: ID of the member being viewed
   renderDay: (day: Date) => JSX.Element;
@@ -37,8 +37,8 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
   years,
   memberContributions,
   contributionsByDate,
-  totalYearlyPledgedAmount, // Destructure new prop
-  totalYearlyPaidAmount,     // Destructure new prop
+  totalYearlyPledgedAmount,
+  totalYearlyPaidAmount,
   allActiveProjects, // Use ALL active projects
   memberId, // Use memberId
   renderDay,
@@ -65,8 +65,8 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
           years={years}
           memberContributions={memberContributions}
           contributionsByDate={contributionsByDate}
-          totalYearlyPledgedAmount={totalYearlyPledgedAmount} {/* New prop */}
-          totalYearlyPaidAmount={totalYearlyPaidAmount}     {/* New prop */}
+          totalYearlyPledgedAmount={totalYearlyPledgedAmount}
+          totalYearlyPaidAmount={totalYearlyPaidAmount}
           allActiveProjects={allActiveProjects} // Pass ALL active projects
           memberId={memberId} // Pass memberId
           renderDay={renderDay}

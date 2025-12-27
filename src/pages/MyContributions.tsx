@@ -32,8 +32,8 @@ const MyContributions: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [myTransactions, setMyTransactions] = useState<Transaction[]>([]);
   const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // ALL active projects in the system
-  const [totalYearlyPledgedAmount, setTotalYearlyPledgedAmount] = useState(0); // New state for yearly pledged
-  const [totalYearlyPaidAmount, setTotalYearlyPaidAmount] = useState(0); // New state for yearly paid
+  const [totalYearlyPledgedAmount, setTotalYearlyPledgedAmount] = useState(0);
+  const [totalYearlyPaidAmount, setTotalYearlyPaidAmount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -248,8 +248,8 @@ const MyContributions: React.FC = () => {
             months={months}
             years={years}
             transactionsByDate={transactionsByDate}
-            totalYearlyPledgedAmount={totalYearlyPledgedAmount} {/* New prop */}
-            totalYearlyPaidAmount={totalYearlyPaidAmount}     {/* New prop */}
+            totalYearlyPledgedAmount={totalYearlyPledgedAmount}
+            totalYearlyPaidAmount={totalYearlyPaidAmount}
             allActiveProjects={allActiveProjects} // Pass ALL active projects
             currentUserId={currentUser?.id || ''} // Pass current user ID for specific collections
             renderDay={renderDay}

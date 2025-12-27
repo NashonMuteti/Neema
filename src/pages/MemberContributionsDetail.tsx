@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { format, getMonth, getYear, parseISO, startOfYear, endOfYear } from "date-fns"; // Added startOfYear, endOfYear
+import { format, getMonth, getYear, parseISO, startOfYear, endOfYear } from "date-fns";
 import { useViewingMember } from "@/context/ViewingMemberContext";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,8 +36,8 @@ const MemberContributionsDetail: React.FC = () => {
   const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([]);
   const [memberName, setMemberName] = useState("Unknown Member");
   const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // ALL active projects in the system
-  const [totalYearlyPledgedAmount, setTotalYearlyPledgedAmount] = useState(0); // New state for yearly pledged
-  const [totalYearlyPaidAmount, setTotalYearlyPaidAmount] = useState(0);     // New state for yearly paid
+  const [totalYearlyPledgedAmount, setTotalYearlyPledgedAmount] = useState(0);
+  const [totalYearlyPaidAmount, setTotalYearlyPaidAmount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -104,7 +104,7 @@ const MemberContributionsDetail: React.FC = () => {
 
     const allContributions: MemberContribution[] = [];
       
-    // Fetch Income Transactions for the selected month/year
+    // Fetch Income Transactions
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
       .select('id, date, amount, source, financial_accounts(name)')
@@ -122,7 +122,7 @@ const MemberContributionsDetail: React.FC = () => {
       accountName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Expenditure Transactions for the selected month/year
+    // Fetch Expenditure Transactions
     const { data: expenditureData, error: expenditureError } = await supabase
       .from('expenditure_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
@@ -140,7 +140,7 @@ const MemberContributionsDetail: React.FC = () => {
       accountName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Petty Cash Transactions for the selected month/year
+    // Fetch Petty Cash Transactions
     const { data: pettyCashData, error: pettyCashError } = await supabase
       .from('petty_cash_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
@@ -158,16 +158,16 @@ const MemberContributionsDetail: React.FC = () => {
       accountName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Project Pledges for the selected month/year (for detailed view)
-    const { data: pledgesDataForMonth, error: pledgesErrorForMonth } = await supabase
+    // Fetch Project Pledges
+    const { data: pledgesData, error: pledgesError } = await supabase
       .from('project_pledges')
       .select('id, due_date, amount, status, comments, projects(name)')
       .eq('member_id', memberId)
       .gte('due_date', startOfMonth.toISOString())
       .lte('due_date', endOfMonth.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
 
-    if (pledgesErrorForMonth) console.error("Error fetching pledges for month:", pledgesErrorForMonth);
-    pledgesDataForMonth?.forEach(pledge => allContributions.push({
+    if (pledgesError) console.error("Error fetching pledges:", pledgesError);
+    pledgesData?.forEach(pledge => allContributions.push({
       id: pledge.id,
       type: 'pledge',
       date: parseISO(pledge.due_date), // Use due_date as the transaction date for pledges
@@ -177,29 +177,6 @@ const MemberContributionsDetail: React.FC = () => {
       status: pledge.status,
       dueDate: parseISO(pledge.due_date),
     }));
-
-    // --- New: Fetch ALL pledges for the CURRENT YEAR for the Pledge Summary ---
-    const startOfCurrentYear = startOfYear(new Date(currentYear, 0, 1));
-    const endOfCurrentYear = endOfYear(new Date(currentYear, 0, 1));
-
-    const { data: yearlyPledgesData, error: yearlyPledgesError } = await supabase
-      .from('project_pledges')
-      .select('amount, status')
-      .eq('member_id', memberId)
-      .gte('due_date', startOfCurrentYear.toISOString())
-      .lte('due_date', endOfCurrentYear.toISOString()) as { data: { amount: number; status: "Active" | "Paid" | "Overdue" }[] | null, error: PostgrestError | null };
-
-    if (yearlyPledgesError) {
-      console.error("Error fetching yearly pledges:", yearlyPledgesError);
-      setTotalYearlyPledgedAmount(0);
-      setTotalYearlyPaidAmount(0);
-    } else {
-      const totalPledged = (yearlyPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
-      const totalPaid = (yearlyPledgesData || []).filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
-      setTotalYearlyPledgedAmount(totalPledged);
-      setTotalYearlyPaidAmount(totalPaid);
-    }
-    // --- End New Pledge Summary Fetch ---
 
     // Fetch ALL active projects (for system-wide expected contributions AND member-specific project breakdown)
     const { data: allProjectsData, error: allProjectsError } = await supabase
@@ -216,7 +193,7 @@ const MemberContributionsDetail: React.FC = () => {
       
     setMemberContributions(filteredAndSorted);
     setLoading(false);
-  }, [memberId, currentUser, authLoading, filterMonth, filterYear, searchQuery, currentYear, setViewingMemberName]); // Added currentYear to dependencies
+  }, [memberId, currentUser, authLoading, filterMonth, filterYear, searchQuery, currentYear, setViewingMemberName]);
 
   useEffect(() => {
     fetchMemberData();
@@ -282,6 +259,7 @@ const MemberContributionsDetail: React.FC = () => {
         </Button>
       </div>
     );
+  );
   }
 
   return (
@@ -302,8 +280,8 @@ const MemberContributionsDetail: React.FC = () => {
         years={years}
         memberContributions={memberContributions}
         contributionsByDate={contributionsByDate}
-        totalYearlyPledgedAmount={totalYearlyPledgedAmount} {/* New prop */}
-        totalYearlyPaidAmount={totalYearlyPaidAmount}     {/* New prop */}
+        totalYearlyPledgedAmount={totalYearlyPledgedAmount}
+        totalYearlyPaidAmount={totalYearlyPaidAmount}
         allActiveProjects={allActiveProjects} // Pass ALL active projects
         memberId={memberId} // Pass memberId
         renderDay={renderDay}
