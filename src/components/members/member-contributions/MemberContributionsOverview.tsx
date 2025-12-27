@@ -36,6 +36,9 @@ interface MemberContributionsOverviewProps {
   allActiveProjects: Project[]; // ALL active projects in the system
   memberId: string; // New prop: ID of the member being viewed
   renderDay: (day: Date) => JSX.Element;
+  memberName: string;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
 }
 
 const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = ({
@@ -124,9 +127,9 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   const overallBalanceDue = subtotalExpected - subtotalPaid;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Changed to lg:grid-cols-3 */}
       {/* Calendar and Filters */}
-      <Card className="lg:col-span-2 transition-all duration-300 ease-in-out hover:shadow-xl">
+      <Card className="lg:col-span-1 transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
           <CardTitle>Activity Calendar</CardTitle>
         </CardHeader>
@@ -193,80 +196,92 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
         </CardContent>
       </Card>
       
-      {/* Financial Summary */}
-      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
-          <CardTitle>Contributions Summary per Project</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {loadingMemberProjectContributionsSummary ? (
-            <div className="space-y-2">
-              <p className="text-muted-foreground">Loading project contributions...</p>
-            </div>
-          ) : memberProjectContributionsSummary.length > 0 ? (
-            <div className="space-y-2">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Project</TableHead>
-                    <TableHead className="text-right">Expected</TableHead>
-                    <TableHead className="text-right">Pledged</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {memberProjectContributionsSummary.map(project => (
-                    <TableRow key={project.projectId}>
-                      <TableCell>{project.projectName}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{project.expected.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{project.pledged.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{project.paid.toFixed(2)}</TableCell>
+      {/* Activity on Selected Date and Contributions Summary */}
+      <div className="grid grid-cols-1 gap-6 lg:col-span-2"> {/* Changed to lg:col-span-2 */}
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+          <CardHeader>
+            <CardTitle>Activity on {selectedDate ? format(selectedDate, "PPP") : "Selected Date"}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {selectedDate && contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
+              <>
+                {contributionsByDate[format(selectedDate, "yyyy-MM-dd")]
+                  .filter(t => t.type === 'income' || t.type === 'pledge') // Filter for contributions/pledges only
+                  .map((c) => {
+                  const status = getContributionStatus(c.type, c.status);
+                  const isIncomeOrPaidPledge = c.type === 'income' || (c.type === 'pledge' && c.status === 'Paid');
+                  return (
+                    <div key={c.id} className="flex justify-between items-center text-sm">
+                      <span>{c.sourceOrPurpose} ({c.accountName})</span>
+                      <Badge variant={status.variant}>
+                        {isIncomeOrPaidPledge ? '+' : '-'}{currency.symbol}{c.amount.toFixed(2)}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {selectedDate && !contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
+              <p className="text-muted-foreground text-sm">
+                No activity on {format(selectedDate, "PPP")}.
+              </p>
+            )}
+            {!selectedDate && (
+              <p className="text-muted-foreground text-sm">Select a date on the calendar to view activity.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+          <CardHeader>
+            <CardTitle>Contributions Summary per Project</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingMemberProjectContributionsSummary ? (
+              <div className="space-y-2">
+                <p className="text-muted-foreground">Loading project contributions...</p>
+              </div>
+            ) : memberProjectContributionsSummary.length > 0 ? (
+              <div className="space-y-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Project</TableHead>
+                      <TableHead className="text-right">Expected</TableHead>
+                      <TableHead className="text-right">Pledged</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
                     </TableRow>
-                  ))}
-                  <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                    <TableCell>Subtotal</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{subtotalExpected.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{subtotalPledged.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{subtotalPaid.toFixed(2)}</TableCell>
-                  </TableRow>
-                  <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                    <TableCell colSpan={3}>Balance to Pay</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{overallBalanceDue.toFixed(2)}</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-muted-foreground">No active projects found for this member to contribute to.</p>
-            </div>
-          )}
-          
-          {selectedDate && contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
-            <div className="mt-6 space-y-2">
-              <h3 className="font-semibold text-lg">Activity on {format(selectedDate, "PPP")}</h3>
-              {contributionsByDate[format(selectedDate, "yyyy-MM-dd")].map((c) => {
-                const status = getContributionStatus(c.type, c.status);
-                const isIncomeOrPaidPledge = c.type === 'income' || (c.type === 'pledge' && c.status === 'Paid');
-                return (
-                  <div key={c.id} className="flex justify-between items-center text-sm">
-                    <span>{c.sourceOrPurpose} ({c.accountName})</span>
-                    <Badge variant={status.variant}>
-                      {isIncomeOrPaidPledge ? '+' : '-'}{currency.symbol}{c.amount.toFixed(2)}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          
-          {selectedDate && !contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
-            <p className="text-muted-foreground text-sm mt-6">
-              No activity on {format(selectedDate, "PPP")}.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {memberProjectContributionsSummary.map(project => (
+                      <TableRow key={project.projectId}>
+                        <TableCell>{project.projectName}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{project.expected.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{project.pledged.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{project.paid.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                      <TableCell>Subtotal</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{subtotalExpected.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{subtotalPledged.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{subtotalPaid.toFixed(2)}</TableCell>
+                    </TableRow>
+                    <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                      <TableCell colSpan={3}>Balance to Pay</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{overallBalanceDue.toFixed(2)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-muted-foreground">No active projects found for this member to contribute to.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
