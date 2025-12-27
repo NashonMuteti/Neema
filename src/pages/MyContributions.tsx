@@ -18,7 +18,8 @@ import {
   IncomeTxRow,
   ExpenditureTxRow,
   PettyCashTxRow,
-  Project // Generic Project interface for all active projects
+  Project, // Generic Project interface for all active projects
+  FinancialAccountName
 } from "@/components/my-contributions/types";
 
 const MyContributions: React.FC = () => {
@@ -61,14 +62,13 @@ const MyContributions: React.FC = () => {
     const allTransactions: Transaction[] = [];
 
     // Fetch Income Transactions for the selected year, filtered for project-related income
-    const { data: incomeData, error: incomeError } = await supabase
+    const { data: incomeData, error: incomeError } = (await supabase
       .from('income_transactions')
       .select('id, date, amount, source, financial_accounts(name), pledge_id') // Select pledge_id
       .eq('profile_id', currentUser.id)
       .gte('date', startOfPeriod.toISOString())
       .lte('date', endOfPeriod.toISOString())
-      .or('source.ilike.%Project Collection:%,pledge_id.not.is.null') // Filter for project collections or paid pledges
-      as { data: IncomeTxRow[] | null, error: PostgrestError | null };
+      .or('source.ilike.%Project Collection:%,pledge_id.not.is.null')) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
     if (incomeError) console.error("Error fetching income:", incomeError);
     incomeData?.forEach(tx => allTransactions.push({
@@ -77,7 +77,7 @@ const MyContributions: React.FC = () => {
       date: parseISO(tx.date),
       amount: tx.amount,
       description: tx.source,
-      accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account',
+      accountOrProjectName: (tx.financial_accounts as FinancialAccountName)?.name || 'Unknown Account',
       pledgeId: tx.pledge_id || undefined, // Include pledgeId
     }));
 

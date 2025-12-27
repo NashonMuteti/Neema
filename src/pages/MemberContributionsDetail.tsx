@@ -18,7 +18,8 @@ import {
   ExpenditureTxRow, 
   PettyCashTxRow,
   PledgeTxRow,
-  Project // Generic Project interface for all active projects
+  Project, // Generic Project interface for all active projects
+  FinancialAccountName
 } from "@/components/members/member-contributions/types";
 
 
@@ -106,14 +107,13 @@ const MemberContributionsDetail: React.FC = () => {
     const allContributions: MemberContribution[] = [];
       
     // Fetch Income Transactions for the selected year, filtered for project-related income
-    const { data: incomeData, error: incomeError } = await supabase
+    const { data: incomeData, error: incomeError } = (await supabase
       .from('income_transactions')
       .select('id, date, amount, source, financial_accounts(name), pledge_id') // Select pledge_id
       .eq('profile_id', memberId)
       .gte('date', startOfPeriod.toISOString())
       .lte('date', endOfPeriod.toISOString())
-      .or('source.ilike.%Project Collection:%,pledge_id.not.is.null') // Filter for project collections or paid pledges
-      as { data: IncomeTxRow[] | null, error: PostgrestError | null };
+      .or('source.ilike.%Project Collection:%,pledge_id.not.is.null')) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
     if (incomeError) console.error("Error fetching income:", incomeError);
     incomeData?.forEach(tx => allContributions.push({
@@ -122,7 +122,7 @@ const MemberContributionsDetail: React.FC = () => {
       date: parseISO(tx.date),
       amount: tx.amount,
       sourceOrPurpose: tx.source,
-      accountName: tx.financial_accounts?.name || 'Unknown Account',
+      accountName: (tx.financial_accounts as FinancialAccountName)?.name || 'Unknown Account',
       pledgeId: tx.pledge_id || undefined, // Include pledgeId
     }));
 
@@ -132,7 +132,7 @@ const MemberContributionsDetail: React.FC = () => {
       .select('id, due_date, amount, status, comments, projects(name)')
       .eq('member_id', memberId)
       .gte('due_date', startOfPeriod.toISOString())
-      .lte('due_period', endOfPeriod.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
+      .lte('due_date', endOfPeriod.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
 
     if (pledgesError) console.error("Error fetching pledges:", pledgesError);
     pledgesData?.forEach(pledge => allContributions.push({
