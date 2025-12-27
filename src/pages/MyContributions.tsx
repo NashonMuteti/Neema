@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, getMonth, getYear, parseISO, startOfYear, endOfYear } from "date-fns"; // Added startOfYear, endOfYear
+import { format, getMonth, getYear, parseISO, startOfYear, endOfYear } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
@@ -137,6 +137,9 @@ const MyContributions: React.FC = () => {
     const startOfCurrentYear = startOfYear(new Date(currentYear, 0, 1));
     const endOfCurrentYear = endOfYear(new Date(currentYear, 0, 1));
 
+    console.log("MyContributions: Fetching yearly pledges for user:", currentUser.id, "Year:", currentYear);
+    console.log("MyContributions: Date range:", startOfCurrentYear.toISOString(), "to", endOfCurrentYear.toISOString());
+
     const { data: yearlyPledgesData, error: yearlyPledgesError } = await supabase
       .from('project_pledges')
       .select('amount, status')
@@ -145,14 +148,16 @@ const MyContributions: React.FC = () => {
       .lte('due_date', endOfCurrentYear.toISOString()) as { data: { amount: number; status: "Active" | "Paid" | "Overdue" }[] | null, error: PostgrestError | null };
 
     if (yearlyPledgesError) {
-      console.error("Error fetching yearly pledges:", yearlyPledgesError);
+      console.error("MyContributions: Error fetching yearly pledges:", yearlyPledgesError);
       setTotalYearlyPledgedAmount(0);
       setTotalYearlyPaidAmount(0);
     } else {
+      console.log("MyContributions: Yearly pledges data:", yearlyPledgesData);
       const totalPledged = (yearlyPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
       const totalPaid = (yearlyPledgesData || []).filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
       setTotalYearlyPledgedAmount(totalPledged);
       setTotalYearlyPaidAmount(totalPaid);
+      console.log("MyContributions: Calculated totalPledged:", totalPledged, "totalPaid:", totalPaid);
     }
     // --- End New Pledge Summary Fetch ---
 
@@ -174,7 +179,7 @@ const MyContributions: React.FC = () => {
 
     setMyTransactions(filteredAndSorted);
     setLoading(false);
-  }, [currentUser, filterMonth, filterYear, searchQuery, currentYear]); // Added currentYear to dependencies
+  }, [currentUser, filterMonth, filterYear, searchQuery, currentYear]);
 
   useEffect(() => {
     if (!authLoading) {

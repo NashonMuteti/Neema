@@ -104,7 +104,7 @@ const MemberContributionsDetail: React.FC = () => {
 
     const allContributions: MemberContribution[] = [];
       
-    // Fetch Income Transactions
+    // Fetch Income Transactions for the selected month/year
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
       .select('id, date, amount, source, financial_accounts(name)')
@@ -122,7 +122,7 @@ const MemberContributionsDetail: React.FC = () => {
       accountName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Expenditure Transactions
+    // Fetch Expenditure Transactions for the selected month/year
     const { data: expenditureData, error: expenditureError } = await supabase
       .from('expenditure_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
@@ -140,7 +140,7 @@ const MemberContributionsDetail: React.FC = () => {
       accountName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Petty Cash Transactions
+    // Fetch Petty Cash Transactions for the selected month/year
     const { data: pettyCashData, error: pettyCashError } = await supabase
       .from('petty_cash_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
@@ -158,7 +158,7 @@ const MemberContributionsDetail: React.FC = () => {
       accountName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Project Pledges
+    // Fetch Project Pledges for the selected month/year (for detailed view)
     const { data: pledgesData, error: pledgesError } = await supabase
       .from('project_pledges')
       .select('id, due_date, amount, status, comments, projects(name)')
@@ -177,6 +177,34 @@ const MemberContributionsDetail: React.FC = () => {
       status: pledge.status,
       dueDate: parseISO(pledge.due_date),
     }));
+
+    // --- New: Fetch ALL pledges for the CURRENT YEAR for the Pledge Summary ---
+    const startOfCurrentYear = startOfYear(new Date(currentYear, 0, 1));
+    const endOfCurrentYear = endOfYear(new Date(currentYear, 0, 1));
+
+    console.log("MemberContributionsDetail: Fetching yearly pledges for member:", memberId, "Year:", currentYear);
+    console.log("MemberContributionsDetail: Date range:", startOfCurrentYear.toISOString(), "to", endOfCurrentYear.toISOString());
+
+    const { data: yearlyPledgesData, error: yearlyPledgesError } = await supabase
+      .from('project_pledges')
+      .select('amount, status')
+      .eq('member_id', memberId)
+      .gte('due_date', startOfCurrentYear.toISOString())
+      .lte('due_date', endOfCurrentYear.toISOString()) as { data: { amount: number; status: "Active" | "Paid" | "Overdue" }[] | null, error: PostgrestError | null };
+
+    if (yearlyPledgesError) {
+      console.error("MemberContributionsDetail: Error fetching yearly pledges:", yearlyPledgesError);
+      setTotalYearlyPledgedAmount(0);
+      setTotalYearlyPaidAmount(0);
+    } else {
+      console.log("MemberContributionsDetail: Yearly pledges data:", yearlyPledgesData);
+      const totalPledged = (yearlyPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
+      const totalPaid = (yearlyPledgesData || []).filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
+      setTotalYearlyPledgedAmount(totalPledged);
+      setTotalYearlyPaidAmount(totalPaid);
+      console.log("MemberContributionsDetail: Calculated totalPledged:", totalPledged, "totalPaid:", totalPaid);
+    }
+    // --- End New Pledge Summary Fetch ---
 
     // Fetch ALL active projects (for system-wide expected contributions AND member-specific project breakdown)
     const { data: allProjectsData, error: allProjectsError } = await supabase
