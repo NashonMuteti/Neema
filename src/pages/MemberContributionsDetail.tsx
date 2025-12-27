@@ -259,7 +259,6 @@ const MemberContributionsDetail: React.FC = () => {
         </Button>
       </div>
     );
-  );
   }
 
   return (
