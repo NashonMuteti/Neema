@@ -44,11 +44,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-}
+import { FinancialAccount, MonthYearOption } from "@/types/common"; // Updated import
 
 interface ProjectCollection {
   id: string;
@@ -76,11 +72,11 @@ const TableBankingSummary: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const months = Array.from({ length: 12 }, (_, i) => ({
+  const months: MonthYearOption[] = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
     label: format(new Date(0, i), "MMMM"),
   }));
-  const years = Array.from({ length: 5 }, (_, i) => ({
+  const years: MonthYearOption[] = Array.from({ length: 5 }, (_, i) => ({
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
   }));
@@ -96,7 +92,7 @@ const TableBankingSummary: React.FC = () => {
 
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
-      .select('id, name')
+      .select('id, name, current_balance')
       .eq('profile_id', currentUser.id) // Filter by current user's profile_id
       .order('name', { ascending: true });
 

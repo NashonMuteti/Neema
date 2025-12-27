@@ -43,6 +43,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog"; // New import
+import { Member, FinancialAccount } from "@/types/common"; // Updated import
 
 interface ProjectPledge {
   id: string;
@@ -60,18 +61,6 @@ interface ProjectPledgesDialogProps {
   projectId: string;
   projectName: string;
   onPledgesUpdated: () => void;
-}
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
 }
 
 interface PledgeRowWithProfile {
@@ -233,7 +222,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
       p_source_account_id: null,
       p_destination_account_id: receivedIntoAccountId,
       p_amount: pledgeToMark.amount,
-      p_profile_id: currentUser.id,
+      p_actor_profile_id: currentUser.id, // The user performing the action
       p_purpose: `Pledge Payment for Project: ${projectName}`,
       p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
       p_is_transfer: false,

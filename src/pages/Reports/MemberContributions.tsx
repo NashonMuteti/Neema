@@ -25,6 +25,7 @@ import { Link } from "react-router-dom";
 import { format, getMonth, getYear, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
+import { Member, MonthYearOption } from "@/types/common"; // Updated import
 
 interface MemberProfile {
   id: string;
@@ -51,11 +52,11 @@ const MemberContributions = () => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const months = Array.from({ length: 12 }, (_, i) => ({
+  const months: MonthYearOption[] = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
     label: format(new Date(0, i), "MMMM"),
   }));
-  const years = Array.from({ length: 5 }, (_, i) => ({
+  const years: MonthYearOption[] = Array.from({ length: 5 }, (_, i) => ({
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
   }));

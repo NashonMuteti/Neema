@@ -24,14 +24,7 @@ import { Search } from "lucide-react";
 import { format, getMonth, getYear } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-
-// Dummy financial accounts (should ideally come from a backend/admin setup)
-const financialAccounts = [
-  { id: "acc1", name: "Cash at Hand" },
-  { id: "acc2", name: "Petty Cash" },
-  { id: "acc3", name: "Bank Mpesa Account" },
-  { id: "acc4", name: "Main Bank Account" },
-];
+import { FinancialAccount, MonthYearOption } from "@/types/common"; // Updated import
 
 interface PettyCashTransaction {
   id: string;
@@ -62,11 +55,11 @@ const PettyCashReport = () => {
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  const months = Array.from({ length: 12 }, (_, i) => ({
+  const months: MonthYearOption[] = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
     label: format(new Date(0, i), "MMMM"),
   }));
-  const years = Array.from({ length: 5 }, (_, i) => ({
+  const years: MonthYearOption[] = Array.from({ length: 5 }, (_, i) => ({
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
   }));
@@ -82,6 +75,14 @@ const PettyCashReport = () => {
   }, [filterMonth, filterYear, searchQuery]);
 
   const totalExpenditure = filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+  // Dummy financial accounts (should ideally come from a backend/admin setup)
+  const financialAccounts: FinancialAccount[] = [
+    { id: "acc1", name: "Cash at Hand", current_balance: 0 },
+    { id: "acc2", name: "Petty Cash", current_balance: 0 },
+    { id: "acc3", name: "Bank Mpesa Account", current_balance: 0 },
+    { id: "acc4", name: "Main Bank Account", current_balance: 0 },
+  ];
 
   return (
     <div className="space-y-6">

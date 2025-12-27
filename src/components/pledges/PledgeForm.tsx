@@ -22,11 +22,7 @@ import { CalendarIcon, PlusCircle } from "lucide-react";
 import { showError } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { Textarea } from "@/components/ui/textarea"; // Import Textarea
-
-interface Member {
-  id: string;
-  name: string;
-}
+import { Member } from "@/types/common"; // Updated import
 
 interface Project {
   id: string;

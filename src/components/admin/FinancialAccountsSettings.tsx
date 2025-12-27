@@ -29,13 +29,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  initial_balance: number;
-  current_balance: number;
-}
+import { FinancialAccount } from "@/types/common"; // Updated import
 
 const FinancialAccountsSettings = () => {
   const { currentUser } = useAuth();

@@ -32,22 +32,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
+import { Member, FinancialAccount } from "@/types/common"; // Updated import
 
 interface Project {
   id: string;
   name: string;
-}
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
 }
 
 export interface Pledge {
@@ -139,7 +128,7 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
         p_source_account_id: null, // No source account for pledges
         p_destination_account_id: receivedIntoAccount,
         p_amount: parsedAmount,
-        p_profile_id: currentUser?.id,
+        p_actor_profile_id: currentUser?.id,
         p_purpose: `Pledge Payment for Project: ${projects.find(p => p.id === projectId)?.name || 'Unknown Project'}`,
         p_source: `Pledge Payment from Member: ${members.find(m => m.id === memberId)?.name || 'Unknown Member'}`,
         p_is_transfer: false, // Not a transfer, it's a direct income

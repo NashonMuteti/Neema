@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
+import { MonthYearOption } from "@/types/common"; // Updated import
 
 interface PledgeFiltersProps {
   filterStatus: "All" | "Paid" | "Unpaid"; // Updated filter options
@@ -23,8 +24,8 @@ interface PledgeFiltersProps {
   setFilterYear: (year: string) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  months: { value: string; label: string }[];
-  years: { value: string; label: string }[];
+  months: MonthYearOption[];
+  years: MonthYearOption[];
 }
 
 const PledgeFilters: React.FC<PledgeFiltersProps> = ({

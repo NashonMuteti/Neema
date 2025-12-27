@@ -16,12 +16,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number; // Use current_balance to match Supabase
-}
+import { FinancialAccount } from "@/types/common"; // Updated import
 
 interface InitializeBalancesDialogProps {
   onInitialize: (balances: Record<string, number>) => void;

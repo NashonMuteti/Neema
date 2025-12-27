@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "./EditPledgeDialog";
 import MarkPledgeAsPaidDialog from "./MarkPledgeAsPaidDialog"; // New import
+import { Member, FinancialAccount } from "@/types/common"; // Updated import
 
 interface Pledge {
   id: string;
@@ -29,21 +30,9 @@ interface Pledge {
   comments?: string;
 }
 
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
-
 interface Project {
   id: string;
   name: string;
-}
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
 }
 
 interface PledgeTableProps {

@@ -8,12 +8,7 @@ import { useAuth } from "@/context/AuthContext"; // New import
 import { useUserRoles } from "@/context/UserRolesContext"; // New import
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
-}
+import { FinancialAccount } from "@/types/common"; // Updated import
 
 const InitializeBalances = () => {
   const { currentUser } = useAuth();
@@ -102,7 +97,6 @@ const InitializeBalances = () => {
         if (updateTxError) {
           console.error("Error updating initial balance income transaction:", updateTxError);
           showError("Account balance updated, but failed to update initial balance income transaction.");
-          hasError = true;
         }
       } else {
         // Create new transaction if not found
@@ -118,7 +112,6 @@ const InitializeBalances = () => {
         if (createTxError) {
           console.error("Error creating initial balance income transaction:", createTxError);
           showError("Account balance updated, but failed to create initial balance income transaction.");
-          hasError = true;
         }
       }
     }
