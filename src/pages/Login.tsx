@@ -55,6 +55,14 @@ const Login: React.FC = () => {
             redirectTo={window.location.origin + '/'} // Redirect to home after auth
             view="sign_in" // Only show the sign-in form
             signUp={{ disabled: true }} // Explicitly disable the sign-up option
+            localization={{
+              variables: {
+                sign_in: {
+                  no_account_text: '', // Removes "Don't have an account?"
+                  sign_up_link_text: '', // Removes "Sign up" link text
+                },
+              },
+            }}
           />
         </CardContent>
       </Card>
