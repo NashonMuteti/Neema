@@ -136,9 +136,9 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   const overallBalanceDue = subtotalExpected - subtotalPaid;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> {/* Changed to lg:grid-cols-2 */}
       {/* Calendar and Filters */}
-      <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+      <Card className="lg:col-span-1 transition-all duration-300 ease-in-out hover:shadow-xl"> {/* Changed to lg:col-span-1 */}
         <CardHeader>
           <CardTitle>Activity Calendar</CardTitle>
         </CardHeader>
@@ -214,7 +214,9 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
           <CardContent className="space-y-2">
             {selectedDate && transactionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
               <>
-                {transactionsByDate[format(selectedDate, "yyyy-MM-dd")].map((t) => {
+                {transactionsByDate[format(selectedDate, "yyyy-MM-dd")]
+                  .filter(t => t.type === 'income' || t.type === 'pledge') // Filter for contributions/pledges only
+                  .map((t) => {
                   const status = getContributionStatus(t.type, t.status);
                   const isIncomeOrPaidPledge = t.type === 'income' || (t.type === 'pledge' && t.status === 'Paid');
                   return (

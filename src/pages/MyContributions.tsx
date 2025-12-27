@@ -54,18 +54,19 @@ const MyContributions: React.FC = () => {
       return;
     }
 
-    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
-    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
+    // Date range for fetching all transactions (now covers the entire filterYear)
+    const startOfPeriod = startOfYear(new Date(parseInt(filterYear), 0, 1));
+    const endOfPeriod = endOfYear(new Date(parseInt(filterYear), 0, 1));
 
     const allTransactions: Transaction[] = [];
 
-    // Fetch Income Transactions for the selected month/year
+    // Fetch Income Transactions for the selected year
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
       .select('id, date, amount, source, financial_accounts(name)')
       .eq('profile_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString()) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
+      .gte('date', startOfPeriod.toISOString())
+      .lte('date', endOfPeriod.toISOString()) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
     if (incomeError) console.error("Error fetching income:", incomeError);
     incomeData?.forEach(tx => allTransactions.push({
@@ -77,13 +78,13 @@ const MyContributions: React.FC = () => {
       accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Expenditure Transactions for the selected month/year
+    // Fetch Expenditure Transactions for the selected year
     const { data: expenditureData, error: expenditureError } = await supabase
       .from('expenditure_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
       .eq('profile_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString()) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
+      .gte('date', startOfPeriod.toISOString())
+      .lte('date', endOfPeriod.toISOString()) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
 
     if (expenditureError) console.error("Error fetching expenditure:", expenditureError);
     expenditureData?.forEach(tx => allTransactions.push({
@@ -95,13 +96,13 @@ const MyContributions: React.FC = () => {
       accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Petty Cash Transactions for the selected month/year
+    // Fetch Petty Cash Transactions for the selected year
     const { data: pettyCashData, error: pettyCashError } = await supabase
       .from('petty_cash_transactions')
       .select('id, date, amount, purpose, financial_accounts(name)')
       .eq('profile_id', currentUser.id)
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString()) as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
+      .gte('date', startOfPeriod.toISOString())
+      .lte('date', endOfPeriod.toISOString()) as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
 
     if (pettyCashError) console.error("Error fetching petty cash:", pettyCashError);
     pettyCashData?.forEach(tx => allTransactions.push({
@@ -113,16 +114,16 @@ const MyContributions: React.FC = () => {
       accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account',
     }));
 
-    // Fetch Project Pledges for the selected month/year (for detailed view)
-    const { data: pledgesDataForMonth, error: pledgesErrorForMonth } = await supabase
+    // Fetch Project Pledges for the selected year
+    const { data: pledgesDataForYear, error: pledgesErrorForYear } = await supabase
       .from('project_pledges')
       .select('id, due_date, amount, status, comments, projects(name)')
       .eq('member_id', currentUser.id)
-      .gte('due_date', startOfMonth.toISOString())
-      .lte('due_date', endOfMonth.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
+      .gte('due_date', startOfPeriod.toISOString())
+      .lte('due_date', endOfPeriod.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
 
-    if (pledgesErrorForMonth) console.error("Error fetching pledges for month:", pledgesErrorForMonth);
-    pledgesDataForMonth?.forEach(pledge => allTransactions.push({
+    if (pledgesErrorForYear) console.error("Error fetching pledges for year:", pledgesErrorForYear);
+    pledgesDataForYear?.forEach(pledge => allTransactions.push({
       id: pledge.id,
       type: 'pledge',
       date: parseISO(pledge.due_date),
@@ -133,12 +134,9 @@ const MyContributions: React.FC = () => {
       dueDate: parseISO(pledge.due_date),
     }));
 
-    // --- New: Fetch ALL pledges for the CURRENT YEAR for the Pledge Summary ---
+    // --- Fetch ALL pledges for the CURRENT YEAR for the Pledge Summary ---
     const startOfCurrentYear = startOfYear(new Date(currentYear, 0, 1));
     const endOfCurrentYear = endOfYear(new Date(currentYear, 0, 1));
-
-    console.log("MyContributions: Fetching yearly pledges for user:", currentUser.id, "Year:", currentYear);
-    console.log("MyContributions: Date range:", startOfCurrentYear.toISOString(), "to", endOfCurrentYear.toISOString());
 
     const { data: yearlyPledgesData, error: yearlyPledgesError } = await supabase
       .from('project_pledges')
@@ -152,12 +150,10 @@ const MyContributions: React.FC = () => {
       setTotalYearlyPledgedAmount(0);
       setTotalYearlyPaidAmount(0);
     } else {
-      console.log("MyContributions: Yearly pledges data:", yearlyPledgesData);
       const totalPledged = (yearlyPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
       const totalPaid = (yearlyPledgesData || []).filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
       setTotalYearlyPledgedAmount(totalPledged);
       setTotalYearlyPaidAmount(totalPaid);
-      console.log("MyContributions: Calculated totalPledged:", totalPledged, "totalPaid:", totalPaid);
     }
     // --- End New Pledge Summary Fetch ---
 
@@ -179,7 +175,7 @@ const MyContributions: React.FC = () => {
 
     setMyTransactions(filteredAndSorted);
     setLoading(false);
-  }, [currentUser, filterMonth, filterYear, searchQuery, currentYear]);
+  }, [currentUser, filterYear, searchQuery, currentYear]); // filterMonth is no longer a direct dependency for the main fetch
 
   useEffect(() => {
     if (!authLoading) {
@@ -264,7 +260,7 @@ const MyContributions: React.FC = () => {
 
         <TabsContent value="my-detailed-contributions" className="space-y-6 mt-6">
           <MyContributionsDetailedTab
-            filterMonth={filterMonth}
+            filterMonth={filterMonth} // Still passed for consistency, but not used for data fetching in this tab
             setFilterMonth={setFilterMonth}
             filterYear={filterYear}
             setFilterYear={setFilterYear}
@@ -272,7 +268,7 @@ const MyContributions: React.FC = () => {
             setSearchQuery={setSearchQuery}
             months={months}
             years={years}
-            myTransactions={myTransactions}
+            myTransactions={myTransactions} // This now contains yearly data
             currency={currency}
           />
         </TabsContent>

@@ -9,12 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { MemberContribution } from "./types";
-import { getContributionStatus } from "@/utils/contributionUtils"; // Updated import
+import { getContributionStatus } from "@/utils/contributionUtils";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface MemberContributionsDetailedProps {
   memberName: string;
-  filterMonth: string;
+  filterMonth: string; // Still passed for consistency, but not used for data filtering in this component
   setFilterMonth: (month: string) => void;
   filterYear: string;
   setFilterYear: (year: string) => void;
@@ -22,12 +22,12 @@ interface MemberContributionsDetailedProps {
   setSearchQuery: (query: string) => void;
   months: { value: string; label: string }[];
   years: { value: string; label: string }[];
-  memberContributions: MemberContribution[];
+  memberContributions: MemberContribution[]; // This now contains yearly data
 }
 
 const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = ({
   memberName,
-  filterMonth,
+  filterMonth, // Not directly used for filtering here, as data is yearly
   setFilterMonth,
   filterYear,
   setFilterYear,
@@ -39,49 +39,19 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
 }) => {
   const { currency } = useSystemSettings(); // Use currency from context
 
+  // Filter transactions to only show 'income' and 'pledge' types
+  const filteredContributionsAndPledges = React.useMemo(() => {
+    return memberContributions.filter(c => c.type === 'income' || c.type === 'pledge');
+  }, [memberContributions]);
+
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
-        <CardTitle>Detailed Transactions for {memberName} ({months[parseInt(filterMonth)].label} {filterYear})</CardTitle>
+        <CardTitle>Detailed Contributions & Pledges for {memberName} ({filterYear})</CardTitle> {/* Updated title */}
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="filter-month-detailed">Month</Label>
-            <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger id="filter-month-detailed" className="w-[140px]">
-                <SelectValue placeholder="Select month" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Month</SelectLabel>
-                  {months.map((month) => (
-                    <SelectItem key={month.value} value={month.value}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="filter-year-detailed">Year</Label>
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger id="filter-year-detailed" className="w-[120px]">
-                <SelectValue placeholder="Select year" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Year</SelectLabel>
-                  {years.map((year) => (
-                    <SelectItem key={year.value} value={year.value}>
-                      {year.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Removed month and year selectors as data is now yearly */}
           <div className="relative flex items-center">
             <Input
               type="text"
@@ -94,7 +64,7 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
           </div>
         </div>
         
-        {memberContributions.length > 0 ? (
+        {filteredContributionsAndPledges.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -107,7 +77,7 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {memberContributions.map((contribution) => {
+              {filteredContributionsAndPledges.map((contribution) => {
                 const status = getContributionStatus(contribution.type, contribution.status);
                 const isIncomeOrPaidPledge = contribution.type === 'income' || (contribution.type === 'pledge' && contribution.status === 'Paid');
                 return (
@@ -131,7 +101,7 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
           </Table>
         ) : (
           <p className="text-muted-foreground text-center mt-4">
-            No transactions found for the selected period or matching your search.
+            No contributions or pledges found for the selected year or matching your search.
           </p>
         )}
       </CardContent>

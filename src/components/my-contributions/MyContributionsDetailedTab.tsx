@@ -44,7 +44,7 @@ interface MyContributionsDetailedTabProps {
 }
 
 const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
-  filterMonth,
+  filterMonth, // Still passed for consistency, but not used for data filtering in this component
   setFilterMonth,
   filterYear,
   setFilterYear,
@@ -55,49 +55,19 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
   myTransactions,
   currency,
 }) => {
+  // Filter transactions to only show 'income' and 'pledge' types
+  const filteredTransactions = React.useMemo(() => {
+    return myTransactions.filter(t => t.type === 'income' || t.type === 'pledge');
+  }, [myTransactions]);
+
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
-        <CardTitle>My Detailed Transactions for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
+        <CardTitle>My Detailed Contributions & Pledges for {filterYear}</CardTitle> {/* Updated title */}
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="filter-month-all">Month</Label>
-            <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger id="filter-month-all" className="w-[140px]">
-                <SelectValue placeholder="Select month" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Month</SelectLabel>
-                  {months.map((month) => (
-                    <SelectItem key={month.value} value={month.value}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="filter-year-all">Year</Label>
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger id="filter-year-all" className="w-[120px]">
-                <SelectValue placeholder="Select year" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Year</SelectLabel>
-                  {years.map((year) => (
-                    <SelectItem key={year.value} value={year.value}>
-                      {year.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Removed month and year selectors as data is now yearly */}
           <div className="relative flex items-center">
             <Input
               type="text"
@@ -110,7 +80,7 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
           </div>
         </div>
 
-        {myTransactions.length > 0 ? (
+        {filteredTransactions.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -123,7 +93,7 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {myTransactions.map((transaction) => {
+              {filteredTransactions.map((transaction) => {
                 const status = getContributionStatus(transaction.type, transaction.status);
                 const isIncomeOrPaidPledge = transaction.type === 'income' || (transaction.type === 'pledge' && transaction.status === 'Paid');
                 return (
@@ -146,7 +116,7 @@ const MyContributionsDetailedTab: React.FC<MyContributionsDetailedTabProps> = ({
             </TableBody>
           </Table>
         ) : (
-          <p className="text-muted-foreground text-center mt-4">No transactions found for the selected period or matching your search.</p>
+          <p className="text-muted-foreground text-center mt-4">No contributions or pledges found for the selected year or matching your search.</p>
         )}
       </CardContent>
     </Card>
