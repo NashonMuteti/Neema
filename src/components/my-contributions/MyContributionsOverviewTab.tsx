@@ -20,7 +20,7 @@ import {
   MonthYearOption,
   Project // Generic Project interface for all active projects
 } from "./types";
-import { getContributionStatus } from "@/utils/contributionUtils"; // Updated import
+import { getContributionStatus } from "@/utils/contributionUtils";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import {
   Table,
@@ -43,8 +43,8 @@ interface MyContributionsOverviewTabProps {
   months: MonthYearOption[];
   years: MonthYearOption[];
   transactionsByDate: Record<string, Transaction[]>;
-  totalYearlyPledgedAmount: number; // New prop
-  totalYearlyPaidAmount: number;     // New prop
+  totalYearlyPledgedAmount: number; // Overall yearly pledged
+  totalYearlyPaidAmount: number;     // Overall yearly paid
   allActiveProjects: Project[]; // ALL active projects in the system
   currentUserId: string; // New prop: ID of the current user
   renderDay: (day: Date) => JSX.Element;
@@ -61,63 +61,62 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   months,
   years,
   transactionsByDate,
-  totalYearlyPledgedAmount, // Destructure new prop
-  totalYearlyPaidAmount,     // Destructure new prop
+  totalYearlyPledgedAmount,
+  totalYearlyPaidAmount,
   allActiveProjects, // Use ALL active projects
   currentUserId, // Use currentUserId
   renderDay,
   currency,
 }) => {
-  const [myProjectContributions, setMyProjectContributions] = useState<
-    { projectId: string; projectName: string; expected: number; paid: number }[]
+  const [myProjectPledgeSummary, setMyProjectPledgeSummary] = useState<
+    { projectId: string; projectName: string; pledged: number; paid: number }[]
   >([]);
-  const [loadingMyProjectContributions, setLoadingMyProjectContributions] = useState(true);
+  const [loadingMyProjectPledgeSummary, setLoadingMyProjectPledgeSummary] = useState(true);
 
-  // Fetch user's specific contributions to each active project
+  // Fetch user's specific pledges and paid amounts for each active project
   useEffect(() => {
-    const fetchMyProjectContributions = async () => {
-      setLoadingMyProjectContributions(true);
-      const contributions: { projectId: string; projectName: string; expected: number; paid: number }[] = [];
+    const fetchMyProjectPledgeSummary = async () => {
+      setLoadingMyProjectPledgeSummary(true);
+      const summary: { projectId: string; projectName: string; pledged: number; paid: number }[] = [];
 
       for (const project of allActiveProjects) {
-        const expected = project.member_contribution_amount || 0;
-
-        // Fetch collections specifically from this user for this project
-        const { data: collectionsData, error: collectionsError } = await supabase
-          .from('project_collections')
-          .select('amount')
+        // Fetch all pledges (Active + Paid) from this user for this project
+        const { data: allPledgesData, error: allPledgesError } = await supabase
+          .from('project_pledges')
+          .select('amount, status')
           .eq('project_id', project.id)
-          .eq('member_id', currentUserId); // Filter by the current user
+          .eq('member_id', currentUserId);
 
-        if (collectionsError) {
-          console.error(`Error fetching collections for project ${project.name} by user ${currentUserId}:`, collectionsError);
-          showError(`Failed to load collections for project ${project.name}.`);
+        if (allPledgesError) {
+          console.error(`Error fetching all pledges for project ${project.name} by user ${currentUserId}:`, allPledgesError);
+          showError(`Failed to load pledges for project ${project.name}.`);
         }
-        const paid = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
+        const totalPledgedForProject = (allPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
+        const totalPaidForProject = (allPledgesData || []).filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
 
-        contributions.push({
+        summary.push({
           projectId: project.id,
           projectName: project.name,
-          expected: expected,
-          paid: paid,
+          pledged: totalPledgedForProject,
+          paid: totalPaidForProject,
         });
       }
-      setMyProjectContributions(contributions);
-      setLoadingMyProjectContributions(false);
+      setMyProjectPledgeSummary(summary);
+      setLoadingMyProjectPledgeSummary(false);
     };
 
     if (allActiveProjects.length > 0 && currentUserId) {
-      fetchMyProjectContributions();
+      fetchMyProjectPledgeSummary();
     } else {
-      setMyProjectContributions([]);
-      setLoadingMyProjectContributions(false);
+      setMyProjectPledgeSummary([]);
+      setLoadingMyProjectPledgeSummary(false);
     }
   }, [allActiveProjects, currentUserId]);
 
-  // Calculate totals for the "My Contributions to Active Projects" table
-  const totalExpectedFromUserToAllProjects = myProjectContributions.reduce((sum, p) => sum + p.expected, 0);
-  const totalPaidFromUserToAllProjects = myProjectContributions.reduce((sum, p) => sum + p.paid, 0);
-  const balanceToPayFromUserToAllProjects = totalExpectedFromUserToAllProjects - totalPaidFromUserToAllProjects;
+  // Calculate totals for the "My Pledges to Active Projects" table
+  const subtotalPledged = myProjectPledgeSummary.reduce((sum, p) => sum + p.pledged, 0);
+  const subtotalPaid = myProjectPledgeSummary.reduce((sum, p) => sum + p.paid, 0);
+  const balanceToPay = subtotalPledged - subtotalPaid;
 
   const amountDueForPayment = totalYearlyPledgedAmount - totalYearlyPaidAmount;
 
@@ -225,7 +224,7 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
 
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
           <CardHeader>
-            <CardTitle>Pledge Summary for {getYear(new Date()).toString()}</CardTitle> {/* Updated title */}
+            <CardTitle>Pledge Summary for {getYear(new Date()).toString()}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Table>
@@ -237,61 +236,61 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
               </TableHeader>
               <TableBody>
                 <TableRow>
-                  <TableCell className="font-medium">Total Pledged</TableCell>
+                  <TableCell className="font-medium">Total Pledged (Yearly)</TableCell>
                   <TableCell className="text-right">{currency.symbol}{totalYearlyPledgedAmount.toFixed(2)}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">Total Paid</TableCell>
+                  <TableCell className="font-medium">Total Paid (Yearly)</TableCell>
                   <TableCell className="text-right">{currency.symbol}{totalYearlyPaidAmount.toFixed(2)}</TableCell>
                 </TableRow>
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                  <TableCell>Amount Due for Payment</TableCell>
+                  <TableCell>Amount Due for Payment (Yearly)</TableCell>
                   <TableCell className="text-right">{currency.symbol}{amountDueForPayment.toFixed(2)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
 
-            {/* My Contributions to Active Projects (User-specific breakdown) */}
-            {loadingMyProjectContributions ? (
+            {/* My Pledges to Active Projects (User-specific breakdown) */}
+            {loadingMyProjectPledgeSummary ? (
               <div className="border-t pt-4 space-y-2">
-                <h3 className="font-semibold text-lg">My Contributions to Active Projects</h3>
-                <p className="text-muted-foreground">Loading project contributions...</p>
+                <h3 className="font-semibold text-lg">My Pledges to Active Projects</h3>
+                <p className="text-muted-foreground">Loading project pledges...</p>
               </div>
-            ) : myProjectContributions.length > 0 ? (
+            ) : myProjectPledgeSummary.length > 0 ? (
               <div className="border-t pt-4 space-y-2">
-                <h3 className="font-semibold text-lg">My Contributions to Active Projects</h3>
+                <h3 className="font-semibold text-lg">My Pledges to Active Projects</h3>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Project</TableHead>
-                      <TableHead className="text-right">Expected</TableHead>
+                      <TableHead className="text-right">Pledged</TableHead>
                       <TableHead className="text-right">Paid</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {myProjectContributions.map(project => (
+                    {myProjectPledgeSummary.map(project => (
                       <TableRow key={project.projectId}>
                         <TableCell>{project.projectName}</TableCell>
-                        <TableCell className="text-right">{currency.symbol}{project.expected.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{project.pledged.toFixed(2)}</TableCell>
                         <TableCell className="text-right">{currency.symbol}{project.paid.toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                      <TableCell>Total</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{totalExpectedFromUserToAllProjects.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{totalPaidFromUserToAllProjects.toFixed(2)}</TableCell>
+                      <TableCell>Subtotal</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{subtotalPledged.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{subtotalPaid.toFixed(2)}</TableCell>
                     </TableRow>
                     <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                       <TableCell colSpan={2}>Balance to Pay</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{balanceToPayFromUserToAllProjects.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{balanceToPay.toFixed(2)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
               </div>
             ) : (
               <div className="border-t pt-4 space-y-2">
-                <h3 className="font-semibold text-lg">My Contributions to Active Projects</h3>
-                <p className="text-muted-foreground">No active projects found for you to contribute to.</p>
+                <h3 className="font-semibold text-lg">My Pledges to Active Projects</h3>
+                <p className="text-muted-foreground">No active projects found for you to pledge to.</p>
               </div>
             )}
           </CardContent>
