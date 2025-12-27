@@ -18,7 +18,8 @@ import {
   IncomeTxRow,
   ExpenditureTxRow,
   PettyCashTxRow,
-  MemberProjectWithCollections // New import
+  MemberProjectWithCollections, // New import
+  Project // Generic Project interface for all active projects
 } from "@/components/my-contributions/types";
 
 const MyContributions: React.FC = () => {
@@ -31,7 +32,9 @@ const MyContributions: React.FC = () => {
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
   const [myTransactions, setMyTransactions] = useState<Transaction[]>([]);
-  const [myProjectsWithCollections, setMyProjectsWithCollections] = useState<MemberProjectWithCollections[]>([]); // New state
+  const [myProjectsWithCollections, setMyProjectsWithCollections] = useState<MemberProjectWithCollections[]>([]); // Projects CREATED BY THIS USER
+  const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // ALL active projects in the system
+  const [activeMembersCount, setActiveMembersCount] = useState(0); // Total active members in the system
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -132,19 +135,19 @@ const MyContributions: React.FC = () => {
     }));
 
     // Fetch projects where this user is the creator AND their collections
-    const { data: projectsData, error: projectsError } = await supabase
+    const { data: userCreatedProjectsData, error: userCreatedProjectsError } = await supabase
       .from('projects')
       .select('id, name, member_contribution_amount')
       .eq('profile_id', currentUser.id)
       .eq('status', 'Open'); // Only open projects
 
-    if (projectsError) {
-      console.error("Error fetching user's projects:", projectsError);
-      setError("Failed to load your projects.");
+    if (userCreatedProjectsError) {
+      console.error("Error fetching user's created projects:", userCreatedProjectsError);
+      setError("Failed to load your created projects.");
       setMyProjectsWithCollections([]);
     } else {
       const projectsWithCollections: MemberProjectWithCollections[] = [];
-      for (const project of projectsData || []) {
+      for (const project of userCreatedProjectsData || []) {
         const { data: collectionsData, error: collectionsError } = await supabase
           .from('project_collections')
           .select('amount')
@@ -163,6 +166,28 @@ const MyContributions: React.FC = () => {
         });
       }
       setMyProjectsWithCollections(projectsWithCollections);
+    }
+
+    // Fetch ALL active projects (for system-wide expected contributions)
+    const { data: allProjectsData, error: allProjectsError } = await supabase
+      .from('projects')
+      .select('id, name, member_contribution_amount')
+      .eq('status', 'Open'); // Only open projects
+
+    if (allProjectsError) console.error("Error fetching all active projects:", allProjectsError);
+    setAllActiveProjects(allProjectsData || []);
+
+    // Fetch active members count (for system-wide expected contributions)
+    const { count: membersCount, error: membersCountError } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Active');
+
+    if (membersCountError) {
+      console.error("Error fetching active members count:", membersCountError);
+      setActiveMembersCount(0);
+    } else {
+      setActiveMembersCount(membersCount || 0);
     }
 
     const filteredAndSorted = allTransactions
@@ -255,7 +280,9 @@ const MyContributions: React.FC = () => {
             transactionsByDate={transactionsByDate}
             totalPaidPledges={totalPaidPledges}
             totalPendingPledges={totalPendingPledges}
-            myProjectsWithCollections={myProjectsWithCollections} // Pass new prop
+            myProjectsWithCollections={myProjectsWithCollections} // Pass projects CREATED BY THIS USER
+            allActiveProjects={allActiveProjects} // Pass ALL active projects
+            activeMembersCount={activeMembersCount} // Pass active members count
             renderDay={renderDay}
             currency={currency}
           />

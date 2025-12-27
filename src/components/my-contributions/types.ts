@@ -70,11 +70,19 @@ export interface PledgeTxRow {
   projects: { name: string } | null;
 }
 
-// Renamed from UserProject to Project for clarity, as it now represents any project
+// Generic Project interface for all active projects (system-wide)
 export interface Project { 
   id: string;
   name: string;
   member_contribution_amount: number | null;
+}
+
+// Interface for projects created by a specific member, including their collections
+export interface MemberProjectWithCollections {
+  id: string;
+  name: string;
+  member_contribution_amount: number | null;
+  totalCollections: number; // Amount actually collected for this project
 }
 
 export interface MonthYearOption {

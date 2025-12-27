@@ -18,8 +18,10 @@ import {
   ExpenditureTxRow, 
   PettyCashTxRow,
   PledgeTxRow,
-  MemberProjectWithCollections // New import
+  MemberProjectWithCollections, // New import
+  Project // Generic Project interface for all active projects
 } from "@/components/members/member-contributions/types";
+
 
 const MemberContributionsDetail: React.FC = () => {
   const { memberId } = useParams<{ memberId: string }>();
@@ -34,7 +36,9 @@ const MemberContributionsDetail: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([]);
   const [memberName, setMemberName] = useState("Unknown Member");
-  const [memberProjectsWithCollections, setMemberProjectsWithCollections] = useState<MemberProjectWithCollections[]>([]); // New state
+  const [memberProjectsWithCollections, setMemberProjectsWithCollections] = useState<MemberProjectWithCollections[]>([]); // Projects CREATED BY THIS MEMBER
+  const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // ALL active projects in the system
+  const [activeMembersCount, setActiveMembersCount] = useState(0); // Total active members in the system
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -176,19 +180,19 @@ const MemberContributionsDetail: React.FC = () => {
     }));
 
     // Fetch projects where this member is the creator AND their collections
-    const { data: projectsData, error: projectsError } = await supabase
+    const { data: memberCreatedProjectsData, error: memberCreatedProjectsError } = await supabase
       .from('projects')
       .select('id, name, member_contribution_amount')
       .eq('profile_id', memberId)
       .eq('status', 'Open'); // Only open projects
 
-    if (projectsError) {
-      console.error("Error fetching member's projects:", projectsError);
-      setError("Failed to load member's projects.");
+    if (memberCreatedProjectsError) {
+      console.error("Error fetching member's created projects:", memberCreatedProjectsError);
+      setError("Failed to load member's created projects.");
       setMemberProjectsWithCollections([]);
     } else {
       const projectsWithCollections: MemberProjectWithCollections[] = [];
-      for (const project of projectsData || []) {
+      for (const project of memberCreatedProjectsData || []) {
         const { data: collectionsData, error: collectionsError } = await supabase
           .from('project_collections')
           .select('amount')
@@ -207,6 +211,28 @@ const MemberContributionsDetail: React.FC = () => {
         });
       }
       setMemberProjectsWithCollections(projectsWithCollections);
+    }
+
+    // Fetch ALL active projects (for system-wide expected contributions)
+    const { data: allProjectsData, error: allProjectsError } = await supabase
+      .from('projects')
+      .select('id, name, member_contribution_amount')
+      .eq('status', 'Open'); // Only open projects
+
+    if (allProjectsError) console.error("Error fetching all active projects:", allProjectsError);
+    setAllActiveProjects(allProjectsData || []);
+
+    // Fetch active members count (for system-wide expected contributions)
+    const { count: membersCount, error: membersCountError } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Active');
+
+    if (membersCountError) {
+      console.error("Error fetching active members count:", membersCountError);
+      setActiveMembersCount(0);
+    } else {
+      setActiveMembersCount(membersCount || 0);
     }
 
     const filteredAndSorted = allContributions
@@ -307,7 +333,9 @@ const MemberContributionsDetail: React.FC = () => {
         contributionsByDate={contributionsByDate}
         totalPaidPledges={totalPaidPledges}
         totalPendingPledges={totalPendingPledges}
-        memberProjectsWithCollections={memberProjectsWithCollections} // Pass new prop
+        memberProjectsWithCollections={memberProjectsWithCollections} // Pass projects CREATED BY THIS MEMBER
+        allActiveProjects={allActiveProjects} // Pass ALL active projects
+        activeMembersCount={activeMembersCount} // Pass active members count
         renderDay={renderDay}
         memberName={memberName}
         searchQuery={searchQuery}

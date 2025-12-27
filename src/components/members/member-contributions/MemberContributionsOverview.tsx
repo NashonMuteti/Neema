@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { format, getMonth, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { getContributionStatus, MemberContribution, MemberProjectWithCollections } from "./types";
+import { getContributionStatus, MemberContribution, MemberProjectWithCollections, Project } from "./types";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import {
   Table,
@@ -30,7 +30,9 @@ interface MemberContributionsOverviewProps {
   contributionsByDate: Record<string, MemberContribution[]>;
   totalPaidPledges: number;
   totalPendingPledges: number;
-  memberProjectsWithCollections: MemberProjectWithCollections[]; // New prop
+  memberProjectsWithCollections: MemberProjectWithCollections[]; // Projects CREATED BY THIS MEMBER
+  allActiveProjects: Project[]; // ALL active projects in the system
+  activeMembersCount: number; // Total active members in the system
   renderDay: (day: Date) => JSX.Element;
 }
 
@@ -47,12 +49,19 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   contributionsByDate,
   totalPaidPledges,
   totalPendingPledges,
-  memberProjectsWithCollections, // Use new prop
+  memberProjectsWithCollections, // Use projects CREATED BY THIS MEMBER
+  allActiveProjects, // Use ALL active projects
+  activeMembersCount, // Use activeMembersCount
   renderDay
 }) => {
   const { currency } = useSystemSettings(); // Use currency from context
 
-  // Calculate totals for projects created by the member
+  // Calculate total expected contributions from ALL active projects (system-wide)
+  const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
+    sum + ((project.member_contribution_amount || 0) * activeMembersCount)
+  , 0);
+
+  // Calculate totals for projects created by the member (for the specific breakdown)
   const totalExpectedFromMemberProjects = memberProjectsWithCollections.reduce((sum, project) => sum + (project.member_contribution_amount || 0), 0);
   const totalPaidForMemberProjects = memberProjectsWithCollections.reduce((sum, project) => sum + project.totalCollections, 0);
   const balanceToPayForMemberProjects = totalExpectedFromMemberProjects - totalPaidForMemberProjects;
@@ -146,7 +155,19 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
             </div>
           </div>
 
-          {/* Projects Created by Member Summary */}
+          {/* Total Expected Contributions from All Active Projects (System-wide) */}
+          <div className="border-t pt-4 space-y-2">
+            <h3 className="font-semibold text-lg">Total Expected from All Active Projects</h3>
+            <div className="flex justify-between items-center text-sm">
+              <p className="text-muted-foreground">Total Expected:</p>
+              <p className="font-bold text-primary">{currency.symbol}{totalExpectedAllProjectsContributions.toFixed(2)}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              (Based on {activeMembersCount} active members and 'member contribution amount' for all active projects)
+            </p>
+          </div>
+
+          {/* Projects Created by Member Summary (Member-specific breakdown) */}
           {memberProjectsWithCollections.length > 0 && (
             <div className="border-t pt-4 space-y-2">
               <h3 className="font-semibold text-lg">Projects Created by Member</h3>

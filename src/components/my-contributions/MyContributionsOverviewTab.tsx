@@ -19,7 +19,8 @@ import {
   Transaction,
   getContributionStatus,
   MonthYearOption,
-  MemberProjectWithCollections // New import
+  MemberProjectWithCollections, // New import
+  Project // Generic Project interface for all active projects
 } from "./types";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import {
@@ -43,7 +44,9 @@ interface MyContributionsOverviewTabProps {
   transactionsByDate: Record<string, Transaction[]>;
   totalPaidPledges: number;
   totalPendingPledges: number;
-  myProjectsWithCollections: MemberProjectWithCollections[]; // New prop
+  myProjectsWithCollections: MemberProjectWithCollections[]; // Projects CREATED BY THIS USER
+  allActiveProjects: Project[]; // ALL active projects in the system
+  activeMembersCount: number; // Total active members in the system
   renderDay: (day: Date) => JSX.Element;
   currency: { code: string; symbol: string };
 }
@@ -60,11 +63,18 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   transactionsByDate,
   totalPaidPledges,
   totalPendingPledges,
-  myProjectsWithCollections, // Use new prop
+  myProjectsWithCollections, // Use projects CREATED BY THIS USER
+  allActiveProjects, // Use ALL active projects
+  activeMembersCount, // Use activeMembersCount
   renderDay,
   currency,
 }) => {
-  // Calculate totals for projects created by the member
+  // Calculate total expected contributions from ALL active projects (system-wide)
+  const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
+    sum + ((project.member_contribution_amount || 0) * activeMembersCount)
+  , 0);
+
+  // Calculate totals for projects created by the member (for the specific breakdown)
   const totalExpectedFromMyProjects = myProjectsWithCollections.reduce((sum, project) => sum + (project.member_contribution_amount || 0), 0);
   const totalPaidForMyProjects = myProjectsWithCollections.reduce((sum, project) => sum + project.totalCollections, 0);
   const balanceToPayForMyProjects = totalExpectedFromMyProjects - totalPaidForMyProjects;
@@ -188,7 +198,19 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
               </div>
             </div>
 
-            {/* Projects Created by Member Summary */}
+            {/* Total Expected Contributions from All Active Projects (System-wide) */}
+            <div className="border-t pt-4 space-y-2">
+              <h3 className="font-semibold text-lg">Total Expected from All Active Projects</h3>
+              <div className="flex justify-between items-center text-sm">
+                <p className="text-muted-foreground">Total Expected:</p>
+                <p className="font-bold text-primary">{currency.symbol}{totalExpectedAllProjectsContributions.toFixed(2)}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                (Based on {activeMembersCount} active members and 'member contribution amount' for all active projects)
+              </p>
+            </div>
+
+            {/* Projects Created by Member Summary (Member-specific breakdown) */}
             {myProjectsWithCollections.length > 0 && (
               <div className="border-t pt-4 space-y-2">
                 <h3 className="font-semibold text-lg">Projects Created by Me</h3>
