@@ -105,13 +105,15 @@ const MemberContributionsDetail: React.FC = () => {
 
     const allContributions: MemberContribution[] = [];
       
-    // Fetch Income Transactions for the selected year
+    // Fetch Income Transactions for the selected year, filtered for project-related income
     const { data: incomeData, error: incomeError } = await supabase
       .from('income_transactions')
-      .select('id, date, amount, source, financial_accounts(name)')
+      .select('id, date, amount, source, financial_accounts(name), pledge_id') // Select pledge_id
       .eq('profile_id', memberId)
       .gte('date', startOfPeriod.toISOString())
-      .lte('date', endOfPeriod.toISOString()) as { data: IncomeTxRow[] | null, error: PostgrestError | null };
+      .lte('date', endOfPeriod.toISOString())
+      .or('source.ilike.%Project Collection:%,pledge_id.not.is.null') // Filter for project collections or paid pledges
+      as { data: IncomeTxRow[] | null, error: PostgrestError | null };
 
     if (incomeError) console.error("Error fetching income:", incomeError);
     incomeData?.forEach(tx => allContributions.push({
@@ -121,42 +123,7 @@ const MemberContributionsDetail: React.FC = () => {
       amount: tx.amount,
       sourceOrPurpose: tx.source,
       accountName: tx.financial_accounts?.name || 'Unknown Account',
-    }));
-
-    // Fetch Expenditure Transactions for the selected year
-    const { data: expenditureData, error: expenditureError } = await supabase
-      .from('expenditure_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('profile_id', memberId)
-      .gte('date', startOfPeriod.toISOString())
-      .lte('date', endOfPeriod.toISOString()) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
-
-    if (expenditureError) console.error("Error fetching expenditure:", expenditureError);
-    expenditureData?.forEach(tx => allContributions.push({
-      id: tx.id,
-      type: 'expenditure',
-      date: parseISO(tx.date),
-      amount: tx.amount,
-      sourceOrPurpose: tx.purpose,
-      accountName: tx.financial_accounts?.name || 'Unknown Account',
-    }));
-
-    // Fetch Petty Cash Transactions for the selected year
-    const { data: pettyCashData, error: pettyCashError } = await supabase
-      .from('petty_cash_transactions')
-      .select('id, date, amount, purpose, financial_accounts(name)')
-      .eq('profile_id', memberId)
-      .gte('date', startOfPeriod.toISOString())
-      .lte('date', endOfPeriod.toISOString()) as { data: PettyCashTxRow[] | null, error: PostgrestError | null };
-
-    if (pettyCashError) console.error("Error fetching petty cash:", pettyCashError);
-    pettyCashData?.forEach(tx => allContributions.push({
-      id: tx.id,
-      type: 'petty_cash',
-      date: parseISO(tx.date),
-      amount: tx.amount,
-      sourceOrPurpose: tx.purpose,
-      accountName: tx.financial_accounts?.name || 'Unknown Account',
+      pledgeId: tx.pledge_id || undefined, // Include pledgeId
     }));
 
     // Fetch Project Pledges for the selected year
@@ -165,7 +132,7 @@ const MemberContributionsDetail: React.FC = () => {
       .select('id, due_date, amount, status, comments, projects(name)')
       .eq('member_id', memberId)
       .gte('due_date', startOfPeriod.toISOString())
-      .lte('due_date', endOfPeriod.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
+      .lte('due_period', endOfPeriod.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
 
     if (pledgesError) console.error("Error fetching pledges:", pledgesError);
     pledgesData?.forEach(pledge => allContributions.push({
@@ -213,7 +180,7 @@ const MemberContributionsDetail: React.FC = () => {
 
     const filteredAndSorted = allContributions
       .filter(c => c.sourceOrPurpose.toLowerCase().includes(searchQuery.toLowerCase()))
-      .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
       
     setMemberContributions(filteredAndSorted);
     setLoading(false);

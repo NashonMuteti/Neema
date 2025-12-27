@@ -136,9 +136,9 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   const overallBalanceDue = subtotalExpected - subtotalPaid;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> {/* Changed to lg:grid-cols-2 */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Calendar and Filters */}
-      <Card className="lg:col-span-1 transition-all duration-300 ease-in-out hover:shadow-xl"> {/* Changed to lg:col-span-1 */}
+      <Card className="lg:col-span-1 transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
           <CardTitle>Activity Calendar</CardTitle>
         </CardHeader>

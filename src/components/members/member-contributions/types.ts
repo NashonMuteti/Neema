@@ -10,6 +10,7 @@ export interface MemberContribution {
   accountName: string; // For financial transactions, project name for pledges
   status?: "Active" | "Paid" | "Overdue"; // Only for pledges
   dueDate?: Date; // Only for pledges
+  pledgeId?: string; // New: To link income transactions to pledges
 }
 
 export interface FinancialAccountName {
@@ -22,6 +23,7 @@ export interface IncomeTxRow {
   amount: number;
   source: string;
   financial_accounts: FinancialAccountName | null;
+  pledge_id: string | null; // New: To link income transactions to pledges
 }
 
 export interface ExpenditureTxRow {

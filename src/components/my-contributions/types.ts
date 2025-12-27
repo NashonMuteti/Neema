@@ -11,6 +11,7 @@ export interface Transaction {
   accountOrProjectName: string; // accountName for financial, project_name for pledge
   status?: "Active" | "Paid" | "Overdue"; // Only for pledges
   dueDate?: Date; // Only for pledges
+  pledgeId?: string; // New: To link income transactions to pledges
 }
 
 // Define expected structure for joined financial_accounts data
@@ -24,6 +25,7 @@ export interface IncomeTxRow {
   amount: number;
   source: string;
   financial_accounts: FinancialAccountName | null;
+  pledge_id: string | null; // New: To link income transactions to pledges
 }
 
 export interface ExpenditureTxRow {
