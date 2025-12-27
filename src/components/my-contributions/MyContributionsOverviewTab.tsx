@@ -17,10 +17,10 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Transaction,
-  getContributionStatus,
   MonthYearOption,
   Project // Generic Project interface for all active projects
 } from "./types";
+import { getContributionStatus } from "@/utils/contributionUtils"; // Updated import
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import {
   Table,

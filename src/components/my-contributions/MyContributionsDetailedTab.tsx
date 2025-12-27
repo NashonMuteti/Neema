@@ -26,9 +26,9 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import {
   Transaction,
-  getContributionStatus,
   MonthYearOption,
 } from "./types";
+import { getContributionStatus } from "@/utils/contributionUtils"; // Updated import
 
 interface MyContributionsDetailedTabProps {
   filterMonth: string;

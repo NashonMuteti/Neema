@@ -78,7 +78,7 @@ const MyContributions: React.FC = () => {
 
     // Fetch Expenditure Transactions
     const { data: expenditureData, error: expenditureError } = await supabase
-      ..from('expenditure_transactions')
+      .from('expenditure_transactions') // Fixed typo here
       .select('id, date, amount, purpose, financial_accounts(name)')
       .eq('profile_id', currentUser.id)
       .gte('date', startOfMonth.toISOString())
