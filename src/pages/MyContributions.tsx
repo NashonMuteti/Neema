@@ -14,12 +14,18 @@ import MyContributionsDetailedTab from "@/components/my-contributions/MyContribu
 import {
   Transaction,
   PledgeTxRow,
-  UserProject,
+  UserProject, // Renamed to Project for clarity in this context
   MonthYearOption,
   IncomeTxRow,
   ExpenditureTxRow,
   PettyCashTxRow,
 } from "@/components/my-contributions/types";
+
+interface Project { // Define Project interface for allActiveProjects
+  id: string;
+  name: string;
+  member_contribution_amount: number | null;
+}
 
 const MyContributions: React.FC = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
@@ -31,7 +37,8 @@ const MyContributions: React.FC = () => {
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
   const [myTransactions, setMyTransactions] = useState<Transaction[]>([]);
-  const [myProjects, setMyProjects] = useState<UserProject[]>([]); // State for user's projects
+  const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // State for ALL active projects
+  const [activeMembersCount, setActiveMembersCount] = useState(0); // State for active members count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,15 +138,27 @@ const MyContributions: React.FC = () => {
       dueDate: parseISO(pledge.due_date),
     }));
 
-    // Fetch user's projects for expected contributions
+    // Fetch ALL active projects (not just those created by this user)
     const { data: projectsData, error: projectsError } = await supabase
       .from('projects')
       .select('id, name, member_contribution_amount')
-      .eq('profile_id', currentUser.id)
       .eq('status', 'Open'); // Only open projects
 
-    if (projectsError) console.error("Error fetching user projects:", projectsError);
-    setMyProjects(projectsData || []);
+    if (projectsError) console.error("Error fetching all active projects:", projectsError);
+    setAllActiveProjects(projectsData || []);
+
+    // Fetch active members count
+    const { count: membersCount, error: membersCountError } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Active');
+
+    if (membersCountError) {
+      console.error("Error fetching active members count:", membersCountError);
+      setActiveMembersCount(0);
+    } else {
+      setActiveMembersCount(membersCount || 0);
+    }
 
     const filteredAndSorted = allTransactions
       .filter(t =>
@@ -231,7 +250,8 @@ const MyContributions: React.FC = () => {
             transactionsByDate={transactionsByDate}
             totalPaidPledges={totalPaidPledges}
             totalPendingPledges={totalPendingPledges}
-            myProjects={myProjects}
+            allActiveProjects={allActiveProjects} // Pass all active projects
+            activeMembersCount={activeMembersCount} // Pass active members count
             renderDay={renderDay}
             currency={currency}
           />

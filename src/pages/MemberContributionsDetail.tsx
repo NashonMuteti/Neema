@@ -20,7 +20,7 @@ import {
   PledgeTxRow // New import
 } from "@/components/members/member-contributions/types";
 
-interface UserProject {
+interface Project {
   id: string;
   name: string;
   member_contribution_amount: number | null;
@@ -39,7 +39,8 @@ const MemberContributionsDetail: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([]);
   const [memberName, setMemberName] = useState("Unknown Member");
-  const [memberProjects, setMemberProjects] = useState<UserProject[]>([]); // New state for member's projects
+  const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // State for ALL active projects
+  const [activeMembersCount, setActiveMembersCount] = useState(0); // State for active members count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -180,15 +181,27 @@ const MemberContributionsDetail: React.FC = () => {
       dueDate: parseISO(pledge.due_date),
     }));
 
-    // Fetch projects where this member is the creator
+    // Fetch ALL active projects (not just those created by this member)
     const { data: projectsData, error: projectsError } = await supabase
       .from('projects')
       .select('id, name, member_contribution_amount')
-      .eq('profile_id', memberId)
       .eq('status', 'Open'); // Only open projects
 
-    if (projectsError) console.error("Error fetching member's projects:", projectsError);
-    setMemberProjects(projectsData || []);
+    if (projectsError) console.error("Error fetching all active projects:", projectsError);
+    setAllActiveProjects(projectsData || []);
+
+    // Fetch active members count
+    const { count: membersCount, error: membersCountError } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Active');
+
+    if (membersCountError) {
+      console.error("Error fetching active members count:", membersCountError);
+      setActiveMembersCount(0);
+    } else {
+      setActiveMembersCount(membersCount || 0);
+    }
 
     const filteredAndSorted = allContributions
       .filter(c => c.sourceOrPurpose.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -286,9 +299,10 @@ const MemberContributionsDetail: React.FC = () => {
         years={years}
         memberContributions={memberContributions}
         contributionsByDate={contributionsByDate}
-        totalPaidPledges={totalPaidPledges} // New prop
-        totalPendingPledges={totalPendingPledges} // New prop
-        memberProjects={memberProjects} // New prop
+        totalPaidPledges={totalPaidPledges}
+        totalPendingPledges={totalPendingPledges}
+        allActiveProjects={allActiveProjects} // Pass all active projects
+        activeMembersCount={activeMembersCount} // Pass active members count
         renderDay={renderDay}
         memberName={memberName}
         searchQuery={searchQuery}

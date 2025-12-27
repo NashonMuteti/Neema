@@ -18,9 +18,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   Transaction,
   getContributionStatus,
-  UserProject,
   MonthYearOption,
 } from "./types";
+
+interface Project { // Define Project interface for allActiveProjects
+  id: string;
+  name: string;
+  member_contribution_amount: number | null;
+}
 
 interface MyContributionsOverviewTabProps {
   selectedDate: Date | undefined;
@@ -34,7 +39,8 @@ interface MyContributionsOverviewTabProps {
   transactionsByDate: Record<string, Transaction[]>;
   totalPaidPledges: number;
   totalPendingPledges: number;
-  myProjects: UserProject[];
+  allActiveProjects: Project[]; // Changed from myProjects to allActiveProjects
+  activeMembersCount: number; // New prop
   renderDay: (day: Date) => JSX.Element;
   currency: { code: string; symbol: string };
 }
@@ -51,10 +57,16 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   transactionsByDate,
   totalPaidPledges,
   totalPendingPledges,
-  myProjects,
+  allActiveProjects, // Use allActiveProjects
+  activeMembersCount, // Use activeMembersCount
   renderDay,
   currency,
 }) => {
+  // Calculate total expected contributions from ALL active projects
+  const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
+    sum + ((project.member_contribution_amount || 0) * activeMembersCount)
+  , 0);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Calendar and Filters */}
@@ -174,18 +186,17 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
               </div>
             </div>
 
-            {/* Expected Project Contributions */}
-            {myProjects.length > 0 && (
-              <div className="border-t pt-4 space-y-2">
-                <h3 className="font-semibold text-lg">Projects Created by Member</h3>
-                {myProjects.map(project => (
-                  <div key={project.id} className="flex justify-between items-center text-sm">
-                    <span>{project.name}:</span>
-                    <span className="font-medium">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)} (Expected per member)</span>
-                  </div>
-                ))}
+            {/* Total Expected Contributions from All Active Projects */}
+            <div className="border-t pt-4 space-y-2">
+              <h3 className="font-semibold text-lg">Total Expected from All Active Projects</h3>
+              <div className="flex justify-between items-center text-sm">
+                <p className="text-muted-foreground">Total Expected:</p>
+                <p className="font-bold text-primary">{currency.symbol}{totalExpectedAllProjectsContributions.toFixed(2)}</p>
               </div>
-            )}
+              <p className="text-xs text-muted-foreground">
+                (Based on {activeMembersCount} active members and 'member contribution amount' for all active projects)
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

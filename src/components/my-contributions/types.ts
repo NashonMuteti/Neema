@@ -70,7 +70,8 @@ export interface PledgeTxRow {
   projects: { name: string } | null;
 }
 
-export interface UserProject {
+// Renamed from UserProject to Project for clarity, as it now represents any project
+export interface Project { 
   id: string;
   name: string;
   member_contribution_amount: number | null;

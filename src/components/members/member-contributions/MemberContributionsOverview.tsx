@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { getContributionStatus, MemberContribution } from "./types";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
-interface UserProject {
+interface Project {
   id: string;
   name: string;
   member_contribution_amount: number | null;
@@ -28,7 +28,8 @@ interface MemberContributionsOverviewProps {
   contributionsByDate: Record<string, MemberContribution[]>;
   totalPaidPledges: number;
   totalPendingPledges: number;
-  memberProjects: UserProject[];
+  allActiveProjects: Project[]; // Changed from memberProjects to allActiveProjects
+  activeMembersCount: number; // New prop
   renderDay: (day: Date) => JSX.Element;
 }
 
@@ -45,13 +46,16 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   contributionsByDate,
   totalPaidPledges,
   totalPendingPledges,
-  memberProjects,
+  allActiveProjects, // Use allActiveProjects
+  activeMembersCount, // Use activeMembersCount
   renderDay
 }) => {
   const { currency } = useSystemSettings(); // Use currency from context
 
-  // Calculate total expected contributions from active projects
-  const totalExpectedProjectContributions = memberProjects.reduce((sum, project) => sum + (project.member_contribution_amount || 0), 0);
+  // Calculate total expected contributions from ALL active projects
+  const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
+    sum + ((project.member_contribution_amount || 0) * activeMembersCount)
+  , 0);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -142,18 +146,17 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
             </div>
           </div>
 
-          {/* Projects Created by Member */}
-          {memberProjects.length > 0 && (
-            <div className="border-t pt-4 space-y-2">
-              <h3 className="font-semibold text-lg">Projects Created by Member</h3>
-              {memberProjects.map(project => (
-                <div key={project.id} className="flex justify-between items-center text-sm">
-                  <span>{project.name}:</span>
-                  <span className="font-medium">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)} (Expected per member)</span>
-                </div>
-              ))}
+          {/* Total Expected Contributions from All Active Projects */}
+          <div className="border-t pt-4 space-y-2">
+            <h3 className="font-semibold text-lg">Total Expected from All Active Projects</h3>
+            <div className="flex justify-between items-center text-sm">
+              <p className="text-muted-foreground">Total Expected:</p>
+              <p className="font-bold text-primary">{currency.symbol}{totalExpectedAllProjectsContributions.toFixed(2)}</p>
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              (Based on {activeMembersCount} active members and 'member contribution amount' for all active projects)
+            </p>
+          </div>
           
           {selectedDate && contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
             <div className="mt-6 space-y-2">
