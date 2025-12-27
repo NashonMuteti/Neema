@@ -23,6 +23,7 @@ import { CheckCircle, DollarSign } from "lucide-react";
 import { showError } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { Label } from "@/components/ui/label"; // Added this import
+import { useAuth } from "@/context/AuthContext"; // New import
 
 interface Member {
   id: string;
@@ -74,6 +75,7 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
   canManagePledges,
 }) => {
   const { currency } = useSystemSettings();
+  const { currentUser } = useAuth(); // New: Get currentUser for p_actor_profile_id
   const [isOpen, setIsOpen] = React.useState(false);
   const [receivedIntoAccount, setReceivedIntoAccount] = React.useState<string | undefined>(undefined);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<string | undefined>(undefined);
@@ -93,7 +95,13 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
       showError("Please select both the account and payment method.");
       return;
     }
+    if (!currentUser) { // Ensure currentUser is available
+      showError("User not logged in to perform this action.");
+      return;
+    }
+
     setIsProcessing(true);
+    // Call the onConfirmPayment prop, which will then call the RPC function
     await onConfirmPayment(pledge.id, receivedIntoAccount, selectedPaymentMethod);
     setIsProcessing(false);
     setIsOpen(false); // Close dialog after processing

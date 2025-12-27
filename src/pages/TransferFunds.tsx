@@ -137,7 +137,7 @@ const TransferFunds = () => {
         p_source_account_id: sourceAccount,
         p_destination_account_id: destinationAccount,
         p_amount: amount,
-        p_profile_id: currentUser?.id,
+        p_actor_profile_id: currentUser?.id, // The user performing the action
         p_purpose: `Funds Transfer to ${destAcc.name}`,
         p_source: `Funds Transfer from ${sourceAcc.name}`,
         p_is_transfer: true,
@@ -145,6 +145,7 @@ const TransferFunds = () => {
         p_member_id: null,
         p_payment_method: null,
         p_pledge_id: null,
+        p_transaction_profile_id: currentUser?.id, // The transaction is for the current user
       });
 
       if (transferError) throw transferError;
@@ -155,7 +156,7 @@ const TransferFunds = () => {
           p_source_account_id: sourceAccount,
           p_destination_account_id: null, // No destination for a standalone expenditure
           p_amount: parsedTransactionCost,
-          p_profile_id: currentUser?.id,
+          p_actor_profile_id: currentUser?.id, // The user performing the action
           p_purpose: `Transaction Cost for Transfer to ${destAcc.name}`,
           p_source: `Transaction Cost`, // This field is for income, but required by RPC. Will be ignored.
           p_is_transfer: false, // This is a standalone expenditure, not a transfer
@@ -163,6 +164,7 @@ const TransferFunds = () => {
           p_member_id: null,
           p_payment_method: null,
           p_pledge_id: null,
+          p_transaction_profile_id: currentUser?.id, // The transaction is for the current user
         });
         if (costError) throw costError;
       }

@@ -186,21 +186,17 @@ const Pledges = () => {
         project_id: p.project_id,
         amount: p.amount,
         due_date: parseISO(p.due_date),
-        status: p.status as "Active" | "Paid",
+        status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid",
         member_name: p.profiles?.name || 'Unknown Member',
         project_name: p.projects?.name || 'Unknown Project',
         comments: p.comments || undefined,
       }));
 
-      const filteredBySearch = fetchedPledges.filter(pledge => {
-        const memberName = (pledge.member_name || "").toLowerCase();
-        const projectName = (pledge.project_name || "").toLowerCase();
-        const comments = (pledge.comments || "").toLowerCase();
-        const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || 
-                              projectName.includes(searchQuery.toLowerCase()) ||
-                              comments.includes(searchQuery.toLowerCase());
-        return matchesSearch;
-      });
+      const filteredBySearch = fetchedPledges.filter(pledge =>
+        (pledge.member_name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (pledge.project_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (pledge.comments || "").toLowerCase().includes(searchQuery.toLowerCase())
+      );
       setPledges(filteredBySearch);
     }
     setLoading(false);
@@ -313,7 +309,7 @@ const Pledges = () => {
       p_source_account_id: null,
       p_destination_account_id: receivedIntoAccountId,
       p_amount: pledgeToMark.amount,
-      p_profile_id: currentUser.id,
+      p_actor_profile_id: currentUser.id, // The user performing the action
       p_purpose: `Pledge Payment for Project: ${pledgeToMark.project_name}`,
       p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
       p_is_transfer: false,
@@ -321,6 +317,7 @@ const Pledges = () => {
       p_member_id: pledgeToMark.member_id,
       p_payment_method: paymentMethod,
       p_pledge_id: pledgeId,
+      p_transaction_profile_id: pledgeToMark.member_id, // NEW: Associate income transaction with the member who made the pledge
     });
 
     if (transactionError) {

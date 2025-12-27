@@ -152,13 +152,15 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
       p_source_account_id: null, // No source account for collections
       p_destination_account_id: receivedIntoAccount,
       p_amount: parsedAmount,
-      p_profile_id: currentUser?.id,
+      p_actor_profile_id: currentUser?.id, // The user performing the action
       p_purpose: `Project Collection: ${projectName}`,
       p_source: `Project Collection: ${projectName}`,
       p_is_transfer: false, // Not a transfer, it's a direct income
       p_project_id: projectId,
       p_member_id: selectedMember,
       p_payment_method: paymentMethod,
+      p_pledge_id: null,
+      p_transaction_profile_id: selectedMember, // NEW: Associate income transaction with the contributing member
     });
 
     if (transactionError) {

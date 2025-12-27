@@ -25,6 +25,12 @@ interface FinancialAccount {
   current_balance: number;
 }
 
+interface Member {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface IncomeTransaction {
   id: string;
   date: Date;
@@ -51,6 +57,7 @@ const Income = () => {
   }, [currentUser, definedRoles]);
 
   const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
+  const [members, setMembers] = React.useState<Member[]>([]); // New state for members
   const [transactions, setTransactions] = React.useState<IncomeTransaction[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -60,6 +67,7 @@ const Income = () => {
   const [incomeAmount, setIncomeAmount] = React.useState("");
   const [incomeAccount, setIncomeAccount] = React.useState<string | undefined>(undefined);
   const [incomeSource, setIncomeSource] = React.useState("");
+  const [selectedIncomeMemberId, setSelectedIncomeMemberId] = React.useState<string | undefined>(undefined); // New state for member
   
   // Filter State
   const currentYear = getYear(new Date());
@@ -78,7 +86,7 @@ const Income = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const fetchFinancialAccounts = React.useCallback(async () => {
+  const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
     let query = supabase
       .from('financial_accounts')
       .select('id, name, current_balance');
@@ -88,17 +96,31 @@ const Income = () => {
       query = query.eq('profile_id', currentUser.id); // Filter by profile_id for non-admins
     }
       
-    const { data, error } = await query;
+    const { data: accountsData, error: accountsError } = await query;
       
-    if (error) {
-      console.error("Error fetching financial accounts:", error);
+    if (accountsError) {
+      console.error("Error fetching financial accounts:", accountsError);
       showError("Failed to load financial accounts.");
     } else {
-      setFinancialAccounts(data || []);
-      if (!incomeAccount && data && data.length > 0) {
-        setIncomeAccount(data[0].id); // Set default account if none selected
+      setFinancialAccounts(accountsData || []);
+      if (!incomeAccount && accountsData && accountsData.length > 0) {
+        setIncomeAccount(accountsData[0].id); // Set default account if none selected
       }
     }
+
+    // Fetch all members for the optional selector
+    const { data: membersData, error: membersError } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .order('name', { ascending: true });
+
+    if (membersError) {
+      console.error("Error fetching members:", membersError);
+      showError("Failed to load members for income association.");
+    } else {
+      setMembers(membersData || []);
+    }
+
   }, [incomeAccount, currentUser]);
 
   const fetchIncomeTransactions = React.useCallback(async () => {
@@ -152,9 +174,9 @@ const Income = () => {
   }, [currentUser, filterMonth, filterYear, searchQuery]);
 
   React.useEffect(() => {
-    fetchFinancialAccounts();
+    fetchFinancialAccountsAndMembers();
     fetchIncomeTransactions();
-  }, [fetchFinancialAccounts, fetchIncomeTransactions]);
+  }, [fetchFinancialAccountsAndMembers, fetchIncomeTransactions]);
 
   const handlePostIncome = async () => {
     if (!currentUser) {
@@ -182,6 +204,9 @@ const Income = () => {
       return;
     }
     
+    // Determine the profile_id for the transaction
+    const transactionProfileId = selectedIncomeMemberId || currentUser.id;
+
     const { error: insertError } = await supabase
       .from('income_transactions')
       .insert({
@@ -189,7 +214,7 @@ const Income = () => {
         amount,
         account_id: incomeAccount,
         source: incomeSource,
-        profile_id: currentUser.id, // Use profile_id
+        profile_id: transactionProfileId, // Use the determined profile_id
       });
       
     if (insertError) {
@@ -211,13 +236,14 @@ const Income = () => {
       
       showSuccess("Income posted successfully!");
       fetchIncomeTransactions();
-      fetchFinancialAccounts(); // Re-fetch accounts to update balances
+      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
       
       // Reset form
       setIncomeDate(new Date());
       setIncomeAmount("");
       setIncomeAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
       setIncomeSource("");
+      setSelectedIncomeMemberId(undefined); // Reset selected member
     }
   };
 
@@ -261,7 +287,7 @@ const Income = () => {
       
       showSuccess("Income transaction deleted successfully!");
       fetchIncomeTransactions();
-      fetchFinancialAccounts(); // Re-fetch accounts to update balances
+      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
     }
   };
 
@@ -354,6 +380,26 @@ const Income = () => {
                   </SelectGroup>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="income-member">Received From Member (Optional)</Label>
+              <Select value={selectedIncomeMemberId} onValueChange={setSelectedIncomeMemberId} disabled={!canManageIncome || members.length === 0}>
+                <SelectTrigger id="income-member">
+                  <SelectValue placeholder="Select a member" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Members</SelectLabel>
+                    {members.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name} ({member.email})
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {members.length === 0 && <p className="text-sm text-muted-foreground">No members available.</p>}
             </div>
             
             <div className="grid gap-1.5">
