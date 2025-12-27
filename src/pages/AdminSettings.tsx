@@ -130,11 +130,14 @@ const AdminSettings = () => {
         {tabsToShow.map((tab) => (
           <TabsContent key={tab.value} value={tab.value} className="space-y-6">
             {tab.value === "general" && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> {/* New grid layout */}
-                {canManageAppCustomization && <AppCustomization />}
-                {canManageSystemCurrency && <SystemCurrencySettings />}
-                {canManageFinancialAccounts && <FinancialAccountsSettings />}
-                {/* HeaderCustomization is now part of AppCustomization, so no need to render separately here */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-6"> {/* Column 1: App Customization related */}
+                  {canManageAppCustomization && <AppCustomization />}
+                </div>
+                <div className="space-y-6"> {/* Column 2: System & Financial related */}
+                  {canManageSystemCurrency && <SystemCurrencySettings />}
+                  {canManageFinancialAccounts && <FinancialAccountsSettings />}
+                </div>
               </div>
             )}
             {tab.value === "security" && <SecuritySettings />}

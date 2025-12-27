@@ -44,7 +44,7 @@ const HeaderCustomization = () => {
         <p className="text-muted-foreground">
           Customize the main title displayed in the application header.
         </p>
-        <div className="grid w-full max-w-sm items-center gap-1.5">
+        <div className="grid w-full items-center gap-1.5"> {/* Removed max-w-sm */}
           <Label htmlFor="header-title">Application Header Title</Label>
           <Input
             id="header-title"

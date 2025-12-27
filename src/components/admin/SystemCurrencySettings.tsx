@@ -61,7 +61,7 @@ const SystemCurrencySettings = () => {
         <p className="text-muted-foreground">
           Set the default currency used throughout the application for financial transactions and reports.
         </p>
-        <div className="grid w-full max-w-sm items-center gap-1.5">
+        <div className="grid w-full items-center gap-1.5"> {/* Removed max-w-sm */}
           <Label htmlFor="system-currency">Default Currency</Label>
           <Select 
             value={localCurrencyCode} // Use local state for the controlled component

@@ -59,7 +59,7 @@ const AppCustomization = () => {
           <p className="text-muted-foreground">
             Adjust the application's default theme.
           </p>
-          <div className="grid w-full max-w-sm items-center gap-1.5">
+          <div className="grid w-full items-center gap-1.5"> {/* Removed max-w-sm */}
             <Label htmlFor="default-theme">Default Application Theme</Label>
             <Select value={localDefaultTheme} onValueChange={setLocalDefaultTheme} disabled={!canManageAppCustomization || isSaving || settingsLoading}>
               <SelectTrigger id="default-theme">
