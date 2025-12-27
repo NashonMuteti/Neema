@@ -60,7 +60,7 @@ interface PledgeRowWithJoinedData {
   project_id: string;
   amount: number;
   due_date: string; // ISO string from DB
-  status: "Active" | "Paid"; // Updated: Removed "Overdue"
+  status: "Active" | "Paid" | "Overdue"; // Fixed: Added "Overdue"
   profiles: { name: string; email: string } | null; // Joined profile data, added email
   projects: { name: string } | null; // Joined project data
   comments?: string; // Added comments
@@ -189,7 +189,7 @@ const PledgeReport = () => {
         project_id: p.project_id,
         amount: p.amount,
         due_date: parseISO(p.due_date),
-        status: p.status as "Active" | "Paid", // Updated: Removed "Overdue"
+        status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid", // Updated: Removed "Overdue"
         member_name: p.profiles?.name || 'Unknown Member',
         project_name: p.projects?.name || 'Unknown Project',
         comments: p.comments || undefined,
@@ -242,7 +242,7 @@ const PledgeReport = () => {
       p_source_account_id: null,
       p_destination_account_id: receivedIntoAccountId,
       p_amount: pledgeToMark.amount,
-      p_profile_id: currentUser.id,
+      p_actor_profile_id: currentUser.id, // The user performing the action
       p_purpose: `Pledge Payment for Project: ${pledgeToMark.project_name}`,
       p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
       p_is_transfer: false,

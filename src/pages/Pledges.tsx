@@ -59,7 +59,7 @@ interface PledgeRowWithJoinedData {
   project_id: string;
   amount: number;
   due_date: string;
-  status: "Active" | "Paid";
+  status: "Active" | "Paid" | "Overdue"; // Fixed: Added "Overdue"
   profiles: { name: string; email: string } | null;
   projects: { name: string } | null;
   comments?: string;
