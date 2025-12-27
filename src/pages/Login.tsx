@@ -54,13 +54,6 @@ const Login: React.FC = () => {
             theme="light" // Use light theme, or dynamically set based on app theme
             redirectTo={window.location.origin + '/'} // Redirect to home after auth
             view="sign_in" // Only show the sign-in form
-            localization={{
-              variables: {
-                sign_in: {
-                  sign_up_link_text: '', // This should hide the "Don't have an account? Sign up" link
-                },
-              },
-            }}
           />
         </CardContent>
       </Card>
