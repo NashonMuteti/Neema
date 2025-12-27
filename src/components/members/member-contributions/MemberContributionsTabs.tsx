@@ -3,13 +3,7 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MemberContributionsOverview from "./MemberContributionsOverview";
 import MemberContributionsDetailed from "./MemberContributionsDetailed";
-import { MemberContribution } from "./types";
-
-interface Project {
-  id: string;
-  name: string;
-  member_contribution_amount: number | null;
-}
+import { MemberContribution, MemberProjectWithCollections } from "./types";
 
 interface MemberContributionsTabsProps {
   selectedDate: Date | undefined;
@@ -24,8 +18,7 @@ interface MemberContributionsTabsProps {
   contributionsByDate: Record<string, MemberContribution[]>;
   totalPaidPledges: number;
   totalPendingPledges: number;
-  allActiveProjects: Project[]; // Changed from memberProjects to allActiveProjects
-  activeMembersCount: number; // New prop
+  memberProjectsWithCollections: MemberProjectWithCollections[]; // New prop
   renderDay: (day: Date) => JSX.Element;
   memberName: string;
   searchQuery: string;
@@ -45,8 +38,7 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
   contributionsByDate,
   totalPaidPledges,
   totalPendingPledges,
-  allActiveProjects, // Use allActiveProjects
-  activeMembersCount, // Use activeMembersCount
+  memberProjectsWithCollections, // Use new prop
   renderDay,
   memberName,
   searchQuery,
@@ -73,8 +65,7 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
           contributionsByDate={contributionsByDate}
           totalPaidPledges={totalPaidPledges}
           totalPendingPledges={totalPendingPledges}
-          allActiveProjects={allActiveProjects} // Pass all active projects
-          activeMembersCount={activeMembersCount} // Pass active members count
+          memberProjectsWithCollections={memberProjectsWithCollections} // Pass new prop
           renderDay={renderDay}
         />
       </TabsContent>

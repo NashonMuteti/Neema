@@ -50,6 +50,14 @@ export interface PledgeTxRow {
   projects: { name: string } | null;
 }
 
+// Interface for projects created by the member, including their collections
+export interface MemberProjectWithCollections {
+  id: string;
+  name: string;
+  member_contribution_amount: number | null;
+  totalCollections: number; // Amount actually collected for this project
+}
+
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
 export const getContributionStatus = (type: MemberContribution['type'], status?: MemberContribution['status']): { text: string; variant: BadgeVariant } => {

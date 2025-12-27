@@ -14,18 +14,12 @@ import MyContributionsDetailedTab from "@/components/my-contributions/MyContribu
 import {
   Transaction,
   PledgeTxRow,
-  UserProject, // Renamed to Project for clarity in this context
   MonthYearOption,
   IncomeTxRow,
   ExpenditureTxRow,
   PettyCashTxRow,
+  MemberProjectWithCollections // New import
 } from "@/components/my-contributions/types";
-
-interface Project { // Define Project interface for allActiveProjects
-  id: string;
-  name: string;
-  member_contribution_amount: number | null;
-}
 
 const MyContributions: React.FC = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
@@ -37,8 +31,7 @@ const MyContributions: React.FC = () => {
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
   const [myTransactions, setMyTransactions] = useState<Transaction[]>([]);
-  const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // State for ALL active projects
-  const [activeMembersCount, setActiveMembersCount] = useState(0); // State for active members count
+  const [myProjectsWithCollections, setMyProjectsWithCollections] = useState<MemberProjectWithCollections[]>([]); // New state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,26 +131,38 @@ const MyContributions: React.FC = () => {
       dueDate: parseISO(pledge.due_date),
     }));
 
-    // Fetch ALL active projects (not just those created by this user)
+    // Fetch projects where this user is the creator AND their collections
     const { data: projectsData, error: projectsError } = await supabase
       .from('projects')
       .select('id, name, member_contribution_amount')
+      .eq('profile_id', currentUser.id)
       .eq('status', 'Open'); // Only open projects
 
-    if (projectsError) console.error("Error fetching all active projects:", projectsError);
-    setAllActiveProjects(projectsData || []);
-
-    // Fetch active members count
-    const { count: membersCount, error: membersCountError } = await supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'Active');
-
-    if (membersCountError) {
-      console.error("Error fetching active members count:", membersCountError);
-      setActiveMembersCount(0);
+    if (projectsError) {
+      console.error("Error fetching user's projects:", projectsError);
+      setError("Failed to load your projects.");
+      setMyProjectsWithCollections([]);
     } else {
-      setActiveMembersCount(membersCount || 0);
+      const projectsWithCollections: MemberProjectWithCollections[] = [];
+      for (const project of projectsData || []) {
+        const { data: collectionsData, error: collectionsError } = await supabase
+          .from('project_collections')
+          .select('amount')
+          .eq('project_id', project.id);
+
+        if (collectionsError) {
+          console.error(`Error fetching collections for project ${project.name}:`, collectionsError);
+          // Continue even if collections fail for one project
+        }
+        const totalCollections = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
+        projectsWithCollections.push({
+          id: project.id,
+          name: project.name,
+          member_contribution_amount: project.member_contribution_amount,
+          totalCollections: totalCollections,
+        });
+      }
+      setMyProjectsWithCollections(projectsWithCollections);
     }
 
     const filteredAndSorted = allTransactions
@@ -250,8 +255,7 @@ const MyContributions: React.FC = () => {
             transactionsByDate={transactionsByDate}
             totalPaidPledges={totalPaidPledges}
             totalPendingPledges={totalPendingPledges}
-            allActiveProjects={allActiveProjects} // Pass all active projects
-            activeMembersCount={activeMembersCount} // Pass active members count
+            myProjectsWithCollections={myProjectsWithCollections} // Pass new prop
             renderDay={renderDay}
             currency={currency}
           />

@@ -19,13 +19,17 @@ import {
   Transaction,
   getContributionStatus,
   MonthYearOption,
+  MemberProjectWithCollections // New import
 } from "./types";
-
-interface Project { // Define Project interface for allActiveProjects
-  id: string;
-  name: string;
-  member_contribution_amount: number | null;
-}
+import { useSystemSettings } from "@/context/SystemSettingsContext";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface MyContributionsOverviewTabProps {
   selectedDate: Date | undefined;
@@ -39,8 +43,7 @@ interface MyContributionsOverviewTabProps {
   transactionsByDate: Record<string, Transaction[]>;
   totalPaidPledges: number;
   totalPendingPledges: number;
-  allActiveProjects: Project[]; // Changed from myProjects to allActiveProjects
-  activeMembersCount: number; // New prop
+  myProjectsWithCollections: MemberProjectWithCollections[]; // New prop
   renderDay: (day: Date) => JSX.Element;
   currency: { code: string; symbol: string };
 }
@@ -57,15 +60,14 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   transactionsByDate,
   totalPaidPledges,
   totalPendingPledges,
-  allActiveProjects, // Use allActiveProjects
-  activeMembersCount, // Use activeMembersCount
+  myProjectsWithCollections, // Use new prop
   renderDay,
   currency,
 }) => {
-  // Calculate total expected contributions from ALL active projects
-  const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
-    sum + ((project.member_contribution_amount || 0) * activeMembersCount)
-  , 0);
+  // Calculate totals for projects created by the member
+  const totalExpectedFromMyProjects = myProjectsWithCollections.reduce((sum, project) => sum + (project.member_contribution_amount || 0), 0);
+  const totalPaidForMyProjects = myProjectsWithCollections.reduce((sum, project) => sum + project.totalCollections, 0);
+  const balanceToPayForMyProjects = totalExpectedFromMyProjects - totalPaidForMyProjects;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -186,17 +188,39 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
               </div>
             </div>
 
-            {/* Total Expected Contributions from All Active Projects */}
-            <div className="border-t pt-4 space-y-2">
-              <h3 className="font-semibold text-lg">Total Expected from All Active Projects</h3>
-              <div className="flex justify-between items-center text-sm">
-                <p className="text-muted-foreground">Total Expected:</p>
-                <p className="font-bold text-primary">{currency.symbol}{totalExpectedAllProjectsContributions.toFixed(2)}</p>
+            {/* Projects Created by Member Summary */}
+            {myProjectsWithCollections.length > 0 && (
+              <div className="border-t pt-4 space-y-2">
+                <h3 className="font-semibold text-lg">Projects Created by Me</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Project</TableHead>
+                      <TableHead className="text-right">Expected</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {myProjectsWithCollections.map(project => (
+                      <TableRow key={project.id}>
+                        <TableCell>{project.name}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{project.totalCollections.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                      <TableCell>Total</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{totalExpectedFromMyProjects.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{totalPaidForMyProjects.toFixed(2)}</TableCell>
+                    </TableRow>
+                    <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                      <TableCell colSpan={2}>Balance to Pay</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{balanceToPayForMyProjects.toFixed(2)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </div>
-              <p className="text-xs text-muted-foreground">
-                (Based on {activeMembersCount} active members and 'member contribution amount' for all active projects)
-              </p>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
