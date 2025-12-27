@@ -32,7 +32,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   onSave,
   availableRoles,
 }) => {
-  const { currentUser: loggedInUser } = useAuth();
+  const { currentUser: loggedInUser, session } = useAuth(); // Get session for Edge Function auth
   const { userRoles: definedRoles } = useUserRoles();
   
   const isSuperAdmin = loggedInUser?.role === "Super Admin";
@@ -122,6 +122,11 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       showError("User Role is required.");
       return;
     }
+
+    if (!session) {
+      showError("You must be logged in to perform this action.");
+      return;
+    }
     
     setIsSaving(true);
     let userImageUrl: string | undefined = initialData?.imageUrl;
@@ -138,114 +143,157 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       userImageUrl = undefined;
     }
     
-    if (initialData?.id) {
-      // Editing existing user
-      const oldEnableLogin = initialData.enableLogin;
-      const newEnableLogin = enableLogin;
+    try {
+      if (initialData?.id) {
+        // Editing existing user
+        const oldEnableLogin = initialData.enableLogin;
+        const newEnableLogin = enableLogin;
 
-      // If trying to enable login for a user who previously didn't have it
-      if (newEnableLogin && !oldEnableLogin) {
-        showError("Cannot enable login for an existing non-login member. Please delete this member and re-add them with 'Enable Login' checked.");
-        setIsSaving(false);
-        return;
-      }
-
-      // If the user had login enabled (or still has it enabled)
-      if (oldEnableLogin || newEnableLogin) {
-        // Update Supabase auth user metadata (for full_name and avatar_url)
-        const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
-          email: email, // Email can be updated here for auth.users
-          user_metadata: { full_name: name, avatar_url: userImageUrl },
-        });
-
-        if (authUpdateError) {
-          console.error("Error updating Supabase Auth user:", authUpdateError);
-          showError("Failed to update user authentication details.");
-          setIsSaving(false);
-          return;
-        }
-      }
-
-      // Always update public.profiles table
-      const { error: profileUpdateError } = await supabase
-        .from('profiles')
-        .update({
-          name,
-          email,
-          role,
-          status,
-          enable_login: newEnableLogin,
-          image_url: userImageUrl
-        })
-        .eq('id', initialData.id);
-
-      if (profileUpdateError) {
-        console.error("Error updating user profile:", profileUpdateError);
-        showError("Failed to update user profile details.");
-        setIsSaving(false);
-        return;
-      }
-      showSuccess("User updated successfully!");
-
-    } else {
-      // Adding new user
-      if (enableLogin) {
-        // Create user in Supabase Auth. The handle_new_user trigger will create the profile.
-        const { data: userData, error: createUserError } = await supabase.auth.admin.createUser({
-          email: email,
-          user_metadata: {
-            full_name: name,
-            avatar_url: userImageUrl,
-            role: role,
-            status: status,
-            enable_login: enableLogin,
-          },
-        });
-
-        if (createUserError) {
-          console.error("Error creating new user in Auth:", createUserError);
-          showError(`Failed to add new user: ${createUserError.message}`);
+        // If trying to enable login for a user who previously didn't have it
+        if (newEnableLogin && !oldEnableLogin) {
+          showError("Cannot enable login for an existing non-login member. Please delete this member and re-add them with 'Enable Login' checked.");
           setIsSaving(false);
           return;
         }
 
-        if (userData.user) {
-          const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-            redirectTo: window.location.origin + '/login',
+        // If the user had login enabled (or still has it enabled)
+        if (oldEnableLogin || newEnableLogin) {
+          // Update Supabase auth user metadata via Edge Function
+          const { data: authUpdateResponse, error: authUpdateError } = await supabase.functions.invoke('manage-user-auth', {
+            body: JSON.stringify({
+              action: 'updateUserById',
+              payload: {
+                userId: initialData.id,
+                updates: {
+                  email: email,
+                  user_metadata: { full_name: name, avatar_url: userImageUrl },
+                },
+              },
+            }),
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
           });
-          if (inviteError) {
-            console.error("Error sending invitation email:", inviteError);
-            showError(`User created, but failed to send invitation email: ${inviteError.message}`);
-          } else {
-            showSuccess("User added and invitation email sent successfully!");
+
+          if (authUpdateError) {
+            console.error("Error updating Supabase Auth user via Edge Function:", authUpdateError);
+            showError(`Failed to update user authentication details: ${authUpdateError.message}`);
+            setIsSaving(false);
+            return;
           }
         }
-      } else {
-        // Add member directly to public.profiles without creating an auth.users entry
-        const { error: createProfileError } = await supabase
-          .from('profiles')
-          .insert({
-            name: name,
-            email: email,
-            role: role,
-            status: status,
-            enable_login: false, // Explicitly false for non-login members
-            image_url: userImageUrl,
-          });
 
-        if (createProfileError) {
-          console.error("Error adding non-login user to profiles:", createProfileError);
-          showError(`Failed to add non-login user: ${createProfileError.message}`);
+        // Always update public.profiles table
+        const { error: profileUpdateError } = await supabase
+          .from('profiles')
+          .update({
+            name,
+            email,
+            role,
+            status,
+            enable_login: newEnableLogin,
+            image_url: userImageUrl
+          })
+          .eq('id', initialData.id);
+
+        if (profileUpdateError) {
+          console.error("Error updating user profile:", profileUpdateError);
+          showError("Failed to update user profile details.");
           setIsSaving(false);
           return;
         }
-        showSuccess("Non-login user added successfully!");
+        showSuccess("User updated successfully!");
+
+      } else {
+        // Adding new user
+        if (enableLogin) {
+          // Create user in Supabase Auth via Edge Function
+          const { data: createUserResponse, error: createUserError } = await supabase.functions.invoke('manage-user-auth', {
+            body: JSON.stringify({
+              action: 'createUser',
+              payload: {
+                email: email,
+                // A temporary password is required by createUser, but inviteUserByEmail will override it.
+                // For security, we'll use a placeholder and immediately send an invite.
+                password: Math.random().toString(36).substring(2, 15), 
+                user_metadata: {
+                  full_name: name,
+                  avatar_url: userImageUrl,
+                  role: role,
+                  status: status,
+                  enable_login: enableLogin,
+                },
+              },
+            }),
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (createUserError) {
+            console.error("Error creating new user in Auth via Edge Function:", createUserError);
+            showError(`Failed to add new user: ${createUserError.message}`);
+            setIsSaving(false);
+            return;
+          }
+
+          if (createUserResponse?.user) {
+            // Send invitation email via Edge Function
+            const { error: inviteError } = await supabase.functions.invoke('manage-user-auth', {
+              body: JSON.stringify({
+                action: 'inviteUserByEmail',
+                payload: {
+                  email: email,
+                  options: {
+                    redirectTo: window.location.origin + '/login',
+                  },
+                },
+              }),
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (inviteError) {
+              console.error("Error sending invitation email via Edge Function:", inviteError);
+              showError(`User created, but failed to send invitation email: ${inviteError.message}`);
+            } else {
+              showSuccess("User added and invitation email sent successfully!");
+            }
+          }
+        } else {
+          // Add member directly to public.profiles without creating an auth.users entry
+          const { error: createProfileError } = await supabase
+            .from('profiles')
+            .insert({
+              name: name,
+              email: email,
+              role: role,
+              status: status,
+              enable_login: false, // Explicitly false for non-login members
+              image_url: userImageUrl,
+            });
+
+          if (createProfileError) {
+            console.error("Error adding non-login user to profiles:", createProfileError);
+            showError(`Failed to add non-login user: ${createProfileError.message}`);
+            setIsSaving(false);
+            return;
+          }
+          showSuccess("Non-login user added successfully!");
+        }
       }
+    } catch (err: any) {
+      console.error("Unexpected error in handleSubmit:", err);
+      showError(`An unexpected error occurred: ${err.message || 'Please try again.'}`);
+    } finally {
+      onSave();
+      setIsOpen(false);
+      setIsSaving(false);
     }
-    
-    onSave();
-    setIsOpen(false);
-    setIsSaving(false);
   };
 
   return (
@@ -358,14 +406,14 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               checked={enableLogin} 
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)} 
               className="col-span-3" 
-              disabled={!canManageUserProfiles || isSaving}
+              disabled={!canManageUserProfiles || isSaving || (initialData && !initialData.enableLogin)} // Disable if editing a non-login user
             />
           </div>
         </div>
         <div className="flex justify-end">
           <Button 
             onClick={handleSubmit} 
-            disabled={!canManageUserProfiles || isSaving}
+            disabled={!canManageUserProfiles || isSaving || (initialData && !initialData.enableLogin && enableLogin)}
           >
             {isSaving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> {initialData ? "Save Changes" : "Add User"}</>}
           </Button>
