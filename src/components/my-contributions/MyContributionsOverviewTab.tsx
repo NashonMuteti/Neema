@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, getMonth, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -43,10 +43,9 @@ interface MyContributionsOverviewTabProps {
   months: MonthYearOption[];
   years: MonthYearOption[];
   transactionsByDate: Record<string, Transaction[]>;
-  totalPaidPledges: number;
-  totalPendingPledges: number;
+  totalYearlyPledgedAmount: number; // New prop
+  totalYearlyPaidAmount: number;     // New prop
   allActiveProjects: Project[]; // ALL active projects in the system
-  // Removed: activeMembersCount: number; // Total active members in the system
   currentUserId: string; // New prop: ID of the current user
   renderDay: (day: Date) => JSX.Element;
   currency: { code: string; symbol: string };
@@ -62,10 +61,9 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   months,
   years,
   transactionsByDate,
-  totalPaidPledges,
-  totalPendingPledges,
+  totalYearlyPledgedAmount, // Destructure new prop
+  totalYearlyPaidAmount,     // Destructure new prop
   allActiveProjects, // Use ALL active projects
-  // Removed: activeMembersCount,
   currentUserId, // Use currentUserId
   renderDay,
   currency,
@@ -74,11 +72,6 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
     { projectId: string; projectName: string; expected: number; paid: number }[]
   >([]);
   const [loadingMyProjectContributions, setLoadingMyProjectContributions] = useState(true);
-
-  // Removed: Calculate total expected contributions from ALL active projects (system-wide)
-  // const totalExpectedAllProjectsContributions = allActiveProjects.reduce((sum, project) => 
-  //   sum + ((project.member_contribution_amount || 0) * activeMembersCount)
-  // , 0);
 
   // Fetch user's specific contributions to each active project
   useEffect(() => {
@@ -125,6 +118,8 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   const totalExpectedFromUserToAllProjects = myProjectContributions.reduce((sum, p) => sum + p.expected, 0);
   const totalPaidFromUserToAllProjects = myProjectContributions.reduce((sum, p) => sum + p.paid, 0);
   const balanceToPayFromUserToAllProjects = totalExpectedFromUserToAllProjects - totalPaidFromUserToAllProjects;
+
+  const amountDueForPayment = totalYearlyPledgedAmount - totalYearlyPaidAmount;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -230,21 +225,31 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
 
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
           <CardHeader>
-            <CardTitle>Summary for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
+            <CardTitle>Pledge Summary for {getYear(new Date()).toString()}</CardTitle> {/* Updated title */}
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Pledge Summary */}
-            <div className="space-y-2">
-              <h3 className="font-semibold text-lg">Pledge Summary</h3>
-              <div className="flex justify-between items-center text-sm">
-                <p className="text-muted-foreground">Total Paid Pledges:</p>
-                <p className="font-bold text-primary">{currency.symbol}{totalPaidPledges.toFixed(2)}</p>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <p className="text-muted-foreground">Total Pending Pledges:</p>
-                <p className="font-bold text-destructive">{currency.symbol}{totalPendingPledges.toFixed(2)}</p>
-              </div>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">Total Pledged</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{totalYearlyPledgedAmount.toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Total Paid</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{totalYearlyPaidAmount.toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                  <TableCell>Amount Due for Payment</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{amountDueForPayment.toFixed(2)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
 
             {/* My Contributions to Active Projects (User-specific breakdown) */}
             {loadingMyProjectContributions ? (

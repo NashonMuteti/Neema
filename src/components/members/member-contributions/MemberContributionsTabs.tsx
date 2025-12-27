@@ -16,10 +16,9 @@ interface MemberContributionsTabsProps {
   years: { value: string; label: string }[];
   memberContributions: MemberContribution[];
   contributionsByDate: Record<string, MemberContribution[]>;
-  totalPaidPledges: number;
-  totalPendingPledges: number;
+  totalYearlyPledgedAmount: number; // New prop
+  totalYearlyPaidAmount: number;     // New prop
   allActiveProjects: Project[]; // ALL active projects in the system
-  // Removed: activeMembersCount: number; // Total active members in the system
   memberId: string; // New prop: ID of the member being viewed
   renderDay: (day: Date) => JSX.Element;
   memberName: string;
@@ -38,10 +37,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
   years,
   memberContributions,
   contributionsByDate,
-  totalPaidPledges,
-  totalPendingPledges,
+  totalYearlyPledgedAmount, // Destructure new prop
+  totalYearlyPaidAmount,     // Destructure new prop
   allActiveProjects, // Use ALL active projects
-  // Removed: activeMembersCount, // Use activeMembersCount
   memberId, // Use memberId
   renderDay,
   memberName,
@@ -67,10 +65,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
           years={years}
           memberContributions={memberContributions}
           contributionsByDate={contributionsByDate}
-          totalPaidPledges={totalPaidPledges}
-          totalPendingPledges={totalPendingPledges}
+          totalYearlyPledgedAmount={totalYearlyPledgedAmount} {/* New prop */}
+          totalYearlyPaidAmount={totalYearlyPaidAmount}     {/* New prop */}
           allActiveProjects={allActiveProjects} // Pass ALL active projects
-          // Removed: activeMembersCount={activeMembersCount} // Pass active members count
           memberId={memberId} // Pass memberId
           renderDay={renderDay}
         />
