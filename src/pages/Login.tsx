@@ -34,7 +34,7 @@ const Login: React.FC = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <img src={brandLogoUrl} alt="Logo" className="h-12 w-auto mx-auto mb-4" />
-          <CardTitle className="text-2xl font-bold">Welcome Back!</CardTitle>
+          <CardTitle className="2xl font-bold">Welcome Back!</CardTitle>
         </CardHeader>
         <CardContent>
           <Auth
@@ -57,7 +57,7 @@ const Login: React.FC = () => {
             localization={{
               variables: {
                 sign_in: {
-                  link_text: '', // Attempt to remove any footer links
+                  sign_up_link_text: '', // This should hide the "Don't have an account? Sign up" link
                 },
               },
             }}
