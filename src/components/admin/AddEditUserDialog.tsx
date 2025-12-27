@@ -126,7 +126,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
     setIsSaving(true);
     let userImageUrl: string | undefined = initialData?.imageUrl;
     if (selectedFile) {
-      const filePath = `${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`; // Corrected: Removed 'avatars/' prefix
+      const filePath = `${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${selectedFile.name.split('.').pop()}`;
       const uploadedUrl = await uploadFileToSupabase('avatars', selectedFile, filePath);
       if (uploadedUrl) {
         userImageUrl = uploadedUrl;
@@ -134,8 +134,8 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         setIsSaving(false);
         return;
       }
-    } else if (!selectedFile && initialData?.imageUrl && !base64Image) { // If no new file, but there was an old one, and no base64Image (meaning user cleared it)
-      userImageUrl = undefined; // Clear the image
+    } else if (!selectedFile && initialData?.imageUrl && !base64Image) {
+      userImageUrl = undefined;
     }
     
     if (initialData?.id) {
@@ -143,14 +143,18 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       const oldEnableLogin = initialData.enableLogin;
       const newEnableLogin = enableLogin;
 
-      // Check if the user has an auth.users entry
-      const { data: currentAuthUser, error: fetchAuthUserError } = await supabase.auth.admin.getUserById(initialData.id);
-      const hasAuthUser = !fetchAuthUserError && currentAuthUser.user !== null;
+      // If trying to enable login for a user who previously didn't have it
+      if (newEnableLogin && !oldEnableLogin) {
+        showError("Cannot enable login for an existing non-login member. Please delete this member and re-add them with 'Enable Login' checked.");
+        setIsSaving(false);
+        return;
+      }
 
-      if (hasAuthUser) {
-        // User has an auth.users entry, update it
+      // If the user had login enabled (or still has it enabled)
+      if (oldEnableLogin || newEnableLogin) {
+        // Update Supabase auth user metadata (for full_name and avatar_url)
         const { error: authUpdateError } = await supabase.auth.admin.updateUserById(initialData.id, {
-          email: email,
+          email: email, // Email can be updated here for auth.users
           user_metadata: { full_name: name, avatar_url: userImageUrl },
         });
 
@@ -160,32 +164,9 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           setIsSaving(false);
           return;
         }
-
-        // If login was disabled and is now enabled, and they haven't set a password, send invite
-        if (newEnableLogin && !oldEnableLogin) {
-          const userAuthData = currentAuthUser.user;
-          if (!userAuthData?.email_confirmed_at && !userAuthData?.last_sign_in_at) {
-            const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-              redirectTo: window.location.origin + '/login',
-            });
-            if (inviteError) {
-              console.error("Error sending invitation email:", inviteError);
-              showError(`User updated, but failed to send invitation email: ${inviteError.message}`);
-            } else {
-              showSuccess("User updated and invitation email sent successfully!");
-            }
-          }
-        }
-      } else {
-        // User does NOT have an auth.users entry (non-login member)
-        if (newEnableLogin && !oldEnableLogin) {
-          showError("To enable login for this member, please create a new user account with login enabled and then manually transfer any existing data. Direct conversion is not supported.");
-          setIsSaving(false);
-          return;
-        }
       }
 
-      // Update public.profiles table
+      // Always update public.profiles table
       const { error: profileUpdateError } = await supabase
         .from('profiles')
         .update({
