@@ -269,5 +269,8 @@
   }
 
   /* Hide the "Don't have an account? Sign up" link in Supabase Auth UI */
-  /* This rule is now removed as localization is used instead */
+  /* This targets any anchor tag within the Auth UI that links to a sign-up path */
+  .supabase-auth-ui a[href*="sign_up"] {
+    display: none !important;
+  }
 }
