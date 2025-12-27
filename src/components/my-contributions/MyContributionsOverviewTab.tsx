@@ -177,11 +177,11 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
             {/* Expected Project Contributions */}
             {myProjects.length > 0 && (
               <div className="border-t pt-4 space-y-2">
-                <h3 className="font-semibold text-lg">Expected Project Contributions</h3>
+                <h3 className="font-semibold text-lg">Projects Created by Member</h3>
                 {myProjects.map(project => (
                   <div key={project.id} className="flex justify-between items-center text-sm">
                     <span>{project.name}:</span>
-                    <span className="font-medium">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)}</span>
+                    <span className="font-medium">{currency.symbol}{(project.member_contribution_amount || 0).toFixed(2)} (Expected per member)</span>
                   </div>
                 ))}
               </div>

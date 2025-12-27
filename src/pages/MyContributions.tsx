@@ -229,7 +229,6 @@ const MyContributions: React.FC = () => {
             months={months}
             years={years}
             transactionsByDate={transactionsByDate}
-            // Removed totalIncome, totalExpenditure, netBalance
             totalPaidPledges={totalPaidPledges}
             totalPendingPledges={totalPendingPledges}
             myProjects={myProjects}

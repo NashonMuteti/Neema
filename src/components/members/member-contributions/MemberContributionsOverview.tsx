@@ -26,12 +26,9 @@ interface MemberContributionsOverviewProps {
   years: { value: string; label: string }[];
   memberContributions: MemberContribution[];
   contributionsByDate: Record<string, MemberContribution[]>;
-  totalIncome: number; // Kept for now, but will be 0
-  totalExpenditure: number; // Kept for now, but will be 0
-  netBalance: number; // Kept for now, but will be 0
-  totalPaidPledges: number; // New prop
-  totalPendingPledges: number; // New prop
-  memberProjects: UserProject[]; // New prop
+  totalPaidPledges: number;
+  totalPendingPledges: number;
+  memberProjects: UserProject[];
   renderDay: (day: Date) => JSX.Element;
 }
 
@@ -46,20 +43,12 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   years,
   memberContributions,
   contributionsByDate,
-  totalIncome, // Kept for prop compatibility, but not used in display
-  totalExpenditure, // Kept for prop compatibility, but not used in display
-  netBalance, // Kept for prop compatibility, but not used in display
-  totalPaidPledges, // Destructure new prop
-  totalPendingPledges, // Destructure new prop
-  memberProjects, // Destructure new prop
+  totalPaidPledges,
+  totalPendingPledges,
+  memberProjects,
   renderDay
 }) => {
   const { currency } = useSystemSettings(); // Use currency from context
-
-  // Calculate actual income and expenditure from memberContributions for display
-  const currentMonthIncome = memberContributions.filter(c => c.type === 'income').reduce((sum, c) => sum + c.amount, 0);
-  const currentMonthExpenditure = memberContributions.filter(c => c.type === 'expenditure' || c.type === 'petty_cash').reduce((sum, c) => sum + c.amount, 0);
-  const currentMonthNetBalance = currentMonthIncome - currentMonthExpenditure;
 
   // Calculate total expected contributions from active projects
   const totalExpectedProjectContributions = memberProjects.reduce((sum, project) => sum + (project.member_contribution_amount || 0), 0);
@@ -140,21 +129,8 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
           <CardTitle>Summary for {months[parseInt(filterMonth)].label} {filterYear}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Financial Overview (Updated) */}
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">Financial Overview</h3>
-            <div className="flex justify-between items-center text-sm">
-              <p className="text-muted-foreground">Active Projects Expected Amount:</p>
-              <p className="font-bold text-primary">{currency.symbol}{totalExpectedProjectContributions.toFixed(2)}</p>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <p className="text-muted-foreground">Paid Amount (Pledges):</p>
-              <p className="font-bold text-primary">{currency.symbol}{totalPaidPledges.toFixed(2)}</p>
-            </div>
-          </div>
-
           {/* Pledge Summary */}
-          <div className="border-t pt-4 space-y-2">
+          <div className="space-y-2">
             <h3 className="font-semibold text-lg">Pledge Summary</h3>
             <div className="flex justify-between items-center text-sm">
               <p className="text-muted-foreground">Total Paid Pledges:</p>
@@ -166,7 +142,7 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
             </div>
           </div>
 
-          {/* Expected Project Contributions */}
+          {/* Projects Created by Member */}
           {memberProjects.length > 0 && (
             <div className="border-t pt-4 space-y-2">
               <h3 className="font-semibold text-lg">Projects Created by Member</h3>

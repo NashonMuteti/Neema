@@ -22,12 +22,9 @@ interface MemberContributionsTabsProps {
   years: { value: string; label: string }[];
   memberContributions: MemberContribution[];
   contributionsByDate: Record<string, MemberContribution[]>;
-  totalIncome: number; // Kept for now, but will be 0
-  totalExpenditure: number; // Kept for now, but will be 0
-  netBalance: number; // Kept for now, but will be 0
-  totalPaidPledges: number; // New prop
-  totalPendingPledges: number; // New prop
-  memberProjects: UserProject[]; // New prop
+  totalPaidPledges: number;
+  totalPendingPledges: number;
+  memberProjects: UserProject[];
   renderDay: (day: Date) => JSX.Element;
   memberName: string;
   searchQuery: string;
@@ -45,12 +42,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
   years,
   memberContributions,
   contributionsByDate,
-  totalIncome,
-  totalExpenditure,
-  netBalance,
-  totalPaidPledges, // Destructure new prop
-  totalPendingPledges, // Destructure new prop
-  memberProjects, // Destructure new prop
+  totalPaidPledges,
+  totalPendingPledges,
+  memberProjects,
   renderDay,
   memberName,
   searchQuery,
@@ -75,12 +69,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
           years={years}
           memberContributions={memberContributions}
           contributionsByDate={contributionsByDate}
-          totalIncome={totalIncome}
-          totalExpenditure={totalExpenditure}
-          netBalance={netBalance}
-          totalPaidPledges={totalPaidPledges} // Pass new prop
-          totalPendingPledges={totalPendingPledges} // Pass new prop
-          memberProjects={memberProjects} // Pass new prop
+          totalPaidPledges={totalPaidPledges}
+          totalPendingPledges={totalPendingPledges}
+          memberProjects={memberProjects}
           renderDay={renderDay}
         />
       </TabsContent>

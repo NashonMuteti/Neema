@@ -286,9 +286,6 @@ const MemberContributionsDetail: React.FC = () => {
         years={years}
         memberContributions={memberContributions}
         contributionsByDate={contributionsByDate}
-        totalIncome={0} // Removed from overview, set to 0
-        totalExpenditure={0} // Removed from overview, set to 0
-        netBalance={0} // Removed from overview, set to 0
         totalPaidPledges={totalPaidPledges} // New prop
         totalPendingPledges={totalPendingPledges} // New prop
         memberProjects={memberProjects} // New prop
