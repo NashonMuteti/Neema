@@ -70,6 +70,9 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
           allActiveProjects={allActiveProjects} // Pass ALL active projects
           memberId={memberId} // Pass memberId
           renderDay={renderDay}
+          memberName={memberName}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
         />
       </TabsContent>
       
