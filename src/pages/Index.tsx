@@ -5,6 +5,7 @@ import SoonDueProjectsGraph from "@/components/dashboard/SoonDueProjectsGraph";
 import ContributionsProgressGraph from "@/components/dashboard/ContributionsProgressGraph";
 import IncomeExpenditureGraph from "@/components/dashboard/IncomeExpenditureGraph";
 import FinancialSummaryBar from "@/components/dashboard/FinancialSummaryBar";
+import RecentTransactions from "@/components/dashboard/RecentTransactions"; // New import
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
 
@@ -74,6 +75,8 @@ const Index = () => {
         <SoonDueProjectsGraph projects={dashboardProjects} />
         <ContributionsProgressGraph projectsData={contributionsProgressData} />
       </div>
+
+      <RecentTransactions /> {/* New: Display recent transactions */}
     </div>
   );
 };
