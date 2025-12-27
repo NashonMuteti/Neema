@@ -56,18 +56,20 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   renderDay
 }) => {
   const { currency } = useSystemSettings();
-  const [memberProjectPledgeSummary, setMemberProjectPledgeSummary] = useState<
-    { projectId: string; projectName: string; pledged: number; paid: number }[]
+  const [memberProjectContributionsSummary, setMemberProjectContributionsSummary] = useState<
+    { projectId: string; projectName: string; expected: number; pledged: number; paid: number; }[]
   >([]);
-  const [loadingMemberProjectPledgeSummary, setLoadingMemberProjectPledgeSummary] = useState(true);
+  const [loadingMemberProjectContributionsSummary, setLoadingMemberProjectContributionsSummary] = useState(true);
 
-  // Fetch member's specific pledges and paid amounts for each active project
+  // Fetch member's specific contributions (pledges and collections) for each active project
   useEffect(() => {
-    const fetchMemberProjectPledgeSummary = async () => {
-      setLoadingMemberProjectPledgeSummary(true);
-      const summary: { projectId: string; projectName: string; pledged: number; paid: number }[] = [];
+    const fetchMemberProjectContributionsSummary = async () => {
+      setLoadingMemberProjectContributionsSummary(true);
+      const summary: { projectId: string; projectName: string; expected: number; pledged: number; paid: number; }[] = [];
 
       for (const project of allActiveProjects) {
+        const expected = project.member_contribution_amount || 0;
+
         // Fetch all pledges (Active + Paid) from this member for this project
         const { data: allPledgesData, error: allPledgesError } = await supabase
           .from('project_pledges')
@@ -80,33 +82,46 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
           showError(`Failed to load pledges for project ${project.name}.`);
         }
         const totalPledgedForProject = (allPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
-        const totalPaidForProject = (allPledgesData || []).filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
+        const totalPaidPledgesForProject = (allPledgesData || []).filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
+
+        // Fetch direct collections from this member for this project
+        const { data: collectionsData, error: collectionsError } = await supabase
+          .from('project_collections')
+          .select('amount')
+          .eq('project_id', project.id)
+          .eq('member_id', memberId);
+
+        if (collectionsError) {
+          console.error(`Error fetching collections for project ${project.name} by member ${memberId}:`, collectionsError);
+          showError(`Failed to load collections for project ${project.name}.`);
+        }
+        const totalCollectedForProject = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
 
         summary.push({
           projectId: project.id,
           projectName: project.name,
+          expected: expected,
           pledged: totalPledgedForProject,
-          paid: totalPaidForProject,
+          paid: totalPaidPledgesForProject + totalCollectedForProject, // Paid is sum of paid pledges and direct collections
         });
       }
-      setMemberProjectPledgeSummary(summary);
-      setLoadingMemberProjectPledgeSummary(false);
+      setMemberProjectContributionsSummary(summary);
+      setLoadingMemberProjectContributionsSummary(false);
     };
 
     if (allActiveProjects.length > 0 && memberId) {
-      fetchMemberProjectPledgeSummary();
+      fetchMemberProjectContributionsSummary();
     } else {
-      setMemberProjectPledgeSummary([]);
-      setLoadingMemberProjectPledgeSummary(false);
+      setMemberProjectContributionsSummary([]);
+      setLoadingMemberProjectContributionsSummary(false);
     }
   }, [allActiveProjects, memberId]);
 
-  // Calculate totals for the "My Pledges to Active Projects" table
-  const subtotalPledged = memberProjectPledgeSummary.reduce((sum, p) => sum + p.pledged, 0);
-  const subtotalPaid = memberProjectPledgeSummary.reduce((sum, p) => sum + p.paid, 0);
-  const balanceToPay = subtotalPledged - subtotalPaid;
-
-  const amountDueForPayment = totalYearlyPledgedAmount - totalYearlyPaidAmount;
+  // Calculate totals for the "Member Contributions to Active Projects" table
+  const subtotalExpected = memberProjectContributionsSummary.reduce((sum, p) => sum + p.expected, 0);
+  const subtotalPledged = memberProjectContributionsSummary.reduce((sum, p) => sum + p.pledged, 0);
+  const subtotalPaid = memberProjectContributionsSummary.reduce((sum, p) => sum + p.paid, 0);
+  const overallBalanceDue = subtotalExpected - subtotalPaid;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -181,73 +196,49 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
       {/* Financial Summary */}
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
-          <CardTitle>Pledge Summary for {getYear(new Date()).toString()}</CardTitle>
+          <CardTitle>Contributions Summary per Project</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">Total Pledged (Yearly)</TableCell>
-                <TableCell className="text-right">{currency.symbol}{totalYearlyPledgedAmount.toFixed(2)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Total Paid (Yearly)</TableCell>
-                <TableCell className="text-right">{currency.symbol}{totalYearlyPaidAmount.toFixed(2)}</TableCell>
-              </TableRow>
-              <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                <TableCell>Amount Due for Payment (Yearly)</TableCell>
-                <TableCell className="text-right">{currency.symbol}{amountDueForPayment.toFixed(2)}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-
-          {/* My Pledges to Active Projects (Member-specific breakdown) */}
-          {loadingMemberProjectPledgeSummary ? (
-            <div className="border-t pt-4 space-y-2">
-              <h3 className="font-semibold text-lg">Pledges to Active Projects</h3>
-              <p className="text-muted-foreground">Loading project pledges...</p>
+          {loadingMemberProjectContributionsSummary ? (
+            <div className="space-y-2">
+              <p className="text-muted-foreground">Loading project contributions...</p>
             </div>
-          ) : memberProjectPledgeSummary.length > 0 ? (
-            <div className="border-t pt-4 space-y-2">
-              <h3 className="font-semibold text-lg">Pledges to Active Projects</h3>
+          ) : memberProjectContributionsSummary.length > 0 ? (
+            <div className="space-y-2">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Project</TableHead>
+                    <TableHead className="text-right">Expected</TableHead>
                     <TableHead className="text-right">Pledged</TableHead>
                     <TableHead className="text-right">Paid</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {memberProjectPledgeSummary.map(project => (
+                  {memberProjectContributionsSummary.map(project => (
                     <TableRow key={project.projectId}>
                       <TableCell>{project.projectName}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{project.expected.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{currency.symbol}{project.pledged.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{currency.symbol}{project.paid.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                     <TableCell>Subtotal</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{subtotalExpected.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{currency.symbol}{subtotalPledged.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{currency.symbol}{subtotalPaid.toFixed(2)}</TableCell>
                   </TableRow>
                   <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                    <TableCell colSpan={2}>Balance to Pay</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{balanceToPay.toFixed(2)}</TableCell>
+                    <TableCell colSpan={3}>Balance to Pay</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{overallBalanceDue.toFixed(2)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
             </div>
           ) : (
-            <div className="border-t pt-4 space-y-2">
-              <h3 className="font-semibold text-lg">Pledges to Active Projects</h3>
-              <p className="text-muted-foreground">No active projects found for this member to pledge to.</p>
+            <div className="space-y-2">
+              <p className="text-muted-foreground">No active projects found for this member to contribute to.</p>
             </div>
           )}
           
