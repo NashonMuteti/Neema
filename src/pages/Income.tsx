@@ -12,18 +12,7 @@ import IncomeForm from "@/components/income/IncomeForm";
 import IncomeTable from "@/components/income/IncomeTable";
 import EditIncomeDialog from "@/components/income/EditIncomeDialog"; // New import
 import DeleteIncomeDialog from "@/components/income/DeleteIncomeDialog"; // New import
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
-}
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
+import { FinancialAccount, Member, MonthYearOption } from "@/types/common"; // Unified imports
 
 interface IncomeTransaction {
   id: string;
@@ -33,11 +22,6 @@ interface IncomeTransaction {
   source: string;
   profile_id: string; // Changed from user_id to profile_id
   account_name: string; // Joined from financial_accounts
-}
-
-interface MonthYearOption {
-  value: string;
-  label: string;
 }
 
 const Income = () => {
@@ -86,7 +70,7 @@ const Income = () => {
   const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
     let query = supabase
       .from('financial_accounts')
-      .select('id, name, current_balance');
+      .select('id, name, current_balance, initial_balance, profile_id'); // Select all fields for FinancialAccount type
       
     const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
     if (!isAdmin && currentUser) {
@@ -401,7 +385,7 @@ const Income = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Adjusted grid layout */}
         <div className="lg:col-span-1"> {/* IncomeForm takes 1/3 width */}
           <IncomeForm
-            key={financialAccounts.length} {/* Added key */}
+            key={financialAccounts.length}
             financialAccounts={financialAccounts}
             members={members}
             canManageIncome={canManageIncome}
@@ -411,7 +395,7 @@ const Income = () => {
         
         <div className="lg:col-span-2"> {/* IncomeTable takes 2/3 width */}
           <IncomeTable
-            key={transactions.length} {/* Added key */}
+            key={transactions.length}
             transactions={transactions}
             canManageIncome={canManageIncome}
             filterMonth={filterMonth}
