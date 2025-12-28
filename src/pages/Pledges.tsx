@@ -23,9 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Member, FinancialAccount } from "@/types/common"; // Updated import
-
-// Removed local FinancialAccount interface definition
+import { Member, FinancialAccount } from "@/types/common";
 
 interface Project {
   id: string;
@@ -50,7 +48,7 @@ interface PledgeRowWithJoinedData {
   project_id: string;
   amount: number;
   due_date: string;
-  status: "Active" | "Paid" | "Overdue"; // Fixed: Added "Overdue"
+  status: "Active" | "Paid" | "Overdue";
   profiles: { name: string; email: string } | null;
   projects: { name: string } | null;
   comments?: string;
@@ -113,20 +111,17 @@ const Pledges = () => {
       .select('id, name')
       .order('name', { ascending: true });
 
-    let financialAccountsData: FinancialAccount[] = [];
-    if (currentUser) {
-      const { data: accountsData, error: accountsError } = await supabase
-        .from('financial_accounts')
-        .select('id, name, current_balance, initial_balance, profile_id') // Added initial_balance and profile_id
-        .eq('profile_id', currentUser.id)
-        .order('name', { ascending: true });
+    // Fetch all financial accounts (not filtered by currentUser.id)
+    const { data: accountsData, error: accountsError } = await supabase
+      .from('financial_accounts')
+      .select('id, name, current_balance, initial_balance, profile_id')
+      .order('name', { ascending: true });
 
-      if (accountsError) {
-        console.error("Error fetching financial accounts:", accountsError);
-        showError("Failed to load financial accounts.");
-      } else {
-        financialAccountsData = (accountsData || []) as FinancialAccount[];
-      }
+    if (accountsError) {
+      console.error("Error fetching financial accounts:", accountsError);
+      showError("Failed to load financial accounts.");
+    } else {
+      setFinancialAccounts((accountsData || []) as FinancialAccount[]);
     }
 
     if (membersError) { console.error("Error fetching members:", membersError); setError("Failed to load members."); }
@@ -137,10 +132,10 @@ const Pledges = () => {
       const uniqueProjects = Array.from(new Map((projectsData || []).map(p => [p.id, p])).values());
       setProjects(uniqueProjects);
     }
-    setFinancialAccounts(financialAccountsData);
 
-    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
-    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
+    // Fetch pledges for the entire selected year, not just a month
+    const startOfYear = new Date(parseInt(filterYear), 0, 1);
+    const endOfYear = new Date(parseInt(filterYear), 11, 31, 23, 59, 59);
 
     let query = supabase
       .from('project_pledges')
@@ -155,9 +150,10 @@ const Pledges = () => {
         profiles ( name, email ),
         projects ( name )
       `)
-      .gte('due_date', startOfMonth.toISOString())
-      .lte('due_date', endOfMonth.toISOString());
+      .gte('due_date', startOfYear.toISOString())
+      .lte('due_date', endOfYear.toISOString());
       
+    // Apply status filter if not "All"
     if (filterStatus === "Paid") {
       query = query.eq('status', 'Paid');
     } else if (filterStatus === "Unpaid") {
@@ -188,10 +184,22 @@ const Pledges = () => {
         (pledge.project_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (pledge.comments || "").toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setPledges(filteredBySearch);
+
+      // Sort pledges: Unpaid first, then by due_date descending
+      const sortedPledges = filteredBySearch.sort((a, b) => {
+        const statusA = getDisplayPledgeStatus(a);
+        const statusB = getDisplayPledgeStatus(b);
+
+        if (statusA === "Unpaid" && statusB === "Paid") return -1;
+        if (statusA === "Paid" && statusB === "Unpaid") return 1;
+
+        return b.due_date.getTime() - a.due_date.getTime(); // Sort by due_date descending
+      });
+
+      setPledges(sortedPledges);
     }
     setLoading(false);
-  }, [filterMonth, filterYear, filterStatus, searchQuery, currentUser]);
+  }, [filterYear, filterStatus, searchQuery]); // Removed filterMonth from dependencies
 
   React.useEffect(() => {
     fetchInitialData();

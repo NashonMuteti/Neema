@@ -37,7 +37,6 @@ import { FinancialAccount } from "@/types/common"; // Import FinancialAccount fr
 // Add interfaces for fetched data
 interface Member { id: string; name: string; email: string; } // Added email for dialog
 interface Project { id: string; name: string; }
-// Removed local FinancialAccount interface definition
 interface Pledge {
   id: string;
   member_id: string;
@@ -122,13 +121,12 @@ const PledgeReport = () => {
       .select('id, name')
       .order('name', { ascending: true });
 
-    // Fetch financial accounts for the current user
+    // Fetch all financial accounts (not filtered by currentUser.id)
     let financialAccountsData: FinancialAccount[] = [];
     if (currentUser) {
       const { data: accountsData, error: accountsError } = await supabase
         .from('financial_accounts')
         .select('id, name, current_balance, initial_balance, profile_id') // Added initial_balance and profile_id
-        .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
 
       if (accountsError) {
@@ -147,8 +145,9 @@ const PledgeReport = () => {
     if (projectsError) { console.error("Error fetching projects:", projectsError); setError("Failed to load projects."); }
     else { setProjects(projectsData || []); }
 
-    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
-    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
+    // Fetch pledges for the entire selected year, not just a month
+    const startOfYear = new Date(parseInt(filterYear), 0, 1);
+    const endOfYear = new Date(parseInt(filterYear), 11, 31, 23, 59, 59);
 
     let query = supabase
       .from('project_pledges')
@@ -163,8 +162,8 @@ const PledgeReport = () => {
         profiles ( name, email ),
         projects ( name )
       `)
-      .gte('due_date', startOfMonth.toISOString())
-      .lte('due_date', endOfMonth.toISOString());
+      .gte('due_date', startOfYear.toISOString())
+      .lte('due_date', endOfYear.toISOString());
       
     if (filterStatus === "Paid") {
       query = query.eq('status', 'Paid');
@@ -186,7 +185,7 @@ const PledgeReport = () => {
         project_id: p.project_id,
         amount: p.amount,
         due_date: parseISO(p.due_date),
-        status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid", // Updated: Removed "Overdue"
+        status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid",
         member_name: p.profiles?.name || 'Unknown Member',
         project_name: p.projects?.name || 'Unknown Project',
         comments: p.comments || undefined,
@@ -201,10 +200,22 @@ const PledgeReport = () => {
                               comments.includes(searchQuery.toLowerCase());
         return matchesSearch;
       });
-      setPledges(filteredBySearch);
+
+      // Sort pledges: Unpaid first, then by due_date descending
+      const sortedPledges = filteredBySearch.sort((a, b) => {
+        const statusA = getDisplayPledgeStatus(a);
+        const statusB = getDisplayPledgeStatus(b);
+
+        if (statusA === "Unpaid" && statusB === "Paid") return -1;
+        if (statusA === "Paid" && statusB === "Unpaid") return 1;
+
+        return b.due_date.getTime() - a.due_date.getTime(); // Sort by due_date descending
+      });
+
+      setPledges(sortedPledges);
     }
     setLoading(false);
-  }, [filterMonth, filterYear, filterStatus, searchQuery, currentUser]);
+  }, [filterYear, filterStatus, searchQuery, currentUser]); // Removed filterMonth from dependencies
 
   useEffect(() => {
     fetchReportData();

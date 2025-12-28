@@ -43,7 +43,7 @@ const Index = () => {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-foreground">{t("dashboard_title")}</h1>
+        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-lg text-muted-foreground">Loading dashboard data...</p>
       </div>
     );
@@ -52,7 +52,7 @@ const Index = () => {
   if (anyError) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-foreground">{t("dashboard_title")}</h1>
+        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-lg text-destructive">Error loading dashboard: {anyError}</p>
       </div>
     );
@@ -60,9 +60,9 @@ const Index = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">{t("dashboard_title")}</h1>
+      <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
       <p className="text-lg text-muted-foreground">
-        {t("welcome_message")}
+        Welcome to your Financial Hub!
       </p>
 
       <FinancialSummaryBar
