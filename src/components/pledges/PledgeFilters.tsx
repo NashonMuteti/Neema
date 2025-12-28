@@ -18,8 +18,7 @@ import { MonthYearOption } from "@/types/common"; // Updated import
 interface PledgeFiltersProps {
   filterStatus: "All" | "Paid" | "Unpaid"; // Updated filter options
   setFilterStatus: (status: "All" | "Paid" | "Unpaid") => void; // Updated filter options
-  filterMonth: string;
-  setFilterMonth: (month: string) => void;
+  // Removed filterMonth and setFilterMonth props
   filterYear: string;
   setFilterYear: (year: string) => void;
   searchQuery: string;
@@ -31,8 +30,8 @@ interface PledgeFiltersProps {
 const PledgeFilters: React.FC<PledgeFiltersProps> = ({
   filterStatus,
   setFilterStatus,
-  filterMonth,
-  setFilterMonth,
+  // Removed filterMonth
+  // Removed setFilterMonth
   filterYear,
   setFilterYear,
   searchQuery,
@@ -57,21 +56,7 @@ const PledgeFilters: React.FC<PledgeFiltersProps> = ({
           </SelectContent>
         </Select>
       </div>
-      <div className="grid gap-1.5 flex-1 min-w-[120px]">
-        <Label htmlFor="filter-month">Month</Label>
-        <Select value={filterMonth} onValueChange={setFilterMonth}>
-          <SelectTrigger id="filter-month">
-            <SelectValue placeholder="Select month" />
-          </SelectTrigger>
-          <SelectContent>
-            {months.map((month) => (
-              <SelectItem key={month.value} value={month.value}>
-                {month.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Removed Month Filter */}
       <div className="grid gap-1.5 flex-1 min-w-[100px]">
         <Label htmlFor="filter-year">Year</Label>
         <Select value={filterYear} onValueChange={setFilterYear}>

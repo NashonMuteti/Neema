@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, getMonth, getYear, parseISO } from "date-fns";
+import { format, getMonth, getYear, parseISO, startOfYear, endOfYear } from "date-fns";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
@@ -77,9 +77,8 @@ const Pledges = () => {
   const [error, setError] = React.useState<string | null>(null);
 
   const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date());
+  // Removed filterMonth state
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All");
-  const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
 
@@ -133,9 +132,9 @@ const Pledges = () => {
       setProjects(uniqueProjects);
     }
 
-    // Fetch pledges for the entire selected year, not just a month
-    const startOfYear = new Date(parseInt(filterYear), 0, 1);
-    const endOfYear = new Date(parseInt(filterYear), 11, 31, 23, 59, 59);
+    // Fetch pledges for the entire selected year
+    const startOfPeriod = startOfYear(new Date(parseInt(filterYear), 0, 1));
+    const endOfPeriod = endOfYear(new Date(parseInt(filterYear), 0, 1));
 
     let query = supabase
       .from('project_pledges')
@@ -150,8 +149,8 @@ const Pledges = () => {
         profiles ( name, email ),
         projects ( name )
       `)
-      .gte('due_date', startOfYear.toISOString())
-      .lte('due_date', endOfYear.toISOString());
+      .gte('due_date', startOfPeriod.toISOString())
+      .lte('due_date', endOfPeriod.toISOString());
       
     // Apply status filter if not "All"
     if (filterStatus === "Paid") {
@@ -353,7 +352,7 @@ const Pledges = () => {
         Record and track financial commitments (pledges) from members for various projects.
       </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Adjusted grid layout */}
         <PledgeForm
           members={members}
           projects={projects}
@@ -361,7 +360,7 @@ const Pledges = () => {
           canManagePledges={canManagePledges}
         />
 
-        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+        <Card className="lg:col-span-2 transition-all duration-300 ease-in-out hover:shadow-xl"> {/* Adjusted column span */}
           <CardHeader>
             <CardTitle>Recent Pledges</CardTitle>
           </CardHeader>
@@ -369,8 +368,7 @@ const Pledges = () => {
             <PledgeFilters
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}
-              filterMonth={filterMonth}
-              setFilterMonth={setFilterMonth}
+              // Removed filterMonth prop
               filterYear={filterYear}
               setFilterYear={setFilterYear}
               searchQuery={searchQuery}
