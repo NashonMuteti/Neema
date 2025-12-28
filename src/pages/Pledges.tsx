@@ -23,30 +23,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Member, FinancialAccount } from "@/types/common";
+import { Member, FinancialAccount, Pledge } from "@/types/common"; // Updated Pledge import
 
 interface Project {
   id: string;
   name: string;
 }
 
-interface Pledge {
-  id: string;
-  member_id: string;
-  project_id: string;
-  amount: number;
-  due_date: Date;
-  status: "Active" | "Paid";
-  member_name: string;
-  project_name: string;
-  comments?: string;
-}
-
 interface PledgeRowWithJoinedData {
   id: string;
   member_id: string;
   project_id: string;
-  amount: number;
+  amount: number; // This is now original_amount
+  paid_amount: number; // New field
   due_date: string;
   status: "Active" | "Paid" | "Overdue";
   profiles: { name: string; email: string } | null;
@@ -77,7 +66,6 @@ const Pledges = () => {
   const [error, setError] = React.useState<string | null>(null);
 
   const currentYear = getYear(new Date());
-  // Removed filterMonth state
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All");
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -92,7 +80,7 @@ const Pledges = () => {
   }));
 
   const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
-    if (pledge.status === "Paid") return "Paid";
+    if (pledge.paid_amount >= pledge.original_amount) return "Paid";
     return "Unpaid";
   };
 
@@ -110,7 +98,6 @@ const Pledges = () => {
       .select('id, name')
       .order('name', { ascending: true });
 
-    // Fetch all financial accounts (not filtered by currentUser.id)
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
       .select('id, name, current_balance, initial_balance, profile_id')
@@ -132,7 +119,6 @@ const Pledges = () => {
       setProjects(uniqueProjects);
     }
 
-    // Fetch pledges for the entire selected year
     const startOfPeriod = startOfYear(new Date(parseInt(filterYear), 0, 1));
     const endOfPeriod = endOfYear(new Date(parseInt(filterYear), 0, 1));
 
@@ -143,6 +129,7 @@ const Pledges = () => {
         member_id,
         project_id,
         amount,
+        paid_amount,
         due_date,
         status,
         comments,
@@ -152,7 +139,6 @@ const Pledges = () => {
       .gte('due_date', startOfPeriod.toISOString())
       .lte('due_date', endOfPeriod.toISOString());
       
-    // Apply status filter if not "All"
     if (filterStatus === "Paid") {
       query = query.eq('status', 'Paid');
     } else if (filterStatus === "Unpaid") {
@@ -170,7 +156,8 @@ const Pledges = () => {
         id: p.id,
         member_id: p.member_id,
         project_id: p.project_id,
-        amount: p.amount,
+        original_amount: p.amount,
+        paid_amount: p.paid_amount,
         due_date: parseISO(p.due_date),
         status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid",
         member_name: p.profiles?.name || 'Unknown Member',
@@ -184,7 +171,6 @@ const Pledges = () => {
         (pledge.comments || "").toLowerCase().includes(searchQuery.toLowerCase())
       );
 
-      // Sort pledges: Unpaid first, then by due_date descending
       const sortedPledges = filteredBySearch.sort((a, b) => {
         const statusA = getDisplayPledgeStatus(a);
         const statusB = getDisplayPledgeStatus(b);
@@ -192,13 +178,13 @@ const Pledges = () => {
         if (statusA === "Unpaid" && statusB === "Paid") return -1;
         if (statusA === "Paid" && statusB === "Unpaid") return 1;
 
-        return b.due_date.getTime() - a.due_date.getTime(); // Sort by due_date descending
+        return b.due_date.getTime() - a.due_date.getTime();
       });
 
       setPledges(sortedPledges);
     }
     setLoading(false);
-  }, [filterYear, filterStatus, searchQuery]); // Removed filterMonth from dependencies
+  }, [filterYear, filterStatus, searchQuery]);
 
   React.useEffect(() => {
     fetchInitialData();
@@ -222,6 +208,7 @@ const Pledges = () => {
         member_id: pledgeData.member_id,
         project_id: pledgeData.project_id,
         amount: pledgeData.amount,
+        paid_amount: 0, // New pledges start with 0 paid_amount
         due_date: pledgeData.due_date.toISOString(),
         status: "Active",
         comments: pledgeData.comments,
@@ -256,7 +243,7 @@ const Pledges = () => {
       return;
     }
 
-    if (pledgeToDelete.status === "Paid") {
+    if (pledgeToDelete.paid_amount > 0) { // Check paid_amount instead of status
       // Use the atomic reversal function for paid pledges
       const { error: rpcError } = await supabase.rpc('reverse_paid_pledge_atomic', {
         p_pledge_id: id,
@@ -286,7 +273,7 @@ const Pledges = () => {
     fetchInitialData();
   };
 
-  const handleMarkAsPaid = async (pledgeId: string, receivedIntoAccountId: string, paymentMethod: string) => {
+  const handleMarkAsPaid = async (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => {
     if (!canManagePledges) {
       showError("You do not have permission to mark pledges as paid.");
       return;
@@ -302,27 +289,20 @@ const Pledges = () => {
       return;
     }
 
-    // Use the atomic transfer function for marking as paid
-    const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
-      p_source_account_id: null,
-      p_destination_account_id: receivedIntoAccountId,
-      p_amount: pledgeToMark.amount,
-      p_actor_profile_id: currentUser.id, // The user performing the action
-      p_purpose: `Pledge Payment for Project: ${pledgeToMark.project_name}`,
-      p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
-      p_is_transfer: false,
-      p_project_id: pledgeToMark.project_id,
-      p_member_id: pledgeToMark.member_id,
-      p_payment_method: paymentMethod,
+    // Call the new atomic RPC function for pledge payments
+    const { error: rpcError } = await supabase.rpc('record_pledge_payment_atomic', {
       p_pledge_id: pledgeId,
-      p_transaction_profile_id: pledgeToMark.member_id, // NEW: Associate income transaction with the member who made the pledge
+      p_amount_paid: amountPaid,
+      p_received_into_account_id: receivedIntoAccountId,
+      p_actor_profile_id: currentUser.id,
+      p_payment_date: paymentDate.toISOString(),
     });
 
-    if (transactionError) {
-      console.error("Error marking pledge as paid and updating balance:", transactionError);
-      showError(`Failed to update pledge: ${transactionError.message}`);
+    if (rpcError) {
+      console.error("Error recording pledge payment:", rpcError);
+      showError(`Failed to record pledge payment: ${rpcError.message}`);
     } else {
-      showSuccess(`Pledge payment of ${currency.symbol}${pledgeToMark.amount.toFixed(2)} recorded successfully!`);
+      showSuccess(`Pledge payment of ${currency.symbol}${amountPaid.toFixed(2)} recorded successfully!`);
       fetchInitialData();
     }
   };
@@ -368,7 +348,6 @@ const Pledges = () => {
             <PledgeFilters
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}
-              // Removed filterMonth prop
               filterYear={filterYear}
               setFilterYear={setFilterYear}
               searchQuery={searchQuery}

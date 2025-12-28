@@ -43,7 +43,8 @@ export interface Pledge {
   id: string;
   member_id: string;
   project_id: string;
-  amount: number;
+  original_amount: number; // The total amount pledged
+  paid_amount: number;     // The amount already paid towards the pledge
   due_date: Date;
   status: "Active" | "Paid"; // Changed: Removed "Overdue"
   comments?: string;
@@ -81,101 +82,80 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
   const [isOpen, setIsOpen] = React.useState(false);
   const [memberId, setMemberId] = React.useState(initialData.member_id);
   const [projectId, setProjectId] = React.useState(initialData.project_id);
-  const [amount, setAmount] = React.useState(initialData.amount.toString());
+  const [originalAmount, setOriginalAmount] = React.useState(initialData.original_amount.toString()); // Now original_amount
   const [dueDate, setDueDate] = React.useState<Date | undefined>(initialData.due_date);
   const [comments, setComments] = React.useState(initialData.comments || "");
-  const [status, setStatus] = React.useState<"Active" | "Paid">(initialData.status); // Changed: Removed "Overdue"
-  const [receivedIntoAccount, setReceivedIntoAccount] = React.useState<string | undefined>(undefined); // New state for financial account
+  const [status, setStatus] = React.useState<"Active" | "Paid">(initialData.status); // Status is derived from paid_amount
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
       setMemberId(initialData.member_id);
       setProjectId(initialData.project_id);
-      setAmount(initialData.amount.toString());
+      setOriginalAmount(initialData.original_amount.toString());
       setDueDate(initialData.due_date);
       setComments(initialData.comments || "");
-      setStatus(initialData.status);
-      // Reset receivedIntoAccount when dialog opens, unless it's already paid
-      setReceivedIntoAccount(initialData.status === "Paid" && financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
+      // Status is derived, but we can set it for initial display if needed
+      setStatus(initialData.paid_amount >= initialData.original_amount ? "Paid" : "Active");
     }
-  }, [isOpen, initialData, financialAccounts]);
+  }, [isOpen, initialData]);
 
   const handleSubmit = async () => {
-    if (!memberId || !projectId || !amount || !dueDate) {
+    if (!memberId || !projectId || !originalAmount || !dueDate) {
       showError("All pledge fields are required.");
       return;
     }
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    const parsedOriginalAmount = parseFloat(originalAmount);
+    if (isNaN(parsedOriginalAmount) || parsedOriginalAmount <= 0) {
       showError("Please enter a valid positive pledge amount.");
       return;
     }
 
-    if (status === "Paid" && !receivedIntoAccount) {
-      showError("Please select an account where the pledge was received.");
+    // Validation: Ensure original_amount is not reduced below paid_amount
+    if (parsedOriginalAmount < initialData.paid_amount) {
+      showError(`Original amount cannot be less than the amount already paid (${currency.symbol}${initialData.paid_amount.toFixed(2)}).`);
       return;
     }
 
     setIsSaving(true);
     
-    // Check if status is changing to 'Paid' and it wasn't paid before
-    const isMarkingAsPaid = status === "Paid" && initialData.status !== "Paid";
+    const newStatus = parsedOriginalAmount <= initialData.paid_amount ? "Paid" : "Active";
 
-    if (isMarkingAsPaid && receivedIntoAccount) {
-      // Use the atomic transfer function for marking as paid
-      const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
-        p_source_account_id: null, // No source account for pledges
-        p_destination_account_id: receivedIntoAccount,
-        p_amount: parsedAmount,
-        p_actor_profile_id: currentUser?.id,
-        p_purpose: `Pledge Payment for Project: ${projects.find(p => p.id === projectId)?.name || 'Unknown Project'}`,
-        p_source: `Pledge Payment from Member: ${members.find(m => m.id === memberId)?.name || 'Unknown Member'}`,
-        p_is_transfer: false, // Not a transfer, it's a direct income
-        p_project_id: projectId,
-        p_member_id: memberId,
-        p_payment_method: 'N/A', // Payment method is not tracked for pledges in this context
-        p_pledge_id: initialData.id, // Pass pledge ID to update its status
-      });
+    const updatedPledgeData = {
+      member_id: memberId,
+      project_id: projectId,
+      amount: parsedOriginalAmount, // Update the 'amount' column (which is now original_amount)
+      paid_amount: initialData.paid_amount, // paid_amount is not edited here
+      due_date: dueDate.toISOString(),
+      status: newStatus,
+      comments: comments.trim() || null,
+    };
 
-      if (transactionError) {
-        console.error("Error marking pledge as paid and updating balance:", transactionError);
-        showError(`Failed to update pledge: ${transactionError.message}`);
-        setIsSaving(false);
-        return;
-      }
-    } else {
-      // If not marking as paid, or if it was already paid, just update the pledge details
-      const updatedPledgeData = {
-        member_id: memberId,
-        project_id: projectId,
-        amount: parsedAmount,
-        due_date: dueDate.toISOString(),
-        status: status,
-        comments: comments.trim() || null,
-      };
+    const { error } = await supabase
+      .from('project_pledges')
+      .update(updatedPledgeData)
+      .eq('id', initialData.id);
 
-      const { error } = await supabase
-        .from('project_pledges')
-        .update(updatedPledgeData)
-        .eq('id', initialData.id);
-
-      if (error) {
-        console.error("Error updating pledge:", error);
-        showError("Failed to update pledge.");
-        setIsSaving(false);
-        return;
-      }
+    if (error) {
+      console.error("Error updating pledge:", error);
+      showError("Failed to update pledge.");
+      setIsSaving(false);
+      return;
     }
 
     showSuccess("Pledge updated successfully!");
-    onSave({ ...initialData, member_id: memberId, project_id: projectId, amount: parsedAmount, due_date: dueDate, status: status, comments: comments.trim() || undefined });
+    onSave({ ...initialData, member_id: memberId, project_id: projectId, original_amount: parsedOriginalAmount, due_date: dueDate, status: newStatus, comments: comments.trim() || undefined });
     setIsOpen(false);
     setIsSaving(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="Edit Pledge" disabled={!canManagePledges}>
+          <Edit className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Pledge</DialogTitle>
@@ -225,16 +205,27 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-pledge-amount">Amount</Label>
+            <Label htmlFor="edit-pledge-original-amount">Original Pledged Amount</Label>
             <Input
-              id="edit-pledge-amount"
+              id="edit-pledge-original-amount"
               type="number"
               step="0.01"
               placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              value={originalAmount}
+              onChange={(e) => setOriginalAmount(e.target.value)}
               disabled={!canManagePledges || isSaving}
             />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-pledge-paid-amount">Amount Paid</Label>
+            <Input
+              id="edit-pledge-paid-amount"
+              type="number"
+              value={initialData.paid_amount.toFixed(2)}
+              disabled // This field is not editable directly
+            />
+            <p className="text-sm text-muted-foreground">Amount paid can only be updated by recording a payment.</p>
           </div>
 
           <div className="grid gap-1.5">
@@ -266,41 +257,13 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
 
           <div className="grid gap-1.5">
             <Label htmlFor="edit-pledge-status">Status</Label>
-            <Select value={status} onValueChange={(value: "Active" | "Paid") => setStatus(value)} disabled={!canManagePledges || isSaving}>
-              <SelectTrigger id="edit-pledge-status">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Pledge Status</SelectLabel>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Paid">Paid</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <Input
+              id="edit-pledge-status"
+              value={initialData.paid_amount >= initialData.original_amount ? "Paid" : "Active"}
+              disabled // Status is derived, not directly editable
+            />
+            <p className="text-sm text-muted-foreground">Status is automatically updated based on payments.</p>
           </div>
-
-          {status === "Paid" && (
-            <div className="grid gap-1.5">
-              <Label htmlFor="received-into-account">Received Into Account</Label>
-              <Select value={receivedIntoAccount} onValueChange={setReceivedIntoAccount} disabled={!canManagePledges || financialAccounts.length === 0 || isSaving}>
-                <SelectTrigger id="received-into-account">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Financial Accounts</SelectLabel>
-                    {financialAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              {financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
-            </div>
-          )}
 
           <div className="grid gap-1.5">
             <Label htmlFor="edit-pledge-comments">Comments (Optional)</Label>
@@ -314,7 +277,7 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManagePledges || isSaving || (status === "Paid" && !receivedIntoAccount)}>
+          <Button onClick={handleSubmit} disabled={!canManagePledges || isSaving || parseFloat(originalAmount) < initialData.paid_amount}>
             {isSaving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> Save Changes</>}
           </Button>
         </div>

@@ -34,8 +34,7 @@ export const useFinancialSummary = () => {
     try {
       let unpaidPledgesQuery = supabase
         .from('project_pledges')
-        .select('amount')
-        .eq('status', 'Active'); // Only count 'Active' pledges as unpaid
+        .select('amount, paid_amount'); // Select paid_amount
 
       if (!isAdmin) {
         unpaidPledgesQuery = unpaidPledgesQuery.eq('member_id', currentUser.id);
@@ -47,7 +46,7 @@ export const useFinancialSummary = () => {
         setSummaryError("Failed to load unpaid pledges.");
         setTotalUnpaidPledges(0);
       } else {
-        const total = (unpaidPledgesData || []).reduce((sum, pledge) => sum + pledge.amount, 0);
+        const total = (unpaidPledgesData || []).reduce((sum, pledge) => sum + (pledge.amount - pledge.paid_amount), 0);
         setTotalUnpaidPledges(total);
       }
 

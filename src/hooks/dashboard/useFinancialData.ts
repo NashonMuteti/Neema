@@ -54,7 +54,7 @@ export const useFinancialData = () => {
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
 
       // Fetch project pledges for outstanding amounts (not income)
-      let projectPledgesQuery = supabase.from('project_pledges').select('due_date, amount, status');
+      let projectPledgesQuery = supabase.from('project_pledges').select('due_date, amount, paid_amount'); // Select paid_amount
       if (!isAdmin) {
         projectPledgesQuery = projectPledgesQuery.eq('member_id', currentUser.id);
       }
@@ -87,10 +87,11 @@ export const useFinancialData = () => {
       incomeTransactions?.forEach(tx => aggregateByMonth(tx.date, 'income', tx.amount));
       expenditureTransactions?.forEach(tx => aggregateByMonth(tx.date, 'expenditure', tx.amount));
       
-      // Only aggregate outstanding pledges here, paid pledges are already in income_transactions
+      // Aggregate outstanding pledges: original_amount - paid_amount
       projectPledges?.forEach(pledge => {
-        if (pledge.status === 'Active') { // Only count 'Active' pledges as outstanding
-          aggregateByMonth(pledge.due_date, 'outstandingPledges', pledge.amount);
+        const outstanding = pledge.amount - pledge.paid_amount;
+        if (outstanding > 0) {
+          aggregateByMonth(pledge.due_date, 'outstandingPledges', outstanding);
         }
       });
 

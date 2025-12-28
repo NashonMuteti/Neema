@@ -18,3 +18,16 @@ export interface MonthYearOption {
   value: string;
   label: string;
 }
+
+export interface Pledge {
+  id: string;
+  member_id: string;
+  project_id: string;
+  original_amount: number; // The total amount pledged
+  paid_amount: number;     // The amount already paid towards the pledge
+  due_date: Date;
+  status: "Active" | "Paid"; // Status in DB is Active or Paid
+  member_name: string;
+  project_name: string;
+  comments?: string;
+}

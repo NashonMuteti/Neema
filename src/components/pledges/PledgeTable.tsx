@@ -16,19 +16,7 @@ import { format } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "./EditPledgeDialog";
 import MarkPledgeAsPaidDialog from "./MarkPledgeAsPaidDialog"; // New import
-import { Member, FinancialAccount } from "@/types/common"; // Updated import
-
-interface Pledge {
-  id: string;
-  member_id: string;
-  project_id: string;
-  amount: number;
-  due_date: Date;
-  status: "Active" | "Paid";
-  member_name: string;
-  project_name: string;
-  comments?: string;
-}
+import { Member, FinancialAccount, Pledge } from "@/types/common"; // Updated Pledge import
 
 interface Project {
   id: string;
@@ -38,7 +26,7 @@ interface Project {
 interface PledgeTableProps {
   pledges: Pledge[];
   canManagePledges: boolean;
-  onMarkAsPaid: (pledgeId: string, receivedIntoAccountId: string, paymentMethod: string) => void; // Updated signature
+  onMarkAsPaid: (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => void; // Updated signature
   onEditPledge: (updatedPledge: EditPledgeDialogPledge) => void;
   onDeletePledge: (id: string) => void;
   members: Member[];
@@ -47,7 +35,7 @@ interface PledgeTableProps {
 }
 
 const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
-  if (pledge.status === "Paid") return "Paid";
+  if (pledge.paid_amount >= pledge.original_amount) return "Paid";
   return "Unpaid";
 };
 
@@ -82,7 +70,9 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
             <TableRow>
               <TableHead>Member</TableHead>
               <TableHead>Project</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-right">Pledged</TableHead>
+              <TableHead className="text-right">Paid</TableHead>
+              <TableHead className="text-right">Remaining</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead>Comments</TableHead>
@@ -92,11 +82,14 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
           <TableBody>
             {pledges.map((pledge) => {
               const displayStatus = getDisplayPledgeStatus(pledge);
+              const remaining = pledge.original_amount - pledge.paid_amount;
               return (
                 <TableRow key={pledge.id}>
                   <TableCell className="font-medium">{pledge.member_name}</TableCell>
                   <TableCell>{pledge.project_name}</TableCell>
-                  <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{pledge.original_amount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{pledge.paid_amount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{remaining.toFixed(2)}</TableCell>
                   <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                   <TableCell className="text-center">
                     <Badge className={getStatusBadgeClasses(displayStatus)}>

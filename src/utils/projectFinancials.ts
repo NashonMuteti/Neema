@@ -28,15 +28,16 @@ export interface ProjectPledge {
   project_id: string;
   member_id: string;
   member_name: string; // Joined from profiles
-  amount: number;
+  original_amount: number; // The total amount pledged
+  paid_amount: number;     // The amount already paid towards the pledge
   due_date: Date;
-  status: "Active" | "Paid" | "Overdue";
+  status: "Active" | "Paid"; // Status in DB is Active or Paid
 }
 
 export interface ProjectFinancialSummary {
   totalBudget: number;
   totalCollections: number;
-  totalPledged: number; // Corrected from totalPledges
+  totalPledged: number;
   totalOutstandingPledges: number;
   collections: ProjectCollection[];
   pledges: ProjectPledge[];
@@ -58,7 +59,8 @@ interface PledgeRowWithProfile {
   id: string;
   project_id: string;
   member_id: string;
-  amount: number;
+  amount: number; // This is original_amount
+  paid_amount: number; // New field
   due_date: string; // ISO string from DB
   status: "Active" | "Paid" | "Overdue";
   profiles: { name: string } | null; // Joined profile data
@@ -102,6 +104,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
       project_id,
       member_id,
       amount,
+      paid_amount,
       due_date,
       status,
       profiles ( name )
@@ -118,9 +121,10 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
     project_id: p.project_id,
     member_id: p.member_id,
     member_name: p.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
-    amount: p.amount,
+    original_amount: p.amount,
+    paid_amount: p.paid_amount,
     due_date: new Date(p.due_date),
-    status: p.status as "Active" | "Paid" | "Overdue",
+    status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid", // Convert Overdue to Active for internal consistency
   }));
 
   // Fetch project budget (assuming projects table exists and has budget)
@@ -133,10 +137,10 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
   const totalBudget = projectData?.member_contribution_amount || 0; // Use member_contribution_amount as a proxy for budget
 
   const totalCollections = collections.reduce((sum, c) => sum + c.amount, 0);
-  const totalPledged = pledges.reduce((sum, p) => sum + p.amount, 0); // Corrected from totalPledges
+  const totalPledged = pledges.reduce((sum, p) => sum + p.original_amount, 0);
   const totalOutstandingPledges = pledges
-    .filter(p => p.status === "Active" || p.status === "Overdue")
-    .reduce((sum, p) => sum + p.amount, 0);
+    .filter(p => p.paid_amount < p.original_amount) // Outstanding if paid_amount is less than original_amount
+    .reduce((sum, p) => sum + (p.original_amount - p.paid_amount), 0);
 
   return {
     totalBudget,

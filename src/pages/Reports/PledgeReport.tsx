@@ -32,29 +32,19 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import the new dialog and its Pledge type
 import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog"; // Added this import
-import { FinancialAccount } from "@/types/common"; // Import FinancialAccount from common types
+import { FinancialAccount, Pledge } from "@/types/common"; // Updated Pledge import
 
 // Add interfaces for fetched data
 interface Member { id: string; name: string; email: string; } // Added email for dialog
 interface Project { id: string; name: string; }
-interface Pledge {
-  id: string;
-  member_id: string;
-  project_id: string;
-  amount: number;
-  due_date: Date;
-  status: "Active" | "Paid"; // Updated: Removed "Overdue"
-  member_name: string;
-  project_name: string;
-  comments?: string; // Added comments
-}
 
 // Define the expected structure of a pledge row with joined profile and project data
 interface PledgeRowWithJoinedData {
   id: string;
   member_id: string;
   project_id: string;
-  amount: number;
+  amount: number; // This is now original_amount
+  paid_amount: number; // New field
   due_date: string; // ISO string from DB
   status: "Active" | "Paid" | "Overdue"; // Fixed: Added "Overdue"
   profiles: { name: string; email: string } | null; // Joined profile data, added email
@@ -103,7 +93,7 @@ const PledgeReport = () => {
 
   // Helper to determine display status (Unpaid for Active/Overdue)
   const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
-    if (pledge.status === "Paid") return "Paid";
+    if (pledge.paid_amount >= pledge.original_amount) return "Paid";
     return "Unpaid";
   };
 
@@ -156,6 +146,7 @@ const PledgeReport = () => {
         member_id,
         project_id,
         amount,
+        paid_amount,
         due_date,
         status,
         comments,
@@ -183,7 +174,8 @@ const PledgeReport = () => {
         id: p.id,
         member_id: p.member_id,
         project_id: p.project_id,
-        amount: p.amount,
+        original_amount: p.amount,
+        paid_amount: p.paid_amount,
         due_date: parseISO(p.due_date),
         status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid",
         member_name: p.profiles?.name || 'Unknown Member',
@@ -215,7 +207,7 @@ const PledgeReport = () => {
       setPledges(sortedPledges);
     }
     setLoading(false);
-  }, [filterYear, filterStatus, searchQuery, currentUser]); // Removed filterMonth from dependencies
+  }, [filterYear, filterStatus, searchQuery, currentUser]);
 
   useEffect(() => {
     fetchReportData();
@@ -229,7 +221,7 @@ const PledgeReport = () => {
     }).sort((a, b) => b.due_date.getTime() - a.due_date.getTime()); // Sort by due date descending
   }, [pledges, filterStatus]);
 
-  const handleMarkAsPaid = async (id: string, receivedIntoAccountId: string, paymentMethod: string) => {
+  const handleMarkAsPaid = async (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => {
     if (!canManagePledges) {
       showError("You do not have permission to mark pledges as paid.");
       return;
@@ -239,39 +231,31 @@ const PledgeReport = () => {
       return;
     }
 
-    const pledgeToMark = pledges.find(p => p.id === id);
+    const pledgeToMark = pledges.find(p => p.id === pledgeId);
     if (!pledgeToMark) {
       showError("Pledge not found.");
       return;
     }
 
-    // Use the atomic transfer function for marking as paid
-    const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
-      p_source_account_id: null,
-      p_destination_account_id: receivedIntoAccountId,
-      p_amount: pledgeToMark.amount,
-      p_actor_profile_id: currentUser.id, // The user performing the action
-      p_purpose: `Pledge Payment for Project: ${pledgeToMark.project_name}`,
-      p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
-      p_is_transfer: false,
-      p_project_id: pledgeToMark.project_id,
-      p_member_id: pledgeToMark.member_id,
-      p_payment_method: paymentMethod,
-      p_pledge_id: id, // Pass pledge ID to update its status
+    // Call the new atomic RPC function for pledge payments
+    const { error: rpcError } = await supabase.rpc('record_pledge_payment_atomic', {
+      p_pledge_id: pledgeId,
+      p_amount_paid: amountPaid,
+      p_received_into_account_id: receivedIntoAccountId,
+      p_actor_profile_id: currentUser.id,
+      p_payment_date: paymentDate.toISOString(),
     });
 
-    if (transactionError) {
-      console.error("Error marking pledge as paid and updating balance:", transactionError);
-      showError(`Failed to update pledge: ${transactionError.message}`);
+    if (rpcError) {
+      console.error("Error recording pledge payment:", rpcError);
+      showError(`Failed to record pledge payment: ${rpcError.message}`);
     } else {
-      showSuccess(`Pledge payment of ${currency.symbol}${pledgeToMark.amount.toFixed(2)} recorded successfully!`);
+      showSuccess(`Pledge payment of ${currency.symbol}${amountPaid.toFixed(2)} recorded successfully!`);
       fetchReportData(); // Re-fetch all data to update lists
     }
   };
 
-  const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => { // Changed to use EditPledgeDialogPledge
-    // This function is called by the EditPledgeDialog on successful save
-    // We just need to re-fetch the data to update the table
+  const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => {
     fetchReportData();
   };
 
@@ -291,7 +275,7 @@ const PledgeReport = () => {
       return;
     }
 
-    if (pledgeToDelete.status === "Paid") {
+    if (pledgeToDelete.paid_amount > 0) { // Check paid_amount instead of status
       // Use the atomic reversal function for paid pledges
       const { error: rpcError } = await supabase.rpc('reverse_paid_pledge_atomic', {
         p_pledge_id: id,
@@ -424,7 +408,9 @@ const PledgeReport = () => {
                 <TableRow>
                   <TableHead>Member</TableHead>
                   <TableHead>Project</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Pledged</TableHead>
+                  <TableHead className="text-right">Paid</TableHead>
+                  <TableHead className="text-right">Remaining</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead>Comments</TableHead>
@@ -436,11 +422,14 @@ const PledgeReport = () => {
                   const displayStatus = getDisplayPledgeStatus(pledge);
                   const memberName = members.find(m => m.id === pledge.member_id)?.name;
                   const projectName = projects.find(p => p.id === pledge.project_id)?.name;
+                  const remaining = pledge.original_amount - pledge.paid_amount;
                   return (
                     <TableRow key={pledge.id}>
                       <TableCell className="font-medium">{memberName}</TableCell>
                       <TableCell>{projectName}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{pledge.original_amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{pledge.paid_amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{remaining.toFixed(2)}</TableCell>
                       <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClasses(displayStatus)}>
