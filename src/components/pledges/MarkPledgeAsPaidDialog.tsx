@@ -51,9 +51,10 @@ export interface Pledge {
 
 interface MarkPledgeAsPaidDialogProps {
   pledge: Pledge;
-  onConfirmPayment: (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => void; // Updated signature
+  onConfirmPayment: (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => Promise<void>; // Updated signature
   financialAccounts: FinancialAccount[];
   canManagePledges: boolean;
+  isProcessing: boolean; // New prop
 }
 
 const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
@@ -61,6 +62,7 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
   onConfirmPayment,
   financialAccounts,
   canManagePledges,
+  isProcessing, // Destructure new prop
 }) => {
   const { currency } = useSystemSettings();
   const { currentUser } = useAuth();
@@ -68,7 +70,7 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
   const [receivedIntoAccount, setReceivedIntoAccount] = React.useState<string | undefined>(undefined);
   const [amountPaid, setAmountPaid] = React.useState<string>("");
   const [paymentDate, setPaymentDate] = React.useState<Date | undefined>(new Date());
-  const [isProcessing, setIsProcessing] = React.useState(false);
+  // Removed local isProcessing state, now using prop
 
   const remainingAmount = pledge.original_amount - pledge.paid_amount;
 
@@ -78,7 +80,6 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
       setReceivedIntoAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
       setAmountPaid(remainingAmount.toFixed(2)); // Default to remaining amount
       setPaymentDate(new Date());
-      setIsProcessing(false);
     }
   }, [isOpen, financialAccounts, remainingAmount]);
 
@@ -102,9 +103,7 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
       return;
     }
 
-    setIsProcessing(true);
     await onConfirmPayment(pledge.id, parsedAmountPaid, receivedIntoAccount, paymentDate);
-    setIsProcessing(false);
     setIsOpen(false); // Close dialog after processing
   };
 
@@ -115,7 +114,7 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
           variant="outline"
           size="icon"
           title="Mark as Paid"
-          disabled={!canManagePledges || pledge.status === "Paid"}
+          disabled={!canManagePledges || pledge.status === "Paid" || isProcessing} // Use isProcessing prop
         >
           <CheckCircle className="h-4 w-4 text-green-600" />
         </Button>
