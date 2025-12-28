@@ -15,12 +15,11 @@ import { useFinancialData } from "@/hooks/dashboard/useFinancialData";
 import { useDashboardProjects } from "@/hooks/dashboard/useDashboardProjects";
 import { useContributionsProgress } from "@/hooks/dashboard/useContributionsProgress";
 import { useFinancialSummary } from "@/hooks/dashboard/useFinancialSummary";
-import { useTranslation } from 'react-i18next'; // New import
+
 
 const Index = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
   const { headerTitle } = useBranding();
-  const { t } = useTranslation(); // Use the useTranslation hook
   
   const isAdmin = useMemo(() => currentUser?.role === "Admin" || currentUser?.role === "Super Admin", [currentUser]);
 

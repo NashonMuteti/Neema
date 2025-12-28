@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, User, Shield } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
-import { LanguageSelector } from "./LanguageSelector";
+
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
 import { useViewingMember } from "@/context/ViewingMemberContext";
@@ -49,7 +49,6 @@ const Header = () => {
             </Link>
           </div>
           <div className="flex items-center space-x-4">
-            <LanguageSelector />
             <ThemeToggle />
             {/* Admin Menu - only visible if the user's role is 'Admin' or 'Super Admin' */}
             {isAdmin && (
