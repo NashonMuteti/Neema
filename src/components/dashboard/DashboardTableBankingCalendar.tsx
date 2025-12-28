@@ -15,7 +15,7 @@ import {
   ExpenditureTxRow,
   PettyCashTxRow,
   PledgeTxRow,
-  FinancialAccount // Renamed from FinancialAccountName
+  FinancialAccount
 } from "@/components/members/member-contributions/types"; // Updated import path
 import {
   Table,
@@ -28,10 +28,6 @@ TableHeader,
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, Handshake, Loader2 } from "lucide-react";
 
-interface FinancialAccount {
-  id: string;
-  name: string;
-}
 
 const DashboardTableBankingCalendar: React.FC = () => {
   const { currency } = useSystemSettings();

@@ -19,7 +19,7 @@ import {
   PettyCashTxRow,
   PledgeTxRow,
   Project, // Generic Project interface for all active projects
-  FinancialAccountName
+  FinancialAccount
 } from "@/components/members/member-contributions/types";
 
 
@@ -122,7 +122,7 @@ const MemberContributionsDetail: React.FC = () => {
       date: parseISO(tx.date),
       amount: tx.amount,
       sourceOrPurpose: tx.source,
-      accountName: (tx.financial_accounts as FinancialAccountName)?.name || 'Unknown Account',
+      accountName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account',
       pledgeId: tx.pledge_id || undefined, // Include pledgeId
     }));
 
