@@ -69,15 +69,6 @@ const Income = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const invalidateDashboardQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['financialData'] });
-    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
-    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
-    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
-    queryClient.invalidateQueries({ queryKey: ['financialAccounts'] }); // Invalidate financial accounts too
-  };
-
   const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
     let query = supabase
       .from('financial_accounts')
@@ -95,7 +86,6 @@ const Income = () => {
       showError("Failed to load financial accounts.");
     } else {
       setFinancialAccounts(accountsData || []);
-      queryClient.invalidateQueries({ queryKey: ['financialAccounts', currentUser?.id] }); // Invalidate specific query key
     }
 
     // Fetch all members for the optional selector
@@ -111,7 +101,7 @@ const Income = () => {
       setMembers(membersData || []);
     }
 
-  }, [currentUser, queryClient]);
+  }, [currentUser]);
 
   const fetchIncomeTransactions = React.useCallback(async () => {
     setLoading(true);
@@ -167,6 +157,14 @@ const Income = () => {
     fetchFinancialAccountsAndMembers();
     fetchIncomeTransactions();
   }, [fetchFinancialAccountsAndMembers, fetchIncomeTransactions]);
+
+  const invalidateDashboardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['financialData'] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] }); // In case project collections/pledges affect it
+    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] }); // In case project collections/pledges affect it
+  };
 
   const handlePostIncome = async (formData: {
     incomeDate: Date;
@@ -252,9 +250,6 @@ const Income = () => {
       return;
     }
 
-    // Optimistically update local state
-    setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
-
     const { error: updateTxError } = await supabase
       .from('income_transactions')
       .update({
@@ -270,8 +265,6 @@ const Income = () => {
     if (updateTxError) {
       console.error("Error updating income transaction:", updateTxError);
       showError("Failed to update income transaction.");
-      // Revert optimistic update if deletion fails
-      await fetchIncomeTransactions(); 
       return;
     }
 
@@ -336,9 +329,6 @@ const Income = () => {
     
     const { id, amount, account_id } = deletingTransaction;
 
-    // Optimistically update local state
-    setTransactions(prev => prev.filter(t => t.id !== id));
-
     const { error: deleteError } = await supabase
       .from('income_transactions')
       .delete()
@@ -348,10 +338,7 @@ const Income = () => {
     if (deleteError) {
       console.error("Error deleting income transaction:", deleteError);
       showError("Failed to delete income transaction.");
-      // Revert optimistic update if deletion fails
-      await fetchIncomeTransactions(); 
     } else {
-      // Revert account balance: subtract the amount that was originally added
       const currentAccount = financialAccounts.find(acc => acc.id === account_id);
       if (currentAccount) {
         const newBalance = currentAccount.current_balance - amount;

@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Member, FinancialAccount, Pledge } from "@/types/common"; // Updated Pledge import
-import { useQueryClient } from "@tanstack/react-query"; // New import
 
 interface Project {
   id: string;
@@ -48,7 +47,6 @@ const Pledges = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
-  const queryClient = useQueryClient(); // Initialize queryClient
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -80,15 +78,6 @@ const Pledges = () => {
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
   }));
-
-  const invalidateDashboardQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['financialData'] });
-    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
-    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
-    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
-    queryClient.invalidateQueries({ queryKey: ['financialAccounts'] });
-  };
 
   const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
     if (pledge.paid_amount >= pledge.original_amount) return "Paid";
@@ -195,7 +184,7 @@ const Pledges = () => {
       setPledges(sortedPledges);
     }
     setLoading(false);
-  }, [filterYear, filterStatus, searchQuery, currentUser, queryClient]);
+  }, [filterYear, filterStatus, searchQuery]);
 
   React.useEffect(() => {
     fetchInitialData();
@@ -231,13 +220,11 @@ const Pledges = () => {
     } else {
       showSuccess("Pledge recorded successfully!");
       fetchInitialData();
-      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
   const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => {
     fetchInitialData();
-    invalidateDashboardQueries(); // Invalidate dashboard queries
   };
 
   const handleDeletePledge = async (id: string) => {
@@ -256,10 +243,8 @@ const Pledges = () => {
       return;
     }
 
-    // Optimistically update local state
-    setPledges(prev => prev.filter(p => p.id !== id));
-
-    if (pledgeToDelete.paid_amount > 0) {
+    if (pledgeToDelete.paid_amount > 0) { // Check paid_amount instead of status
+      // Use the atomic reversal function for paid pledges
       const { error: rpcError } = await supabase.rpc('reverse_paid_pledge_atomic', {
         p_pledge_id: id,
         p_profile_id: currentUser.id,
@@ -268,10 +253,10 @@ const Pledges = () => {
       if (rpcError) {
         console.error("Error reversing paid pledge:", rpcError);
         showError(`Failed to delete paid pledge: ${rpcError.message}`);
-        await fetchInitialData(); // Revert optimistic update
         return;
       }
     } else {
+      // For unpaid pledges, proceed with direct deletion
       const { error: deleteError } = await supabase
         .from('project_pledges')
         .delete()
@@ -280,14 +265,12 @@ const Pledges = () => {
       if (deleteError) {
         console.error("Error deleting pledge:", deleteError);
         showError("Failed to delete pledge.");
-        await fetchInitialData(); // Revert optimistic update
         return;
       }
     }
 
     showSuccess("Pledge deleted successfully!");
     fetchInitialData();
-    invalidateDashboardQueries(); // Invalidate dashboard queries
   };
 
   const handleMarkAsPaid = async (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => {
@@ -306,6 +289,7 @@ const Pledges = () => {
       return;
     }
 
+    // Call the new atomic RPC function for pledge payments
     const { error: rpcError } = await supabase.rpc('record_pledge_payment_atomic', {
       p_pledge_id: pledgeId,
       p_amount_paid: amountPaid,
@@ -320,7 +304,6 @@ const Pledges = () => {
     } else {
       showSuccess(`Pledge payment of ${currency.symbol}${amountPaid.toFixed(2)} recorded successfully!`);
       fetchInitialData();
-      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 

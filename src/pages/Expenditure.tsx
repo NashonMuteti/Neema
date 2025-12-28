@@ -18,9 +18,6 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-import { useQueryClient } from "@tanstack/react-query"; // New import
-import DeleteExpenditureDialog from "@/components/expenditure/DeleteExpenditureDialog"; // New import
-import EditExpenditureDialog from "@/components/expenditure/EditExpenditureDialog"; // New import
 
 interface FinancialAccount {
   id: string;
@@ -41,14 +38,12 @@ interface ExpenditureTransaction {
   account_id: string;
   purpose: string;
   profile_id: string; // Changed from user_id to profile_id
-  account_name: string; // Joined from financial_accounts
 }
 
 const Expenditure = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
-  const queryClient = useQueryClient(); // Initialize queryClient
   
   const { canManageExpenditure } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -66,10 +61,6 @@ const Expenditure = () => {
   const [transactions, setTransactions] = React.useState<ExpenditureTransaction[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  
-  // State for Edit/Delete Dialogs
-  const [editingTransaction, setEditingTransaction] = React.useState<ExpenditureTransaction | null>(null);
-  const [deletingTransaction, setDeletingTransaction] = React.useState<ExpenditureTransaction | null>(null);
   
   // Form State
   const [expenditureDate, setExpenditureDate] = React.useState<Date | undefined>(new Date());
@@ -95,35 +86,23 @@ const Expenditure = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const invalidateDashboardQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['financialData'] });
-    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
-    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
-    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
-    queryClient.invalidateQueries({ queryKey: ['financialAccounts'] });
-  };
-
   const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
-    let query = supabase
+    const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance, initial_balance, profile_id');
-      
-    const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
-    if (!isAdmin && currentUser) {
-      query = query.eq('profile_id', currentUser.id);
-    }
-      
-    const { data: accountsData, error: accountsError } = await query;
+      .select('id, name, current_balance')
+      .eq('profile_id', currentUser?.id); // Filter by profile_id
       
     if (accountsError) {
       console.error("Error fetching financial accounts:", accountsError);
       showError("Failed to load financial accounts.");
     } else {
       setFinancialAccounts(accountsData || []);
-      queryClient.invalidateQueries({ queryKey: ['financialAccounts', currentUser?.id] });
+      if (!expenditureAccount && accountsData && accountsData.length > 0) {
+        setExpenditureAccount(accountsData[0].id); // Set default account if none selected
+      }
     }
 
+    // Fetch all members for the optional selector
     const { data: membersData, error: membersError } = await supabase
       .from('profiles')
       .select('id, name, email')
@@ -135,7 +114,7 @@ const Expenditure = () => {
     } else {
       setMembers(membersData || []);
     }
-  }, [currentUser, queryClient]);
+  }, [expenditureAccount, currentUser]);
 
   const fetchExpenditureTransactions = React.useCallback(async () => {
     setLoading(true);
@@ -152,13 +131,9 @@ const Expenditure = () => {
     let query = supabase
       .from('expenditure_transactions')
       .select('*, financial_accounts(name)')
+      .eq('profile_id', currentUser.id) // Changed to profile_id
       .gte('date', startOfMonth.toISOString())
       .lte('date', endOfMonth.toISOString());
-      
-    const isAdmin = currentUser.role === "Admin" || currentUser.role === "Super Admin";
-    if (!isAdmin) {
-      query = query.eq('profile_id', currentUser.id);
-    }
       
     if (searchQuery) {
       query = query.ilike('purpose', `%${searchQuery}%`);
@@ -178,7 +153,7 @@ const Expenditure = () => {
         amount: tx.amount,
         account_id: tx.account_id,
         purpose: tx.purpose,
-        profile_id: tx.profile_id,
+        profile_id: tx.profile_id, // Changed to profile_id
         account_name: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
       })));
     }
@@ -204,6 +179,7 @@ const Expenditure = () => {
     
     const amount = parseFloat(expenditureAmount);
     
+    // Server-side validation
     const validation = validateFinancialTransaction(amount, expenditureAccount, currentUser.id);
     if (!validation.isValid) {
       showError(validation.error || "Invalid expenditure amount.");
@@ -221,6 +197,7 @@ const Expenditure = () => {
       return;
     }
 
+    // Determine the profile_id for the transaction
     const transactionProfileId = selectedExpenditureMemberId || currentUser.id;
     
     const { error: insertError } = await supabase
@@ -230,19 +207,20 @@ const Expenditure = () => {
         amount,
         account_id: expenditureAccount,
         purpose: expenditurePurpose,
-        profile_id: transactionProfileId,
+        profile_id: transactionProfileId, // Use the determined profile_id
       });
       
     if (insertError) {
       console.error("Error posting expenditure:", insertError);
       showError("Failed to post expenditure.");
     } else {
+      // Update account balance
       const newBalance = currentAccount.current_balance - amount;
       const { error: updateBalanceError } = await supabase
         .from('financial_accounts')
         .update({ current_balance: newBalance })
         .eq('id', expenditureAccount)
-        .eq('profile_id', currentUser.id);
+        .eq('profile_id', currentUser.id); // Ensure user owns the account
         
       if (updateBalanceError) {
         console.error("Error updating account balance:", updateBalanceError);
@@ -251,146 +229,48 @@ const Expenditure = () => {
       
       showSuccess("Expenditure posted successfully!");
       fetchExpenditureTransactions();
-      fetchFinancialAccountsAndMembers();
-      invalidateDashboardQueries(); // Invalidate dashboard queries
+      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
       
       // Reset form
       setExpenditureDate(new Date());
       setExpenditureAmount("");
       setExpenditureAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
       setExpenditurePurpose("");
-      setSelectedExpenditureMemberId(undefined);
+      setSelectedExpenditureMemberId(undefined); // Reset selected member
     }
   };
 
-  const handleEditTransaction = (transaction: ExpenditureTransaction) => {
-    setEditingTransaction(transaction);
+  const handleEditTransaction = (id: string) => {
+    // In a real app, this would open an edit dialog pre-filled with transaction data
+    console.log("Editing expenditure transaction:", id);
+    showError("Edit functionality is not yet implemented for expenditure transactions.");
   };
 
-  const handleSaveEditedTransaction = async (updatedTx: ExpenditureTransaction) => {
+  const handleDeleteTransaction = async (id: string, amount: number, accountId: string) => {
     if (!currentUser) {
-      showError("You must be logged in to edit expenditure.");
-      return;
-    }
-
-    const oldTx = transactions.find(t => t.id === updatedTx.id);
-    if (!oldTx) {
-      showError("Original transaction not found.");
-      return;
-    }
-
-    const parsedAmount = parseFloat(updatedTx.amount.toString());
-    const validation = validateFinancialTransaction(parsedAmount, updatedTx.account_id, currentUser.id);
-    if (!validation.isValid) {
-      showError(validation.error || "Invalid expenditure amount.");
-      return;
-    }
-
-    // Optimistically update local state
-    setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
-
-    const { error: updateTxError } = await supabase
-      .from('expenditure_transactions')
-      .update({
-        date: updatedTx.date.toISOString(),
-        amount: parsedAmount,
-        account_id: updatedTx.account_id,
-        purpose: updatedTx.purpose,
-        profile_id: updatedTx.profile_id,
-      })
-      .eq('id', updatedTx.id)
-      .eq('profile_id', currentUser.id);
-
-    if (updateTxError) {
-      console.error("Error updating expenditure transaction:", updateTxError);
-      showError("Failed to update expenditure transaction.");
-      await fetchExpenditureTransactions(); // Revert optimistic update
-      return;
-    }
-
-    const oldAccount = financialAccounts.find(acc => acc.id === oldTx.account_id);
-    const newAccount = financialAccounts.find(acc => acc.id === updatedTx.account_id);
-
-    if (!oldAccount || !newAccount) {
-      showError("One or more financial accounts not found for balance adjustment.");
-      return;
-    }
-
-    if (oldTx.account_id === updatedTx.account_id) {
-      const amountDifference = oldTx.amount - parsedAmount; // Expenditure: old - new
-      const newBalance = oldAccount.current_balance + amountDifference;
-      const { error: updateBalanceError } = await supabase
-        .from('financial_accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', oldAccount.id)
-        .eq('profile_id', currentUser.id);
-      if (updateBalanceError) {
-        console.error("Error updating account balance for same account:", updateBalanceError);
-        showError("Transaction updated, but failed to adjust account balance.");
-      }
-    } else {
-      const oldAccountNewBalance = oldAccount.current_balance + oldTx.amount; // Add back to old account
-      const newAccountNewBalance = newAccount.current_balance - parsedAmount; // Deduct from new account
-
-      const { error: updateOldAccountError } = await supabase
-        .from('financial_accounts')
-        .update({ current_balance: oldAccountNewBalance })
-        .eq('id', oldAccount.id)
-        .eq('profile_id', currentUser.id);
-
-      const { error: updateNewAccountError } = await supabase
-        .from('financial_accounts')
-        .update({ current_balance: newAccountNewBalance })
-        .eq('id', newAccount.id)
-        .eq('profile_id', currentUser.id);
-
-      if (updateOldAccountError || updateNewAccountError) {
-        console.error("Error updating account balances for different accounts:", updateOldAccountError, updateNewAccountError);
-        showError("Transaction updated, but failed to adjust account balances.");
-      }
-    }
-
-    showSuccess("Expenditure transaction updated successfully!");
-    setEditingTransaction(null);
-    await fetchExpenditureTransactions();
-    await fetchFinancialAccountsAndMembers();
-    invalidateDashboardQueries();
-  };
-
-  const handleDeleteTransaction = (transaction: ExpenditureTransaction) => {
-    setDeletingTransaction(transaction);
-  };
-
-  const handleConfirmDeleteTransaction = async () => {
-    if (!deletingTransaction || !currentUser) {
-      showError("No transaction selected for deletion or user not logged in.");
+      showError("You must be logged in to delete income.");
       return;
     }
     
-    const { id, amount, account_id } = deletingTransaction;
-
-    // Optimistically update local state
-    setTransactions(prev => prev.filter(t => t.id !== id));
-
     const { error: deleteError } = await supabase
       .from('expenditure_transactions')
       .delete()
       .eq('id', id)
-      .eq('profile_id', currentUser.id);
+      .eq('profile_id', currentUser.id); // Ensure only owner can delete
       
     if (deleteError) {
       console.error("Error deleting expenditure transaction:", deleteError);
       showError("Failed to delete expenditure transaction.");
-      await fetchExpenditureTransactions(); // Revert optimistic update
     } else {
-      const currentAccount = financialAccounts.find(acc => acc.id === account_id);
+      // Revert account balance
+      const currentAccount = financialAccounts.find(acc => acc.id === accountId);
       if (currentAccount) {
-        const newBalance = currentAccount.current_balance + amount; // Add back to account
+        const newBalance = currentAccount.current_balance + amount;
         const { error: updateBalanceError } = await supabase
           .from('financial_accounts')
           .update({ current_balance: newBalance })
-          .eq('id', account_id)
-          .eq('profile_id', currentUser.id);
+          .eq('id', accountId)
+          .eq('profile_id', currentUser.id); // Ensure user owns the account
           
         if (updateBalanceError) {
           console.error("Error reverting account balance:", updateBalanceError);
@@ -399,10 +279,8 @@ const Expenditure = () => {
       }
       
       showSuccess("Expenditure transaction deleted successfully!");
-      setDeletingTransaction(null);
-      await fetchExpenditureTransactions();
-      await fetchFinancialAccountsAndMembers();
-      invalidateDashboardQueries();
+      fetchExpenditureTransactions();
+      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
     }
   };
 
@@ -604,10 +482,10 @@ const Expenditure = () => {
                       {canManageExpenditure && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEditTransaction(tx)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleEditTransaction(tx.id)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx.id, tx.amount, tx.account_id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
@@ -623,29 +501,6 @@ const Expenditure = () => {
           </CardContent>
         </Card>
       </div>
-
-      {editingTransaction && (
-        <EditExpenditureDialog
-          isOpen={!!editingTransaction}
-          setIsOpen={() => setEditingTransaction(null)}
-          initialData={editingTransaction}
-          onSave={handleSaveEditedTransaction}
-          financialAccounts={financialAccounts}
-          members={members}
-          canManageExpenditure={canManageExpenditure}
-          currency={currency}
-        />
-      )}
-
-      {deletingTransaction && (
-        <DeleteExpenditureDialog
-          isOpen={!!deletingTransaction}
-          setIsOpen={() => setDeletingTransaction(null)}
-          transaction={deletingTransaction}
-          onConfirm={handleConfirmDeleteTransaction}
-          currency={currency}
-        />
-      )}
     </div>
   );
 };
