@@ -59,7 +59,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
       // Fetch Income Transactions
       let incomeQuery = supabase
         .from('income_transactions')
-        .select('id, date, amount, source, financial_accounts(id, name), pledge_id') // Select id for financial_accounts
+        .select('id, date, amount, source, financial_accounts(id, name), pledge_id')
         .gte('date', startOfRange.toISOString())
         .lte('date', endOfRange.toISOString());
       if (!isAdmin) {
@@ -80,7 +80,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
       // Fetch Expenditure Transactions
       let expenditureQuery = supabase
         .from('expenditure_transactions')
-        .select('id, date, amount, purpose, financial_accounts(id, name)') // Select id for financial_accounts
+        .select('id, date, amount, purpose, financial_accounts(id, name)')
         .gte('date', startOfRange.toISOString())
         .lte('date', endOfRange.toISOString());
       if (!isAdmin) {
@@ -100,7 +100,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
       // Fetch Petty Cash Transactions
       let pettyCashQuery = supabase
         .from('petty_cash_transactions')
-        .select('id, date, amount, purpose, financial_accounts(id, name)') // Select id for financial_accounts
+        .select('id, date, amount, purpose, financial_accounts(id, name)')
         .gte('date', startOfRange.toISOString())
         .lte('date', endOfRange.toISOString());
       if (!isAdmin) {

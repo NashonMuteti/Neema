@@ -14,6 +14,27 @@ import MemberContributionsOverview from "@/components/my-contributions/MemberCon
 import MemberContributionsDetailed from "@/components/my-contributions/MemberContributionsDetailed";
 import { MyContribution, MyFinancialAccount } from "@/components/my-contributions/types"; // Import types
 
+// Define the expected structure of a collection row with joined project data
+interface CollectionRowWithProject {
+  id: string;
+  project_id: string;
+  amount: number;
+  date: string;
+  projects: { name: string } | null;
+}
+
+// Define the expected structure of a pledge row with joined project data
+interface PledgeRowWithProject {
+  id: string;
+  project_id: string;
+  amount: number;
+  paid_amount: number;
+  due_date: string;
+  status: "Active" | "Paid" | "Overdue";
+  comments?: string;
+  projects: { name: string } | null;
+}
+
 const MyContributions = () => {
   const { currentUser } = useAuth();
   const [contributions, setContributions] = useState<MyContribution[]>([]);
@@ -32,7 +53,7 @@ const MyContributions = () => {
 
     try {
       // Fetch collections
-      const { data: collectionsData, error: collectionsError } = await supabase
+      const { data: collectionsData, error: collectionsError } = (await supabase
         .from('project_collections')
         .select(`
           id,
@@ -42,21 +63,21 @@ const MyContributions = () => {
           projects ( name )
         `)
         .eq('member_id', currentUser.id)
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })) as { data: CollectionRowWithProject[] | null, error: PostgrestError | null };
 
       if (collectionsError) throw collectionsError;
 
       const fetchedCollections: MyContribution[] = (collectionsData || []).map(c => ({
         id: c.id,
         project_id: c.project_id,
-        project_name: (c.projects as { name: string } | null)?.name || 'Unknown Project', // Explicitly cast projects
+        project_name: c.projects?.name || 'Unknown Project',
         amount: c.amount,
         date: parseISO(c.date),
         type: "Collection",
       }));
 
       // Fetch pledges
-      const { data: pledgesData, error: pledgesError } = await supabase
+      const { data: pledgesData, error: pledgesError } = (await supabase
         .from('project_pledges')
         .select(`
           id,
@@ -69,14 +90,14 @@ const MyContributions = () => {
           projects ( name )
         `)
         .eq('member_id', currentUser.id)
-        .order('due_date', { ascending: false });
+        .order('due_date', { ascending: false })) as { data: PledgeRowWithProject[] | null, error: PostgrestError | null };
 
       if (pledgesError) throw pledgesError;
 
       const fetchedPledges: MyContribution[] = (pledgesData || []).map(p => ({
         id: p.id,
         project_id: p.project_id,
-        project_name: (p.projects as { name: string } | null)?.name || 'Unknown Project', // Explicitly cast projects
+        project_name: p.projects?.name || 'Unknown Project',
         amount: p.amount, // This is the original pledged amount
         original_amount: p.amount, // Store original amount explicitly
         paid_amount: p.paid_amount, // Store paid amount

@@ -14,7 +14,7 @@ export interface Transaction {
   pledgeId?: string; // To link income transactions to pledges
 }
 
-export interface FinancialAccount { // Renamed from FinancialAccountName
+export interface FinancialAccount {
   id: string; // Added id property
   name: string;
 }
