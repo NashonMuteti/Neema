@@ -115,7 +115,7 @@ const Income = () => {
       setMembers(membersData || []);
     }
 
-  }, [currentUser]);
+  }, [currentUser]); // Corrected dependency array
 
   const fetchIncomeTransactions = React.useCallback(async () => {
     setLoading(true);
