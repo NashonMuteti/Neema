@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { parseISO } from "date-fns";
@@ -17,17 +17,11 @@ export const useDashboardProjects = () => {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
-  const [dashboardProjects, setDashboardProjects] = useState<DashboardProject[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const queryKey = ['dashboardProjects', currentUser?.id, isAdmin];
 
-  const fetchDashboardProjects = useCallback(async () => {
-    setLoadingProjects(true);
-    setProjectsError(null);
-
+  const fetcher = async (): Promise<DashboardProject[]> => {
     if (!currentUser) {
-      setLoadingProjects(false);
-      return;
+      return [];
     }
 
     try {
@@ -41,33 +35,32 @@ export const useDashboardProjects = () => {
       }
 
       const { data, error } = await query;
+      if (error) throw error;
 
-      if (error) {
-        console.error("Error fetching dashboard projects:", error);
-        setProjectsError("Failed to load projects for dashboard.");
-        setDashboardProjects([]);
-        return;
-      }
-
-      setDashboardProjects(data.map(p => ({
+      return data.map(p => ({
         id: p.id,
         name: p.name,
         dueDate: p.due_date ? parseISO(p.due_date) : undefined,
         status: p.status as "Open" | "Closed" | "Deleted",
-      })));
-    } catch (err) {
-      console.error("Unexpected error in fetchDashboardProjects:", err);
-      setProjectsError("An unexpected error occurred while loading projects.");
-    } finally {
-      setLoadingProjects(false);
+      }));
+    } catch (err: any) {
+      console.error("Error fetching dashboard projects:", err);
+      showError("Failed to load projects for dashboard.");
+      throw err;
     }
-  }, [currentUser, isAdmin]);
+  };
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchDashboardProjects();
-    }
-  }, [currentUser, fetchDashboardProjects]);
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKey,
+    queryFn: fetcher,
+    enabled: !!currentUser,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
+  });
 
-  return { dashboardProjects, loadingProjects, projectsError };
+  return {
+    dashboardProjects: data || [],
+    loadingProjects: isLoading,
+    projectsError: error ? error.message : null,
+  };
 };

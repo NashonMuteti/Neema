@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { getYear, format, parseISO } from "date-fns";
@@ -18,55 +18,39 @@ export const useFinancialData = () => {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
-  const [monthlyFinancialData, setMonthlyFinancialData] = useState<MonthlyFinancialData[]>([]);
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [loadingFinancials, setLoadingFinancials] = useState(true);
-  const [financialsError, setFinancialsError] = useState<string | null>(null);
+  const queryKey = ['financialData', currentUser?.id, isAdmin];
 
-  const fetchFinancialData = useCallback(async () => {
-    setLoadingFinancials(true);
-    setFinancialsError(null);
-
+  const fetcher = async (): Promise<{ monthlyFinancialData: MonthlyFinancialData[]; availableYears: number[] }> => {
     if (!currentUser) {
-      setLoadingFinancials(false);
-      return;
+      return { monthlyFinancialData: [], availableYears: [] };
     }
 
     try {
       // Fetch all income transactions, including initial balances, collections, and paid pledges
-      // The transfer_funds_atomic function ensures these are recorded as income_transactions.
       let incomeQuery = supabase.from('income_transactions').select('date,amount,source');
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude income from transfers to avoid counting internal movements as new income
       incomeQuery = incomeQuery.not('source', 'ilike', `Funds Transfer from %`);
 
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
+      if (incomeError) throw incomeError;
 
       let expenditureQuery = supabase.from('expenditure_transactions').select('date,amount,purpose');
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
-      // Exclude expenditure from transfers to avoid counting internal movements as new expenditure
       expenditureQuery = expenditureQuery.not('purpose', 'ilike', `Funds Transfer to %`);
 
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
+      if (expenditureError) throw expenditureError;
 
-      // Fetch project pledges for outstanding amounts (not income)
-      let projectPledgesQuery = supabase.from('project_pledges').select('due_date, amount, paid_amount'); // Select paid_amount
+      let projectPledgesQuery = supabase.from('project_pledges').select('due_date, amount, paid_amount');
       if (!isAdmin) {
         projectPledgesQuery = projectPledgesQuery.eq('member_id', currentUser.id);
       }
       const { data: projectPledges, error: pledgesError } = await projectPledgesQuery;
-
-      if (incomeError || expenditureError || pledgesError) {
-        console.error("Error fetching financial data:", incomeError || expenditureError || pledgesError);
-        setFinancialsError("Failed to load financial data.");
-        setMonthlyFinancialData([]);
-        setAvailableYears([]);
-        return;
-      }
+      if (pledgesError) throw pledgesError;
 
       const aggregatedData: Record<string, { income: number; expenditure: number; outstandingPledges: number }> = {};
       const yearsSet = new Set<number>();
@@ -87,7 +71,6 @@ export const useFinancialData = () => {
       incomeTransactions?.forEach(tx => aggregateByMonth(tx.date, 'income', tx.amount));
       expenditureTransactions?.forEach(tx => aggregateByMonth(tx.date, 'expenditure', tx.amount));
       
-      // Aggregate outstanding pledges: original_amount - paid_amount
       projectPledges?.forEach(pledge => {
         const outstanding = pledge.amount - pledge.paid_amount;
         if (outstanding > 0) {
@@ -112,25 +95,30 @@ export const useFinancialData = () => {
           return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
         });
 
-      setMonthlyFinancialData(sortedData);
-      
       const currentYear = getYear(new Date());
       const yearsArray = Array.from({ length: 10 }, (_, i) => currentYear - i).sort((a, b) => b - a);
-      setAvailableYears(yearsArray);
 
-    } catch (err) {
-      console.error("Unexpected error in fetchFinancialData:", err);
-      setFinancialsError("An unexpected error occurred while loading financial data.");
-    } finally {
-      setLoadingFinancials(false);
+      return { monthlyFinancialData: sortedData, availableYears: yearsArray };
+
+    } catch (err: any) {
+      console.error("Error fetching financial data:", err);
+      showError("Failed to load financial data.");
+      throw err; // Re-throw to be caught by useQuery
     }
-  }, [currentUser, isAdmin]);
+  };
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchFinancialData();
-    }
-  }, [currentUser, fetchFinancialData]);
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKey,
+    queryFn: fetcher,
+    enabled: !!currentUser, // Only run query if currentUser is available
+    staleTime: 1000 * 60 * 5, // 5 minutes stale time
+    refetchOnWindowFocus: true,
+  });
 
-  return { monthlyFinancialData, availableYears, loadingFinancials, financialsError };
+  return {
+    monthlyFinancialData: data?.monthlyFinancialData || [],
+    availableYears: data?.availableYears || [],
+    loadingFinancials: isLoading,
+    financialsError: error ? error.message : null,
+  };
 };

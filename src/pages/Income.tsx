@@ -7,6 +7,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useQueryClient } from "@tanstack/react-query"; // New import
 
 import IncomeForm from "@/components/income/IncomeForm";
 import IncomeTable from "@/components/income/IncomeTable";
@@ -28,6 +29,7 @@ const Income = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
+  const queryClient = useQueryClient(); // Initialize queryClient
   
   const { canManageIncome } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -156,6 +158,14 @@ const Income = () => {
     fetchIncomeTransactions();
   }, [fetchFinancialAccountsAndMembers, fetchIncomeTransactions]);
 
+  const invalidateDashboardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['financialData'] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] }); // In case project collections/pledges affect it
+    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] }); // In case project collections/pledges affect it
+  };
+
   const handlePostIncome = async (formData: {
     incomeDate: Date;
     incomeAmount: number;
@@ -170,7 +180,6 @@ const Income = () => {
     
     const { incomeDate, incomeAmount, incomeAccount, incomeSource, selectedIncomeMemberId } = formData;
 
-    // Server-side validation
     const validation = validateFinancialTransaction(incomeAmount, incomeAccount, currentUser.id);
     if (!validation.isValid) {
       showError(validation.error || "Invalid income amount.");
@@ -183,7 +192,6 @@ const Income = () => {
       return;
     }
     
-    // Determine the profile_id for the transaction
     const transactionProfileId = selectedIncomeMemberId || currentUser.id;
 
     const { error: insertError } = await supabase
@@ -193,20 +201,19 @@ const Income = () => {
         amount: incomeAmount,
         account_id: incomeAccount,
         source: incomeSource,
-        profile_id: transactionProfileId, // Use the determined profile_id
+        profile_id: transactionProfileId,
       });
       
     if (insertError) {
       console.error("Error posting income:", insertError);
       showError("Failed to post income.");
     } else {
-      // Update account balance
       const newBalance = currentAccount.current_balance + incomeAmount;
       const { error: updateBalanceError } = await supabase
         .from('financial_accounts')
         .update({ current_balance: newBalance })
         .eq('id', incomeAccount)
-        .eq('profile_id', currentUser.id); // Ensure user owns the account
+        .eq('profile_id', currentUser.id);
         
       if (updateBalanceError) {
         console.error("Error updating account balance:", updateBalanceError);
@@ -214,8 +221,9 @@ const Income = () => {
       }
       
       showSuccess("Income posted successfully!");
-      await fetchIncomeTransactions(); // Refresh transactions
-      await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+      await fetchIncomeTransactions();
+      await fetchFinancialAccountsAndMembers();
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
@@ -242,7 +250,6 @@ const Income = () => {
       return;
     }
 
-    // Update the transaction in the database
     const { error: updateTxError } = await supabase
       .from('income_transactions')
       .update({
@@ -253,7 +260,7 @@ const Income = () => {
         profile_id: updatedTx.profile_id,
       })
       .eq('id', updatedTx.id)
-      .eq('profile_id', currentUser.id); // Ensure only owner can edit
+      .eq('profile_id', currentUser.id);
 
     if (updateTxError) {
       console.error("Error updating income transaction:", updateTxError);
@@ -261,7 +268,6 @@ const Income = () => {
       return;
     }
 
-    // Adjust account balances
     const oldAccount = financialAccounts.find(acc => acc.id === oldTx.account_id);
     const newAccount = financialAccounts.find(acc => acc.id === updatedTx.account_id);
 
@@ -271,7 +277,6 @@ const Income = () => {
     }
 
     if (oldTx.account_id === updatedTx.account_id) {
-      // Same account: adjust balance by the difference
       const amountDifference = parsedAmount - oldTx.amount;
       const newBalance = oldAccount.current_balance + amountDifference;
       const { error: updateBalanceError } = await supabase
@@ -284,7 +289,6 @@ const Income = () => {
         showError("Transaction updated, but failed to adjust account balance.");
       }
     } else {
-      // Different accounts: deduct from old, add to new
       const oldAccountNewBalance = oldAccount.current_balance - oldTx.amount;
       const newAccountNewBalance = newAccount.current_balance + parsedAmount;
 
@@ -308,8 +312,9 @@ const Income = () => {
 
     showSuccess("Income transaction updated successfully!");
     setEditingTransaction(null);
-    await fetchIncomeTransactions(); // Refresh transactions
-    await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+    await fetchIncomeTransactions();
+    await fetchFinancialAccountsAndMembers();
+    invalidateDashboardQueries(); // Invalidate dashboard queries
   };
 
   const handleDeleteTransaction = (transaction: IncomeTransaction) => {
@@ -328,21 +333,20 @@ const Income = () => {
       .from('income_transactions')
       .delete()
       .eq('id', id)
-      .eq('profile_id', currentUser.id); // Ensure only owner can delete
+      .eq('profile_id', currentUser.id);
       
     if (deleteError) {
       console.error("Error deleting income transaction:", deleteError);
       showError("Failed to delete income transaction.");
     } else {
-      // Revert account balance: subtract the amount that was originally added
       const currentAccount = financialAccounts.find(acc => acc.id === account_id);
       if (currentAccount) {
-        const newBalance = currentAccount.current_balance - amount; // Correctly debiting the account
+        const newBalance = currentAccount.current_balance - amount;
         const { error: updateBalanceError } = await supabase
           .from('financial_accounts')
           .update({ current_balance: newBalance })
           .eq('id', account_id)
-          .eq('profile_id', currentUser.id); // Ensure user owns the account
+          .eq('profile_id', currentUser.id);
           
         if (updateBalanceError) {
           console.error("Error reverting account balance:", updateBalanceError);
@@ -352,8 +356,9 @@ const Income = () => {
       
       showSuccess("Income transaction deleted successfully!");
       setDeletingTransaction(null);
-      await fetchIncomeTransactions(); // Refresh transactions
-      await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+      await fetchIncomeTransactions();
+      await fetchFinancialAccountsAndMembers();
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
@@ -382,8 +387,8 @@ const Income = () => {
         Record and manage all financial inflows.
       </p>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Adjusted grid layout */}
-        <div className="lg:col-span-1"> {/* IncomeForm takes 1/3 width */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
           <IncomeForm
             key={financialAccounts.length}
             financialAccounts={financialAccounts}
@@ -393,7 +398,7 @@ const Income = () => {
           />
         </div>
         
-        <div className="lg:col-span-2"> {/* IncomeTable takes 2/3 width */}
+        <div className="lg:col-span-2">
           <IncomeTable
             key={transactions.length}
             transactions={transactions}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { parseISO } from "date-fns";
@@ -17,17 +17,11 @@ export const useRecentTransactions = (limit: number = 5) => {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
-  const [loadingRecentTransactions, setLoadingRecentTransactions] = useState(true);
-  const [recentTransactionsError, setRecentTransactionsError] = useState<string | null>(null);
+  const queryKey = ['recentTransactions', currentUser?.id, isAdmin, limit];
 
-  const fetchRecentTransactions = useCallback(async () => {
-    setLoadingRecentTransactions(true);
-    setRecentTransactionsError(null);
-
+  const fetcher = async (): Promise<Transaction[]> => {
     if (!currentUser) {
-      setLoadingRecentTransactions(false);
-      return;
+      return [];
     }
 
     try {
@@ -43,7 +37,6 @@ export const useRecentTransactions = (limit: number = 5) => {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
       const { data: incomeData, error: incomeError } = await incomeQuery as { data: IncomeTxRow[] | null, error: any };
-
       if (incomeError) console.error("Error fetching recent income:", incomeError);
       incomeData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
@@ -51,7 +44,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.source,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account',
       }));
 
       // Fetch Expenditure Transactions
@@ -64,7 +57,6 @@ export const useRecentTransactions = (limit: number = 5) => {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
       const { data: expenditureData, error: expenditureError } = await expenditureQuery as { data: ExpenditureTxRow[] | null, error: any };
-
       if (expenditureError) console.error("Error fetching recent expenditure:", expenditureError);
       expenditureData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
@@ -72,7 +64,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account',
       }));
 
       // Fetch Petty Cash Transactions
@@ -85,7 +77,6 @@ export const useRecentTransactions = (limit: number = 5) => {
         pettyCashQuery = pettyCashQuery.eq('profile_id', currentUser.id);
       }
       const { data: pettyCashData, error: pettyCashError } = await pettyCashQuery as { data: PettyCashTxRow[] | null, error: any };
-
       if (pettyCashError) console.error("Error fetching recent petty cash:", pettyCashError);
       pettyCashData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
@@ -93,30 +84,33 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account',
       }));
 
-      // Sort all transactions by date (most recent first) and limit to the desired number
       const sortedAndLimited = allFetchedTransactions
         .sort((a, b) => b.date.getTime() - a.date.getTime())
         .slice(0, limit);
 
-      setRecentTransactions(sortedAndLimited);
+      return sortedAndLimited;
 
-    } catch (err) {
-      console.error("Unexpected error in fetchRecentTransactions:", err);
-      setRecentTransactionsError("An unexpected error occurred while loading recent transactions.");
+    } catch (err: any) {
+      console.error("Error fetching recent transactions:", err);
       showError("Failed to load recent transactions.");
-    } finally {
-      setLoadingRecentTransactions(false);
+      throw err;
     }
-  }, [currentUser, isAdmin, limit]);
+  };
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchRecentTransactions();
-    }
-  }, [currentUser, fetchRecentTransactions]);
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKey,
+    queryFn: fetcher,
+    enabled: !!currentUser,
+    staleTime: 1000 * 60 * 1, // 1 minute stale time for recent transactions
+    refetchOnWindowFocus: true,
+  });
 
-  return { recentTransactions, loadingRecentTransactions, recentTransactionsError };
+  return {
+    recentTransactions: data || [],
+    loadingRecentTransactions: isLoading,
+    recentTransactionsError: error ? error.message : null,
+  };
 };
