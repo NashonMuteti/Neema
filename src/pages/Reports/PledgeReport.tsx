@@ -32,15 +32,12 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import the new dialog and its Pledge type
 import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog"; // Added this import
+import { FinancialAccount } from "@/types/common"; // Import FinancialAccount from common types
 
 // Add interfaces for fetched data
 interface Member { id: string; name: string; email: string; } // Added email for dialog
 interface Project { id: string; name: string; }
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
-}
+// Removed local FinancialAccount interface definition
 interface Pledge {
   id: string;
   member_id: string;

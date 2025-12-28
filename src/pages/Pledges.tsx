@@ -23,22 +23,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Member, FinancialAccount } from "@/types/common"; // Updated import
 
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
+// Removed local FinancialAccount interface definition
 
 interface Project {
   id: string;
   name: string;
-}
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
 }
 
 interface Pledge {
