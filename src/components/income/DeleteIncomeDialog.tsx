@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
+import { format } from "date-fns"; // <--- Added this import
 
 interface IncomeTransaction {
   id: string;
