@@ -15,6 +15,7 @@ export interface Transaction {
 }
 
 export interface FinancialAccount { // Renamed from FinancialAccountName
+  id: string; // Added id property
   name: string;
 }
 
