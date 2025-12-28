@@ -375,11 +375,11 @@ const Pledges = () => {
               pledges={pledges}
               canManagePledges={canManagePledges}
               onMarkAsPaid={handleMarkAsPaid}
-              onEditPledge={handleEditPledge}
+              onEditPledge={handleEditPledge} // Pass the handler here
               onDeletePledge={handleDeletePledge}
-              members={members}
-              projects={projects}
               financialAccounts={financialAccounts}
+              currency={currency}
+              isProcessing={false} // Pass isProcessing prop
             />
           </CardContent>
         </Card>
