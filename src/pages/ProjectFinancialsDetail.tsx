@@ -45,7 +45,7 @@ type HookProjectCollection = ReturnType<typeof useProjectFinancials>['collection
 
 // Helper to determine display status
 const getDisplayPledgeStatus = (pledge: HookProjectPledge): "Paid" | "Unpaid" => {
-  if (pledge.status === "Paid") return "Paid";
+  if (pledge.paid_amount >= pledge.original_amount) return "Paid";
   return "Unpaid"; // Active and Overdue are now considered Unpaid
 };
 
@@ -273,7 +273,9 @@ const ProjectFinancialsDetail: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Member</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Pledged</TableHead>
+                  <TableHead className="text-right">Paid</TableHead>
+                  <TableHead className="text-right">Remaining</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                 </TableRow>
@@ -281,10 +283,13 @@ const ProjectFinancialsDetail: React.FC = () => {
               <TableBody>
                 {pledges.map((pledge) => {
                   const displayStatus = getDisplayPledgeStatus(pledge);
+                  const remaining = pledge.original_amount - pledge.paid_amount;
                   return (
                     <TableRow key={pledge.id}>
                       <TableCell>{pledge.member_name}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{pledge.original_amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{pledge.paid_amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{remaining.toFixed(2)}</TableCell>
                       <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClasses(displayStatus)}>
@@ -297,7 +302,7 @@ const ProjectFinancialsDetail: React.FC = () => {
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                   <TableCell colSpan={1}>Total Pledges</TableCell>
                   <TableCell className="text-right">{currency.symbol}{totalPledged.toFixed(2)}</TableCell>
-                  <TableCell colSpan={2}></TableCell>
+                  <TableCell colSpan={3}></TableCell>
                 </TableRow>
               </TableBody>
             </Table>

@@ -50,7 +50,8 @@ interface ProjectPledge {
   member_id: string;
   project_id: string; // Added project_id
   member_name: string;
-  amount: number;
+  original_amount: number; // The total amount pledged
+  paid_amount: number;     // The amount already paid towards the pledge
   due_date: Date;
   status: "Active" | "Paid";
   project_name: string; // Added for dialog context
@@ -66,7 +67,8 @@ interface ProjectPledgesDialogProps {
 interface PledgeRowWithProfile {
   id: string;
   member_id: string;
-  amount: number;
+  amount: number; // This is original_amount
+  paid_amount: number; // New field
   due_date: string;
   status: "Active" | "Paid" | "Overdue";
   profiles: { name: string } | null;
@@ -74,7 +76,7 @@ interface PledgeRowWithProfile {
 }
 
 const getDisplayPledgeStatus = (pledge: ProjectPledge): "Paid" | "Unpaid" => {
-  if (pledge.status === "Paid") return "Paid";
+  if (pledge.paid_amount >= pledge.original_amount) return "Paid";
   return "Unpaid";
 };
 
@@ -130,6 +132,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         id,
         member_id,
         amount,
+        paid_amount,
         due_date,
         status,
         comments,
@@ -148,7 +151,8 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         member_id: p.member_id,
         project_id: projectId, // Explicitly add project_id here
         member_name: p.profiles?.name || 'Unknown Member',
-        amount: p.amount,
+        original_amount: p.amount,
+        paid_amount: p.paid_amount,
         due_date: parseISO(p.due_date),
         status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid",
         project_name: projectName, // Add project name for dialog context
@@ -202,7 +206,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     }
   }, [isOpen, fetchPledges, fetchMembersAndAccounts]);
 
-  const handleMarkPledgeAsPaid = async (pledgeId: string, receivedIntoAccountId: string, paymentMethod: string) => {
+  const handleMarkPledgeAsPaid = async (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => {
     if (!canManagePledges) {
       showError("You do not have permission to update pledge status.");
       return;
@@ -218,18 +222,12 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
       return;
     }
 
-    const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
-      p_source_account_id: null,
-      p_destination_account_id: receivedIntoAccountId,
-      p_amount: pledgeToMark.amount,
-      p_actor_profile_id: currentUser.id, // The user performing the action
-      p_purpose: `Pledge Payment for Project: ${projectName}`,
-      p_source: `Pledge Payment from Member: ${pledgeToMark.member_name}`,
-      p_is_transfer: false,
-      p_project_id: projectId,
-      p_member_id: pledgeToMark.member_id,
-      p_payment_method: paymentMethod,
+    const { error: transactionError } = await supabase.rpc('record_pledge_payment_atomic', {
       p_pledge_id: pledgeId,
+      p_amount_paid: amountPaid,
+      p_received_into_account_id: receivedIntoAccountId,
+      p_actor_profile_id: currentUser.id, // The user performing the action
+      p_payment_date: paymentDate.toISOString(),
     });
 
     if (transactionError) {
@@ -260,6 +258,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         project_id: projectId,
         member_id: newPledgeMember,
         amount: parsedAmount,
+        paid_amount: 0, // New pledges start with 0 paid_amount
         due_date: newPledgeDueDate.toISOString(),
         status: "Active",
       });
@@ -370,7 +369,9 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
               <TableHeader>
                 <TableRow>
                   <TableHead>Member</TableHead>
-                  <TableHead>Amount</TableHead>
+                  <TableHead>Pledged</TableHead>
+                  <TableHead>Paid</TableHead>
+                  <TableHead>Remaining</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
@@ -379,10 +380,13 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
               <TableBody>
                 {pledges.map((pledge) => {
                   const displayStatus = getDisplayPledgeStatus(pledge);
+                  const remaining = pledge.original_amount - pledge.paid_amount;
                   return (
                     <TableRow key={pledge.id}>
                       <TableCell className="font-medium">{pledge.member_name}</TableCell>
-                      <TableCell>{currency.symbol}{pledge.amount.toFixed(2)}</TableCell>
+                      <TableCell>{currency.symbol}{pledge.original_amount.toFixed(2)}</TableCell>
+                      <TableCell>{currency.symbol}{pledge.paid_amount.toFixed(2)}</TableCell>
+                      <TableCell>{currency.symbol}{remaining.toFixed(2)}</TableCell>
                       <TableCell>{format(pledge.due_date, "PPP")}</TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClasses(displayStatus)}>
