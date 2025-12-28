@@ -115,7 +115,7 @@ const Income = () => {
       setMembers(membersData || []);
     }
 
-  }, [currentUser]); // Corrected dependency array
+  }, [currentUser]);
 
   const fetchIncomeTransactions = React.useCallback(async () => {
     setLoading(true);
@@ -401,6 +401,7 @@ const Income = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Adjusted grid layout */}
         <div className="lg:col-span-1"> {/* IncomeForm takes 1/3 width */}
           <IncomeForm
+            key={financialAccounts.length} {/* Added key */}
             financialAccounts={financialAccounts}
             members={members}
             canManageIncome={canManageIncome}
@@ -410,6 +411,7 @@ const Income = () => {
         
         <div className="lg:col-span-2"> {/* IncomeTable takes 2/3 width */}
           <IncomeTable
+            key={transactions.length} {/* Added key */}
             transactions={transactions}
             canManageIncome={canManageIncome}
             filterMonth={filterMonth}
