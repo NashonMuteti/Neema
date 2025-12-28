@@ -230,8 +230,8 @@ const Income = () => {
       }
       
       showSuccess("Income posted successfully!");
-      fetchIncomeTransactions();
-      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+      await fetchIncomeTransactions(); // Refresh transactions
+      await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
     }
   };
 
@@ -324,8 +324,8 @@ const Income = () => {
 
     showSuccess("Income transaction updated successfully!");
     setEditingTransaction(null);
-    fetchIncomeTransactions();
-    fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+    await fetchIncomeTransactions(); // Refresh transactions
+    await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
   };
 
   const handleDeleteTransaction = (transaction: IncomeTransaction) => {
@@ -350,10 +350,10 @@ const Income = () => {
       console.error("Error deleting income transaction:", deleteError);
       showError("Failed to delete income transaction.");
     } else {
-      // Revert account balance
+      // Revert account balance: subtract the amount that was originally added
       const currentAccount = financialAccounts.find(acc => acc.id === account_id);
       if (currentAccount) {
-        const newBalance = currentAccount.current_balance - amount;
+        const newBalance = currentAccount.current_balance - amount; // Correctly debiting the account
         const { error: updateBalanceError } = await supabase
           .from('financial_accounts')
           .update({ current_balance: newBalance })
@@ -368,8 +368,8 @@ const Income = () => {
       
       showSuccess("Income transaction deleted successfully!");
       setDeletingTransaction(null);
-      fetchIncomeTransactions();
-      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+      await fetchIncomeTransactions(); // Refresh transactions
+      await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
     }
   };
 
