@@ -15,8 +15,9 @@ import {
   ExpenditureTxRow,
   PettyCashTxRow,
   PledgeTxRow,
-  FinancialAccount
-} from "@/components/members/member-contributions/types"; // Updated import path
+  JoinedFinancialAccount, // Use JoinedFinancialAccount for the nested object
+  FinancialAccount // Use FinancialAccount for the main type
+} from "@/types/common"; // Updated import path
 import {
   Table,
   TableBody,
@@ -73,7 +74,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.source,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
+        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account', // Use JoinedFinancialAccount
         pledgeId: tx.pledge_id || undefined,
       }));
 
@@ -94,7 +95,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
+        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account', // Use JoinedFinancialAccount
       }));
 
       // Fetch Petty Cash Transactions
@@ -114,7 +115,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
+        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account', // Use JoinedFinancialAccount
       }));
 
       // Fetch Project Pledges (both active/unpaid and paid)
@@ -144,7 +145,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
       // Fetch Financial Accounts
       let accountsQuery = supabase
         .from('financial_accounts')
-        .select('id, name');
+        .select('id, name, current_balance, initial_balance, profile_id'); // Select all fields for FinancialAccount type
       if (!isAdmin) {
         accountsQuery = accountsQuery.eq('profile_id', currentUser.id);
       }
@@ -233,7 +234,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
     selectedDayTransactions.forEach(tx => {
       // For the summary bar, we only care about direct income/expenditure to financial accounts.
       // Pledges are commitments, not direct cash flow on a given day for the account summary.
-      const account = financialAccounts.find(acc => acc.name === tx.accountOrProjectName);
+      const account = financialAccounts.find(acc => acc.id === tx.accountOrProjectName); // This is incorrect, tx.accountOrProjectName is the name, not the ID
       if (account) { // Only include transactions linked to a known financial account
         if (tx.type === 'income') {
           incomeSummary[account.id] = (incomeSummary[account.id] || 0) + tx.amount;

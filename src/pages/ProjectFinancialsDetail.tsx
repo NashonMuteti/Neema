@@ -21,8 +21,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { showError } from "@/utils/toast"; // Import showError
+import { Project as CommonProject, FinancialAccount } from "@/types/common"; // Import Project and FinancialAccount from common.ts
 
-interface Project {
+interface Project { // Local Project interface for this component
   id: string;
   name: string;
   description: string;
@@ -31,12 +32,6 @@ interface Project {
   dueDate?: Date;
   memberContributionAmount?: number;
   profile_id: string; // Changed from user_id to profile_id
-}
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
 }
 
 // Use the exported types from the hook
@@ -113,7 +108,7 @@ const ProjectFinancialsDetail: React.FC = () => {
       }
       const { data, error } = await supabase
         .from('financial_accounts')
-        .select('id, name, current_balance')
+        .select('id, name, current_balance, initial_balance, profile_id') // Select all fields for FinancialAccount type
         .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
 

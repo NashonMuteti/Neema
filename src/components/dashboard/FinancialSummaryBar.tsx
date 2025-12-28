@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Wallet, Banknote, Handshake } from "lucide-react"; // Added Handshake
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { cn } from "@/lib/utils";
+import { FinancialAccount } from "@/types/common"; // Import FinancialAccount from common.ts
 
 interface FinancialAccountSummary {
   id: string;

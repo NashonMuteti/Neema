@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { Project } from "@/types/common"; // Import Project from common.ts
 
 interface MonthlyFinancialData {
   year: number;

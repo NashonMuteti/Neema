@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { showError } from "@/utils/toast";
+import { Project } from "@/types/common"; // Import Project from common.ts
 
 interface ProjectContributionData {
   name: string;
@@ -25,7 +26,7 @@ export const useContributionsProgress = () => {
 
     try {
       let activeMembersCount = 0;
-      const { count: membersCount, error: membersCountError } = await supabase
+      const { count, error: membersCountError } = await supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'Active');
@@ -33,7 +34,7 @@ export const useContributionsProgress = () => {
       if (membersCountError) {
         console.error("Error fetching active members count:", membersCountError);
       } else {
-        activeMembersCount = membersCount || 0;
+        activeMembersCount = count || 0;
       }
 
       let projectsQuery = supabase

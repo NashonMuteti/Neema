@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import { MyContribution, MyFinancialAccount } from "./types"; // Import types
+import { MyContribution, MyFinancialAccount } from "@/types/common"; // Import types from common.ts
 
 interface MemberContributionsDetailedProps {
   contributions: MyContribution[];

@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import { MyContribution } from "./types"; // Import MyContribution type
+import { MyContribution } from "@/types/common"; // Import MyContribution type from common.ts
 
 interface MyContributionsDetailedTabProps {
   contributions: MyContribution[];

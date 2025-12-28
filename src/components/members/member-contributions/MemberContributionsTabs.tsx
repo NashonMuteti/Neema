@@ -3,7 +3,7 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MemberContributionsOverview from "./MemberContributionsOverview";
 import MemberContributionsDetailed from "./MemberContributionsDetailed";
-import { MemberContribution, Project } from "./types";
+import { MemberContribution, Project } from "@/types/common"; // Updated import path
 
 interface MemberContributionsTabsProps {
   selectedDate: Date | undefined;

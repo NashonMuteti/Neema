@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { format, getMonth, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { MemberContribution, Project } from "./types";
+import { MemberContribution, Project } from "@/types/common"; // Updated import path
 import { getContributionStatus } from "@/utils/contributionUtils";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import {

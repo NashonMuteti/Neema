@@ -1,17 +1,6 @@
 import { type VariantProps } from "class-variance-authority";
 import { badgeVariants } from "@/components/ui/badge";
-
-// Unified Transaction interface (copied from types.ts for context, but not exported here)
-interface Transaction {
-  id: string;
-  type: 'income' | 'expenditure' | 'petty_cash' | 'pledge';
-  date: Date;
-  amount: number;
-  description: string;
-  accountOrProjectName: string;
-  status?: "Active" | "Paid" | "Overdue";
-  dueDate?: Date;
-}
+import { Transaction } from "@/types/common"; // Updated import path
 
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 

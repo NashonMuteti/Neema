@@ -1,8 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { PostgrestError } from "@supabase/supabase-js";
+import {
+  Project as CommonProject, // Renamed to avoid conflict with local interface
+  JoinedFinancialAccount,
+  JoinedProject,
+  JoinedProfile,
+} from "@/types/common";
 
-export interface Project {
+export interface Project { // This is a local interface, not the common one
   id: string;
   name: string;
   description: string;
@@ -50,8 +56,7 @@ interface CollectionRowWithProfile {
   member_id: string;
   amount: number;
   date: string; // ISO string from DB
-  payment_method: string;
-  profiles: { name: string } | null; // Joined profile data
+  profiles: JoinedProfile | null; // Joined profile data
 }
 
 // Define the expected structure of a pledge row with joined profile and project data
@@ -63,7 +68,7 @@ interface PledgeRowWithProfile {
   paid_amount: number; // New field
   due_date: string; // ISO string from DB
   status: "Active" | "Paid" | "Overdue";
-  profiles: { name: string } | null; // Joined profile data
+  profiles: JoinedProfile | null; // Joined profile data
 }
 
 export const getProjectFinancialSummary = async (projectId: string): Promise<ProjectFinancialSummary> => {

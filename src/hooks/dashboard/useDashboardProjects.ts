@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
+import { Project } from "@/types/common"; // Import Project from common.ts
 
 interface DashboardProject {
   id: string;

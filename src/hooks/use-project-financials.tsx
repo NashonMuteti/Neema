@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getProjectFinancialSummary, ProjectFinancialSummary, ProjectCollection, ProjectPledge } from '@/utils/projectFinancials';
 import { showError } from '@/utils/toast';
+import { Project as CommonProject } from '@/types/common'; // Import Project from common.ts
 
 interface UseProjectFinancialsResult {
   financialSummary: ProjectFinancialSummary | null;

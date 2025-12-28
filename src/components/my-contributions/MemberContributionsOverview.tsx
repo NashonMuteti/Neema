@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import { MyFinancialAccount } from "./types"; // Import MyFinancialAccount type
+import { MyFinancialAccount } from "@/types/common"; // Import MyFinancialAccount type from common.ts
 
 interface MemberContributionsOverviewProps {
   financialAccounts: MyFinancialAccount[];

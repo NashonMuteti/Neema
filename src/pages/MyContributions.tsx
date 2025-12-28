@@ -12,7 +12,7 @@ import MyContributionsOverviewTab from "@/components/my-contributions/MyContribu
 import MyContributionsDetailedTab from "@/components/my-contributions/MyContributionsDetailedTab";
 import MemberContributionsOverview from "@/components/my-contributions/MemberContributionsOverview";
 import MemberContributionsDetailed from "@/components/my-contributions/MemberContributionsDetailed";
-import { MyContribution, MyFinancialAccount } from "@/components/my-contributions/types"; // Import types
+import { MyContribution, MyFinancialAccount, JoinedProject } from "@/types/common"; // Import types from common.ts
 
 // Define the expected structure of a collection row with joined project data
 interface CollectionRowWithProject {
@@ -20,7 +20,7 @@ interface CollectionRowWithProject {
   project_id: string;
   amount: number;
   date: string;
-  projects: { name: string } | null;
+  projects: JoinedProject | null;
 }
 
 // Define the expected structure of a pledge row with joined project data
@@ -32,7 +32,7 @@ interface PledgeRowWithProject {
   due_date: string;
   status: "Active" | "Paid" | "Overdue";
   comments?: string;
-  projects: { name: string } | null;
+  projects: JoinedProject | null;
 }
 
 const MyContributions = () => {

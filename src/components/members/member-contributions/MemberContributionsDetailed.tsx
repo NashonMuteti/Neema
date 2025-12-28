@@ -8,7 +8,7 @@ import { Search } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { MemberContribution } from "./types";
+import { MemberContribution } from "@/types/common"; // Updated import path
 import { getContributionStatus } from "@/utils/contributionUtils";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 

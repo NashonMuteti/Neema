@@ -12,15 +12,15 @@ import { canAccessMemberData, logSecurityEvent } from "@/utils/security";
 import { showError } from "@/utils/toast";
 import MemberContributionsHeader from "@/components/members/member-contributions/MemberContributionsHeader";
 import MemberContributionsTabs from "@/components/members/member-contributions/MemberContributionsTabs";
-import { 
-  MemberContribution, 
-  IncomeTxRow, 
-  ExpenditureTxRow, 
+import {
+  MemberContribution,
+  IncomeTxRow,
+  ExpenditureTxRow,
   PettyCashTxRow,
   PledgeTxRow,
   Project, // Generic Project interface for all active projects
-  FinancialAccount
-} from "@/components/members/member-contributions/types";
+  FinancialAccount // Use FinancialAccount for the main type
+} from "@/types/common"; // Updated import path
 
 
 const MemberContributionsDetail: React.FC = () => {
@@ -152,10 +152,10 @@ const MemberContributionsDetail: React.FC = () => {
 
     const { data: yearlyPledgesData, error: yearlyPledgesError } = await supabase
       .from('project_pledges')
-      .select('amount, status')
+      .select('amount, paid_amount') // Select paid_amount
       .eq('member_id', memberId)
       .gte('due_date', startOfCurrentYear.toISOString())
-      .lte('due_date', endOfCurrentYear.toISOString()) as { data: { amount: number; status: "Active" | "Paid" | "Overdue" }[] | null, error: PostgrestError | null };
+      .lte('due_date', endOfCurrentYear.toISOString()) as { data: { amount: number; paid_amount: number }[] | null, error: PostgrestError | null };
 
     if (yearlyPledgesError) {
       console.error("MemberContributionsDetail: Error fetching yearly pledges:", yearlyPledgesError);
@@ -163,7 +163,7 @@ const MemberContributionsDetail: React.FC = () => {
       setTotalYearlyPaidAmount(0);
     } else {
       const totalPledged = (yearlyPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
-      const totalPaid = (yearlyPledgesData || []).filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
+      const totalPaid = (yearlyPledgesData || []).reduce((sum, p) => sum + p.paid_amount, 0); // Sum paid_amount
       setTotalYearlyPledgedAmount(totalPledged);
       setTotalYearlyPaidAmount(totalPaid);
     }

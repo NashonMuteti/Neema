@@ -10,8 +10,8 @@ import {
   IncomeTxRow,
   ExpenditureTxRow,
   PettyCashTxRow,
-  FinancialAccount // Renamed from FinancialAccountName
-} from "@/components/members/member-contributions/types"; // Updated import path
+  JoinedFinancialAccount // Use JoinedFinancialAccount for the nested object
+} from "@/types/common"; // Updated import path
 
 export const useRecentTransactions = (limit: number = 5) => {
   const { currentUser } = useAuth();
@@ -44,7 +44,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.source,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
       }));
 
       // Fetch Expenditure Transactions
@@ -64,7 +64,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
       }));
 
       // Fetch Petty Cash Transactions
@@ -84,7 +84,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
       }));
 
       const sortedAndLimited = allFetchedTransactions

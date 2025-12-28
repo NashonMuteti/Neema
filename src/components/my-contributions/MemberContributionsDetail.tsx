@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import { MyContribution, MyFinancialAccount } from "./types"; // Import types
+import { MyContribution, MyFinancialAccount } from "@/types/common"; // Import types from common.ts
 
 interface MemberContributionsDetailProps {
   contributions: MyContribution[];
