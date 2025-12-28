@@ -10,7 +10,8 @@ import {
   IncomeTxRow,
   ExpenditureTxRow,
   PettyCashTxRow,
-} from "@/components/my-contributions/types";
+  FinancialAccount // Renamed from FinancialAccountName
+} from "@/components/members/member-contributions/types"; // Updated import path
 
 export const useRecentTransactions = (limit: number = 5) => {
   const { currentUser } = useAuth();
@@ -50,7 +51,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.source,
-        accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
       }));
 
       // Fetch Expenditure Transactions
@@ -71,7 +72,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
       }));
 
       // Fetch Petty Cash Transactions
@@ -92,7 +93,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: tx.financial_accounts?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
       }));
 
       // Sort all transactions by date (most recent first) and limit to the desired number

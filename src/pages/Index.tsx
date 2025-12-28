@@ -72,7 +72,7 @@ const Index = () => {
         cumulativeNetOperatingBalance={cumulativeNetOperatingBalance}
       />
 
-      <IncomeExpenditureGraph allFinancialData={monthlyFinancialData} availableYears={availableYears} />
+      <IncomeExpenditureGraph financialData={monthlyFinancialData} selectedYear={availableYears[0]} />
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <SoonDueProjectsGraph projects={dashboardProjects} />

@@ -15,14 +15,14 @@ import {
   ExpenditureTxRow,
   PettyCashTxRow,
   PledgeTxRow,
-  FinancialAccountName
-} from "@/components/my-contributions/types";
+  FinancialAccount // Renamed from FinancialAccountName
+} from "@/components/members/member-contributions/types"; // Updated import path
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +77,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.source,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccountName)?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
         pledgeId: tx.pledge_id || undefined,
       }));
 
@@ -98,7 +98,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccountName)?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
       }));
 
       // Fetch Petty Cash Transactions
@@ -118,7 +118,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as FinancialAccountName)?.name || 'Unknown Account',
+        accountOrProjectName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account', // Use FinancialAccount
       }));
 
       // Fetch Project Pledges (both active/unpaid and paid)

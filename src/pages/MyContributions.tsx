@@ -49,7 +49,7 @@ const MyContributions = () => {
       const fetchedCollections: MyContribution[] = (collectionsData || []).map(c => ({
         id: c.id,
         project_id: c.project_id,
-        project_name: c.projects?.name || 'Unknown Project',
+        project_name: (c.projects as { name: string } | null)?.name || 'Unknown Project', // Explicitly cast projects
         amount: c.amount,
         date: parseISO(c.date),
         type: "Collection",
@@ -76,7 +76,7 @@ const MyContributions = () => {
       const fetchedPledges: MyContribution[] = (pledgesData || []).map(p => ({
         id: p.id,
         project_id: p.project_id,
-        project_name: p.projects?.name || 'Unknown Project',
+        project_name: (p.projects as { name: string } | null)?.name || 'Unknown Project', // Explicitly cast projects
         amount: p.amount, // This is the original pledged amount
         original_amount: p.amount, // Store original amount explicitly
         paid_amount: p.paid_amount, // Store paid amount
