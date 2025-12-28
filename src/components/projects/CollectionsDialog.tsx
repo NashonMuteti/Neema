@@ -64,80 +64,87 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
-  const { currency } = useSystemSettings(); // Use currency from context
+  const { currency } = useSystemSettings();
 
-  const { canManageProjects } = React.useMemo(() => {
+  const { canManageCollections } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
-      return { canManageProjects: false };
+      return { canManageCollections: false };
     }
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-    const canManageProjects = currentUserPrivileges.includes("Manage Projects");
-    return { canManageProjects };
+    const canManageCollections = currentUserPrivileges.includes("Manage Collections");
+    return { canManageCollections };
   }, [currentUser, definedRoles]);
 
   const [isOpen, setIsOpen] = React.useState(false);
-  const [collectionDate, setCollectionDate] = React.useState<Date | undefined>(new Date());
   const [amount, setAmount] = React.useState("");
-  const [selectedMember, setSelectedMember] = React.useState<string | undefined>(undefined);
+  const [memberId, setMemberId] = React.useState<string | undefined>(undefined);
+  const [receivedIntoAccount, setReceivedIntoAccount] = React.useState<string | undefined>(undefined);
+  const [collectionDate, setCollectionDate] = React.useState<Date | undefined>(new Date());
   const [paymentMethod, setPaymentMethod] = React.useState<string | undefined>(undefined);
-  const [receivedIntoAccount, setReceivedIntoAccount] = React.useState<string | undefined>(undefined); // New state for financial account
   const [members, setMembers] = React.useState<Member[]>([]);
-  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]); // New state for financial accounts
+  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
   const [loadingMembers, setLoadingMembers] = React.useState(true);
   const [loadingAccounts, setLoadingAccounts] = React.useState(true);
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
-  React.useEffect(() => {
-    const fetchMembersAndAccounts = async () => {
-      setLoadingMembers(true);
-      setLoadingAccounts(true);
+  const fetchMembersAndAccounts = React.useCallback(async () => {
+    setLoadingMembers(true);
+    setLoadingAccounts(true);
 
-      // Fetch members
-      const { data: membersData, error: membersError } = await supabase
-        .from('profiles')
-        .select('id, name, email')
+    const { data: membersData, error: membersError } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .order('name', { ascending: true });
+
+    if (membersError) {
+      console.error("Error fetching members:", membersError);
+      showError("Failed to load members for collections.");
+    } else {
+      setMembers(membersData || []);
+      if (membersData && membersData.length > 0 && !memberId) {
+        setMemberId(membersData[0].id);
+      }
+    }
+    setLoadingMembers(false);
+
+    if (currentUser) {
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('financial_accounts')
+        .select('id, name, current_balance')
+        .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
 
-      if (membersError) {
-        console.error("Error fetching members:", membersError);
-        showError("Failed to load members for collection.");
+      if (accountsError) {
+        console.error("Error fetching financial accounts:", accountsError);
+        showError("Failed to load financial accounts for collections.");
       } else {
-        setMembers(membersData || []);
-        if (membersData && membersData.length > 0 && !selectedMember) {
-          setSelectedMember(membersData[0].id); // Default to first member
+        setFinancialAccounts(accountsData || []);
+        if (accountsData && accountsData.length > 0 && !receivedIntoAccount) {
+          setReceivedIntoAccount(accountsData[0].id);
         }
       }
-      setLoadingMembers(false);
+    }
+    setLoadingAccounts(false);
+  }, [memberId, receivedIntoAccount, currentUser]);
 
-      // Fetch financial accounts for the current user
-      if (currentUser) {
-        const { data: accountsData, error: accountsError } = await supabase
-          .from('financial_accounts')
-          .select('id, name, current_balance')
-          .eq('profile_id', currentUser.id)
-          .order('name', { ascending: true });
-
-        if (accountsError) {
-          console.error("Error fetching financial accounts:", accountsError);
-          showError("Failed to load financial accounts for collection.");
-        } else {
-          setFinancialAccounts(accountsData || []);
-          if (accountsData && accountsData.length > 0 && !receivedIntoAccount) {
-            setReceivedIntoAccount(accountsData[0].id); // Default to first account
-          }
-        }
-      }
-      setLoadingAccounts(false);
-    };
-
+  React.useEffect(() => {
     if (isOpen) {
       fetchMembersAndAccounts();
+      setAmount("");
+      setCollectionDate(new Date());
+      setPaymentMethod(paymentMethods[0]?.value); // Default to first payment method
+      setIsProcessing(false);
     }
-  }, [isOpen, selectedMember, receivedIntoAccount, currentUser]);
+  }, [isOpen, fetchMembersAndAccounts]);
 
-  const handleSubmit = async () => {
-    if (!collectionDate || !amount || !selectedMember || !paymentMethod || !receivedIntoAccount) {
-      showError("All fields are required.");
+  const handleAddCollection = async () => {
+    if (!amount || !memberId || !receivedIntoAccount || !collectionDate || !paymentMethod) {
+      showError("All collection fields are required.");
+      return;
+    }
+    if (!currentUser) {
+      showError("User not logged in to perform this action.");
       return;
     }
 
@@ -147,42 +154,38 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
       return;
     }
 
-    // Start a transaction for atomicity
-    const { error: transactionError } = await supabase.rpc('transfer_funds_atomic', {
-      p_source_account_id: null, // No source account for collections
+    setIsProcessing(true);
+
+    const { error: rpcError } = await supabase.rpc('transfer_funds_atomic', {
+      p_source_account_id: null, // No source account for a collection
       p_destination_account_id: receivedIntoAccount,
       p_amount: parsedAmount,
-      p_actor_profile_id: currentUser?.id, // The user performing the action
-      p_purpose: `Project Collection: ${projectName}`,
+      p_actor_profile_id: currentUser.id,
+      p_purpose: `Project Collection for ${projectName}`,
       p_source: `Project Collection: ${projectName}`,
-      p_is_transfer: false, // Not a transfer, it's a direct income
+      p_is_transfer: false,
       p_project_id: projectId,
-      p_member_id: selectedMember,
+      p_member_id: memberId,
       p_payment_method: paymentMethod,
-      p_pledge_id: null,
-      p_transaction_profile_id: selectedMember, // NEW: Associate income transaction with the contributing member
+      p_pledge_id: null, // This is not a pledge payment
+      p_transaction_profile_id: memberId, // Associate transaction with the member who made the collection
     });
 
-    if (transactionError) {
-      console.error("Error adding collection and updating balance:", transactionError);
-      showError(`Failed to add collection: ${transactionError.message}`);
+    if (rpcError) {
+      console.error("Error adding collection:", rpcError);
+      showError(`Failed to add collection: ${rpcError.message}`);
     } else {
-      showSuccess("Collection added and account balance updated successfully!");
+      showSuccess("Collection added successfully!");
       onCollectionAdded();
       setIsOpen(false);
-      // Reset form
-      setCollectionDate(new Date());
-      setAmount("");
-      setSelectedMember(members.length > 0 ? members[0].id : undefined);
-      setPaymentMethod(undefined);
-      setReceivedIntoAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
     }
+    setIsProcessing(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={!canManageProjects}>
+        <Button variant="outline" size="sm" disabled={!canManageCollections}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add Collection
         </Button>
       </DialogTrigger>
@@ -190,12 +193,46 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Add Collection for {projectName}</DialogTitle>
           <DialogDescription>
-            Record a financial contribution made to this project.
+            Record a new financial collection for this project.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="collection-date">Date of Collection</Label>
+            <Label htmlFor="collection-member">Member</Label>
+            <Select value={memberId} onValueChange={setMemberId} disabled={!canManageCollections || loadingMembers || isProcessing}>
+              <SelectTrigger id="collection-member">
+                <SelectValue placeholder="Select a member" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Members</SelectLabel>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name} ({member.email})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {loadingMembers && <p className="text-sm text-muted-foreground">Loading members...</p>}
+            {members.length === 0 && !loadingMembers && <p className="text-sm text-destructive">No members found. Please add one in Admin Settings.</p>}
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="collection-amount">Amount</Label>
+            <Input
+              id="collection-amount"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              disabled={!canManageCollections || isProcessing}
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="collection-date">Collection Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -204,7 +241,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
                     "w-full justify-start text-left font-normal",
                     !collectionDate && "text-muted-foreground"
                   )}
-                  disabled={!canManageProjects}
+                  disabled={!canManageCollections || isProcessing}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {collectionDate ? format(collectionDate, "PPP") : <span>Pick a date</span>}
@@ -222,41 +259,32 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="collection-amount">Amount</Label>
-            <Input
-              id="collection-amount"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              disabled={!canManageProjects}
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="collection-member">Collected From Member</Label>
-            <Select value={selectedMember} onValueChange={setSelectedMember} disabled={!canManageProjects || loadingMembers}>
-              <SelectTrigger id="collection-member">
-                <SelectValue placeholder="Select a member" />
+            <Label htmlFor="received-into-account">Received Into Account</Label>
+            <Select
+              value={receivedIntoAccount}
+              onValueChange={setReceivedIntoAccount}
+              disabled={!canManageCollections || financialAccounts.length === 0 || isProcessing}
+            >
+              <SelectTrigger id="received-into-account">
+                <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectLabel>Members</SelectLabel>
-                  {members.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.name} ({member.email})
+                  <SelectLabel>Financial Accounts</SelectLabel>
+                  {financialAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
                     </SelectItem>
                   ))}
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {loadingMembers && <p className="text-sm text-muted-foreground">Loading members...</p>}
+            {financialAccounts.length === 0 && !loadingAccounts && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
           </div>
 
           <div className="grid gap-1.5">
             <Label htmlFor="payment-method">Payment Method</Label>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={!canManageProjects}>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={!canManageCollections || isProcessing}>
               <SelectTrigger id="payment-method">
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
@@ -272,31 +300,13 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
               </SelectContent>
             </Select>
           </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="received-into-account">Received Into Account</Label>
-            <Select value={receivedIntoAccount} onValueChange={setReceivedIntoAccount} disabled={!canManageProjects || loadingAccounts || financialAccounts.length === 0}>
-              <SelectTrigger id="received-into-account">
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Financial Accounts</SelectLabel>
-                  {financialAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            {loadingAccounts && <p className="text-sm text-muted-foreground">Loading accounts...</p>}
-            {!loadingAccounts && financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
-          </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManageProjects || !collectionDate || !amount || !selectedMember || !paymentMethod || !receivedIntoAccount || financialAccounts.length === 0}>
-            Add Collection
+          <Button
+            onClick={handleAddCollection}
+            disabled={!canManageCollections || !amount || !memberId || !receivedIntoAccount || !collectionDate || !paymentMethod || isProcessing || members.length === 0 || financialAccounts.length === 0}
+          >
+            {isProcessing ? "Adding..." : <><PlusCircle className="mr-2 h-4 w-4" /> Add Collection</>}
           </Button>
         </div>
       </DialogContent>

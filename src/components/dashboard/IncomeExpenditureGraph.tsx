@@ -3,69 +3,37 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  LabelList,
 } from "recharts";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { format, getYear } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 
 interface MonthlyFinancialData {
-  year: number; // Added year to the interface
+  year: number;
   month: string;
   income: number;
   expenditure: number;
-  outstandingPledges: number; // New: Outstanding pledges
+  outstandingPledges: number; // New field
 }
 
 interface IncomeExpenditureGraphProps {
-  allFinancialData: MonthlyFinancialData[]; // Changed prop name to reflect it's the full dataset
-  availableYears: number[];
+  financialData: MonthlyFinancialData[];
+  selectedYear: number;
 }
 
 const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
-  allFinancialData,
-  availableYears,
+  financialData,
+  selectedYear,
 }) => {
   const { currency } = useSystemSettings(); // Use currency from context
-  const currentYear = getYear(new Date());
-  const [selectedYear, setSelectedYear] = React.useState<string>(
-    availableYears.includes(currentYear) ? currentYear.toString() : (availableYears.length > 0 ? availableYears[0].toString() : "")
-  );
 
-  React.useEffect(() => {
-    // Set default selected year if availableYears changes and current selected year is no longer valid
-    if (availableYears.length > 0 && !availableYears.includes(parseInt(selectedYear))) {
-      setSelectedYear(availableYears[0].toString());
-    } else if (availableYears.length === 0) {
-      setSelectedYear("");
-    }
-  }, [availableYears, selectedYear]);
-
-  // Filter data by selected year
-  const filteredData = React.useMemo(() => {
-    return allFinancialData.filter(item => item.year.toString() === selectedYear);
-  }, [allFinancialData, selectedYear]);
-
-  const totalIncome = filteredData.reduce((sum, item) => sum + item.income, 0);
-  const totalExpenditure = filteredData.reduce((sum, item) => sum + item.expenditure, 0);
-  const totalOutstandingPledges = filteredData.reduce((sum, item) => sum + item.outstandingPledges, 0); // New total
-  const netBalance = totalIncome - totalExpenditure;
+  const filteredData = financialData.filter((data) => data.year === selectedYear);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -84,78 +52,57 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
   };
 
   return (
-    <Card className="transition-all duration-300 ease-in-out hover:shadow-xl col-span-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-semibold">Financial Overview</CardTitle>
-        <div className="flex items-center space-x-2">
-          <Select value={selectedYear} onValueChange={setSelectedYear} disabled={availableYears.length === 0}>
-            <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Select Year" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Year</SelectLabel>
-                {availableYears.map((year) => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+    <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+      <CardHeader>
+        <CardTitle>Income, Expenditure & Outstanding Pledges ({selectedYear})</CardTitle>
       </CardHeader>
       <CardContent>
-        {filteredData.length > 0 ? (
-          <>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={filteredData}
-                margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" stroke="hsl(var(--foreground))" />
-                <YAxis allowDecimals={false} stroke="hsl(var(--foreground))" />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Bar dataKey="income" fill="hsl(var(--primary))" name="Income">
-                  <LabelList dataKey="income" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `${currency.symbol}${value.toFixed(0)}`} />
-                </Bar>
-                <Bar dataKey="expenditure" fill="hsl(var(--destructive))" name="Expenditure">
-                  <LabelList dataKey="expenditure" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `${currency.symbol}${value.toFixed(0)}`} />
-                </Bar>
-                <Bar dataKey="outstandingPledges" fill="hsl(var(--accent))" name="Outstanding Pledges"> {/* New Bar */}
-                  <LabelList dataKey="outstandingPledges" position="top" fill="hsl(var(--foreground))" formatter={(value: number) => `${currency.symbol}${value.toFixed(0)}`} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="mt-6 grid grid-cols-4 gap-4 text-center"> {/* Changed to grid-cols-4 */}
-              <div>
-                <p className="text-sm text-muted-foreground">Total Income ({selectedYear})</p>
-                <p className="text-xl font-bold text-primary">{currency.symbol}{totalIncome.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Expenditure ({selectedYear})</p>
-                <p className="text-xl font-bold text-destructive">{currency.symbol}{totalExpenditure.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Outstanding Pledges ({selectedYear})</p> {/* New display */}
-                <p className="text-xl font-bold text-accent">{currency.symbol}{totalOutstandingPledges.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Net Balance ({selectedYear})</p>
-                <p className={`text-xl font-bold ${netBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {currency.symbol}{netBalance.toFixed(2)}
-                </p>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground mt-4 text-center">
-              Monthly breakdown of financial inflows, outflows, and outstanding pledges for the selected year.
-            </p>
-          </>
-        ) : (
-          <p className="text-muted-foreground text-center mt-4">No financial data available for the selected year.</p>
-        )}
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart
+            data={filteredData}
+            margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="month" stroke="hsl(var(--foreground))" />
+            <YAxis allowDecimals={false} stroke="hsl(var(--foreground))" />
+            <Tooltip
+              cursor={{ fill: "hsl(var(--accent))", opacity: 0.2 }}
+              content={<CustomTooltip />} // Use custom tooltip
+              contentStyle={{
+                backgroundColor: "hsl(var(--popover))",
+                borderColor: "hsl(var(--border))",
+                borderRadius: "var(--radius)",
+              }}
+              labelStyle={{ color: "hsl(var(--foreground))" }}
+              itemStyle={{ color: "hsl(var(--foreground))" }}
+            />
+            <Legend />
+            <Line
+              type="monotone"
+              dataKey="income"
+              stroke="hsl(var(--primary))"
+              name="Income"
+              activeDot={{ r: 8 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="expenditure"
+              stroke="hsl(var(--destructive))"
+              name="Expenditure"
+              activeDot={{ r: 8 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="outstandingPledges"
+              stroke="hsl(var(--ring))" // Use a distinct color for pledges
+              name="Outstanding Pledges"
+              activeDot={{ r: 8 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+        <p className="text-sm text-muted-foreground mt-4 text-center">
+          Monthly breakdown of financial activity and outstanding commitments.
+        </p>
       </CardContent>
     </Card>
   );

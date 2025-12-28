@@ -10,45 +10,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import { MyContribution } from "./types"; // Import MyContribution type
+import { MyContribution, MyFinancialAccount } from "./types"; // Import types
 
-interface MyContributionsOverviewTabProps {
+interface MemberContributionsDetailProps {
   contributions: MyContribution[];
+  financialAccounts: MyFinancialAccount[];
   loading: boolean;
   error: string | null;
 }
 
-const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
+const MemberContributionsDetail: React.FC<MemberContributionsDetailProps> = ({
   contributions,
+  financialAccounts,
   loading,
   error,
 }) => {
   const { currency } = useSystemSettings();
 
-  const getDisplayPledgeStatus = (contribution: MyContribution): "Paid" | "Unpaid" | undefined => {
-    if (contribution.type === "Pledge" && contribution.original_amount !== undefined && contribution.paid_amount !== undefined) {
-      if (contribution.paid_amount >= contribution.original_amount) return "Paid";
-      return "Unpaid";
-    }
-    return undefined;
-  };
-
-  const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid" | undefined) => {
-    switch (displayStatus) {
-      case "Paid":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Unpaid":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-    }
-  };
-
   if (loading) {
-    return <p className="text-muted-foreground">Loading your contributions...</p>;
+    return <p className="text-muted-foreground">Loading detailed contributions...</p>;
   }
 
   if (error) {
@@ -60,7 +42,7 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Contributions</CardTitle>
+        <CardTitle>Detailed Contributions</CardTitle>
       </CardHeader>
       <CardContent>
         {sortedContributions.length > 0 ? (
@@ -70,19 +52,22 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
                 <TableHead>Date</TableHead>
                 <TableHead>Project</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="text-right">Pledged Amount</TableHead>
+                <TableHead className="text-right">Paid Amount</TableHead>
                 <TableHead className="text-right">Remaining</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedContributions.map((contribution) => {
-                const displayStatus = getDisplayPledgeStatus(contribution);
                 const isPledge = contribution.type === "Pledge";
                 const remaining = isPledge && contribution.original_amount !== undefined && contribution.paid_amount !== undefined
                   ? contribution.original_amount - contribution.paid_amount
                   : 0;
+                const displayStatus = isPledge && contribution.original_amount !== undefined && contribution.paid_amount !== undefined
+                  ? (contribution.paid_amount >= contribution.original_amount ? "Paid" : "Active")
+                  : "-";
 
                 return (
                   <TableRow key={contribution.id}>
@@ -90,38 +75,37 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
                     <TableCell>{contribution.project_name}</TableCell>
                     <TableCell>{contribution.type}</TableCell>
                     <TableCell className="text-right">
-                      {currency.symbol}{contribution.amount.toFixed(2)}
+                      {isPledge && contribution.original_amount !== undefined
+                        ? `${currency.symbol}${contribution.original_amount.toFixed(2)}`
+                        : "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       {isPledge && contribution.paid_amount !== undefined
                         ? `${currency.symbol}${contribution.paid_amount.toFixed(2)}`
-                        : "-"}
+                        : isPledge ? `${currency.symbol}0.00` : `${currency.symbol}${contribution.amount.toFixed(2)}`}
                     </TableCell>
                     <TableCell className="text-right">
                       {isPledge && remaining > 0
                         ? `${currency.symbol}${remaining.toFixed(2)}`
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-center">
-                      {isPledge && displayStatus ? (
-                        <Badge className={getStatusBadgeClasses(displayStatus)}>
-                          {displayStatus}
-                        </Badge>
-                      ) : (
-                        "-"
-                      )}
+                    <TableCell>
+                      {isPledge && contribution.due_date
+                        ? format(contribution.due_date, "MMM dd, yyyy")
+                        : "-"}
                     </TableCell>
+                    <TableCell>{displayStatus}</TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
         ) : (
-          <p className="text-muted-foreground text-center">No contributions found.</p>
+          <p className="text-muted-foreground text-center">No detailed contributions found.</p>
         )}
       </CardContent>
     </Card>
   );
 };
 
-export default MyContributionsOverviewTab;
+export default MemberContributionsDetail;
