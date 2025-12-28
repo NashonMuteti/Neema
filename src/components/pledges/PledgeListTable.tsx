@@ -17,7 +17,7 @@ import { FinancialAccount, Pledge } from "@/types/common";
 import { Trash2 } from "lucide-react";
 import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import EditPledgeDialog
 
-interface PledgeTableProps { // Renamed interface
+interface PledgeListTableProps { // Renamed interface
   pledges: Pledge[];
   canManagePledges: boolean;
   onMarkAsPaid: (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => Promise<void>;
@@ -44,7 +44,7 @@ const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
   }
 };
 
-const PledgeTable: React.FC<PledgeTableProps> = ({ // Using the new interface
+const PledgeListTable: React.FC<PledgeListTableProps> = ({ // Using the new interface
   pledges,
   canManagePledges,
   onMarkAsPaid,
@@ -126,4 +126,4 @@ const PledgeTable: React.FC<PledgeTableProps> = ({ // Using the new interface
   );
 };
 
-export default PledgeTable;
+export default PledgeListTable;

@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
 import PledgeForm from "@/components/pledges/PledgeForm";
 import PledgeFilters from "@/components/pledges/PledgeFilters";
-import PledgeTable from "@/components/pledges/PledgeTable";
+import PledgeListTable from "@/components/pledges/PledgeListTable"; // Updated import
 import { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import {
@@ -371,7 +371,7 @@ const Pledges = () => {
             />
             {/* Removed global paidIntoAccount select, now handled by dialog */}
 
-            <PledgeTable
+            <PledgeListTable // Updated component name
               pledges={pledges}
               canManagePledges={canManagePledges}
               onMarkAsPaid={handleMarkAsPaid}
