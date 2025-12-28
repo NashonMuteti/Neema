@@ -10,6 +10,8 @@ import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import u
 
 import IncomeForm from "@/components/income/IncomeForm";
 import IncomeTable from "@/components/income/IncomeTable";
+import EditIncomeDialog from "@/components/income/EditIncomeDialog"; // New import
+import DeleteIncomeDialog from "@/components/income/DeleteIncomeDialog"; // New import
 
 interface FinancialAccount {
   id: string;
@@ -59,6 +61,10 @@ const Income = () => {
   const [transactions, setTransactions] = React.useState<IncomeTransaction[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  
+  // State for Edit/Delete Dialogs
+  const [editingTransaction, setEditingTransaction] = React.useState<IncomeTransaction | null>(null);
+  const [deletingTransaction, setDeletingTransaction] = React.useState<IncomeTransaction | null>(null);
   
   // Filter State
   const currentYear = getYear(new Date());
@@ -229,18 +235,111 @@ const Income = () => {
     }
   };
 
-  const handleEditTransaction = (id: string) => {
-    // In a real app, this would open an edit dialog pre-filled with transaction data
-    console.log("Editing income transaction:", id);
-    showError("Edit functionality is not yet implemented for income transactions.");
+  const handleEditTransaction = (transaction: IncomeTransaction) => {
+    setEditingTransaction(transaction);
   };
 
-  const handleDeleteTransaction = async (id: string, amount: number, accountId: string) => {
+  const handleSaveEditedTransaction = async (updatedTx: IncomeTransaction) => {
     if (!currentUser) {
-      showError("You must be logged in to delete income.");
+      showError("You must be logged in to edit income.");
+      return;
+    }
+
+    const oldTx = transactions.find(t => t.id === updatedTx.id);
+    if (!oldTx) {
+      showError("Original transaction not found.");
+      return;
+    }
+
+    const parsedAmount = parseFloat(updatedTx.amount.toString());
+    const validation = validateFinancialTransaction(parsedAmount, updatedTx.account_id, currentUser.id);
+    if (!validation.isValid) {
+      showError(validation.error || "Invalid income amount.");
+      return;
+    }
+
+    // Update the transaction in the database
+    const { error: updateTxError } = await supabase
+      .from('income_transactions')
+      .update({
+        date: updatedTx.date.toISOString(),
+        amount: parsedAmount,
+        account_id: updatedTx.account_id,
+        source: updatedTx.source,
+        profile_id: updatedTx.profile_id,
+      })
+      .eq('id', updatedTx.id)
+      .eq('profile_id', currentUser.id); // Ensure only owner can edit
+
+    if (updateTxError) {
+      console.error("Error updating income transaction:", updateTxError);
+      showError("Failed to update income transaction.");
+      return;
+    }
+
+    // Adjust account balances
+    const oldAccount = financialAccounts.find(acc => acc.id === oldTx.account_id);
+    const newAccount = financialAccounts.find(acc => acc.id === updatedTx.account_id);
+
+    if (!oldAccount || !newAccount) {
+      showError("One or more financial accounts not found for balance adjustment.");
+      return;
+    }
+
+    if (oldTx.account_id === updatedTx.account_id) {
+      // Same account: adjust balance by the difference
+      const amountDifference = parsedAmount - oldTx.amount;
+      const newBalance = oldAccount.current_balance + amountDifference;
+      const { error: updateBalanceError } = await supabase
+        .from('financial_accounts')
+        .update({ current_balance: newBalance })
+        .eq('id', oldAccount.id)
+        .eq('profile_id', currentUser.id);
+      if (updateBalanceError) {
+        console.error("Error updating account balance for same account:", updateBalanceError);
+        showError("Transaction updated, but failed to adjust account balance.");
+      }
+    } else {
+      // Different accounts: deduct from old, add to new
+      const oldAccountNewBalance = oldAccount.current_balance - oldTx.amount;
+      const newAccountNewBalance = newAccount.current_balance + parsedAmount;
+
+      const { error: updateOldAccountError } = await supabase
+        .from('financial_accounts')
+        .update({ current_balance: oldAccountNewBalance })
+        .eq('id', oldAccount.id)
+        .eq('profile_id', currentUser.id);
+
+      const { error: updateNewAccountError } = await supabase
+        .from('financial_accounts')
+        .update({ current_balance: newAccountNewBalance })
+        .eq('id', newAccount.id)
+        .eq('profile_id', currentUser.id);
+
+      if (updateOldAccountError || updateNewAccountError) {
+        console.error("Error updating account balances for different accounts:", updateOldAccountError, updateNewAccountError);
+        showError("Transaction updated, but failed to adjust account balances.");
+      }
+    }
+
+    showSuccess("Income transaction updated successfully!");
+    setEditingTransaction(null);
+    fetchIncomeTransactions();
+    fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+  };
+
+  const handleDeleteTransaction = (transaction: IncomeTransaction) => {
+    setDeletingTransaction(transaction);
+  };
+
+  const handleConfirmDeleteTransaction = async () => {
+    if (!deletingTransaction || !currentUser) {
+      showError("No transaction selected for deletion or user not logged in.");
       return;
     }
     
+    const { id, amount, account_id } = deletingTransaction;
+
     const { error: deleteError } = await supabase
       .from('income_transactions')
       .delete()
@@ -252,13 +351,13 @@ const Income = () => {
       showError("Failed to delete income transaction.");
     } else {
       // Revert account balance
-      const currentAccount = financialAccounts.find(acc => acc.id === accountId);
+      const currentAccount = financialAccounts.find(acc => acc.id === account_id);
       if (currentAccount) {
         const newBalance = currentAccount.current_balance - amount;
         const { error: updateBalanceError } = await supabase
           .from('financial_accounts')
           .update({ current_balance: newBalance })
-          .eq('id', accountId)
+          .eq('id', account_id)
           .eq('profile_id', currentUser.id); // Ensure user owns the account
           
         if (updateBalanceError) {
@@ -268,6 +367,7 @@ const Income = () => {
       }
       
       showSuccess("Income transaction deleted successfully!");
+      setDeletingTransaction(null);
       fetchIncomeTransactions();
       fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
     }
@@ -298,29 +398,56 @@ const Income = () => {
         Record and manage all financial inflows.
       </p>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <IncomeForm
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Adjusted grid layout */}
+        <div className="lg:col-span-1"> {/* IncomeForm takes 1/3 width */}
+          <IncomeForm
+            financialAccounts={financialAccounts}
+            members={members}
+            canManageIncome={canManageIncome}
+            onPostIncome={handlePostIncome}
+          />
+        </div>
+        
+        <div className="lg:col-span-2"> {/* IncomeTable takes 2/3 width */}
+          <IncomeTable
+            transactions={transactions}
+            canManageIncome={canManageIncome}
+            filterMonth={filterMonth}
+            setFilterMonth={setFilterMonth}
+            filterYear={filterYear}
+            setFilterYear={setFilterYear}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            months={months}
+            years={years}
+            onEditTransaction={handleEditTransaction}
+            onDeleteTransaction={handleDeleteTransaction}
+          />
+        </div>
+      </div>
+
+      {editingTransaction && (
+        <EditIncomeDialog
+          isOpen={!!editingTransaction}
+          setIsOpen={() => setEditingTransaction(null)}
+          initialData={editingTransaction}
+          onSave={handleSaveEditedTransaction}
           financialAccounts={financialAccounts}
           members={members}
           canManageIncome={canManageIncome}
-          onPostIncome={handlePostIncome}
+          currency={currency}
         />
-        
-        <IncomeTable
-          transactions={transactions}
-          canManageIncome={canManageIncome}
-          filterMonth={filterMonth}
-          setFilterMonth={setFilterMonth}
-          filterYear={filterYear}
-          setFilterYear={setFilterYear}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          months={months}
-          years={years}
-          onEditTransaction={handleEditTransaction}
-          onDeleteTransaction={handleDeleteTransaction}
+      )}
+
+      {deletingTransaction && (
+        <DeleteIncomeDialog
+          isOpen={!!deletingTransaction}
+          setIsOpen={() => setDeletingTransaction(null)}
+          transaction={deletingTransaction}
+          onConfirm={handleConfirmDeleteTransaction}
+          currency={currency}
         />
-      </div>
+      )}
     </div>
   );
 };

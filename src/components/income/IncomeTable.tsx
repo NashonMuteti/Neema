@@ -36,8 +36,8 @@ interface IncomeTableProps {
   setSearchQuery: (query: string) => void;
   months: MonthYearOption[];
   years: MonthYearOption[];
-  onEditTransaction: (id: string) => void;
-  onDeleteTransaction: (id: string, amount: number, accountId: string) => void;
+  onEditTransaction: (transaction: IncomeTransaction) => void; // Updated signature
+  onDeleteTransaction: (transaction: IncomeTransaction) => void; // Updated signature
 }
 
 const IncomeTable: React.FC<IncomeTableProps> = ({
@@ -126,10 +126,10 @@ const IncomeTable: React.FC<IncomeTableProps> = ({
                   {canManageIncome && (
                     <TableCell className="text-center">
                       <div className="flex justify-center space-x-2">
-                        <Button variant="ghost" size="icon" onClick={() => onEditTransaction(tx.id)}>
+                        <Button variant="ghost" size="icon" onClick={() => onEditTransaction(tx)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => onDeleteTransaction(tx.id, tx.amount, tx.account_id)}>
+                        <Button variant="ghost" size="icon" onClick={() => onDeleteTransaction(tx)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
