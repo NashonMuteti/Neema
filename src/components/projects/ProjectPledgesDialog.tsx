@@ -181,7 +181,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     if (currentUser) {
       const { data: accountsData, error: accountsError } = await supabase
         .from('financial_accounts')
-        .select('id, name, current_balance')
+        .select('id, name, current_balance, initial_balance, profile_id') // Added initial_balance and profile_id
         .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
 

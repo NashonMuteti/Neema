@@ -78,10 +78,10 @@ const PettyCashReport = () => {
 
   // Dummy financial accounts (should ideally come from a backend/admin setup)
   const financialAccounts: FinancialAccount[] = [
-    { id: "acc1", name: "Cash at Hand", current_balance: 0 },
-    { id: "acc2", name: "Petty Cash", current_balance: 0 },
-    { id: "acc3", name: "Bank Mpesa Account", current_balance: 0 },
-    { id: "acc4", name: "Main Bank Account", current_balance: 0 },
+    { id: "acc1", name: "Cash at Hand", current_balance: 0, initial_balance: 0, profile_id: "dummy-profile-id-1" },
+    { id: "acc2", name: "Petty Cash", current_balance: 0, initial_balance: 0, profile_id: "dummy-profile-id-1" },
+    { id: "acc3", name: "Bank Mpesa Account", current_balance: 0, initial_balance: 0, profile_id: "dummy-profile-id-1" },
+    { id: "acc4", name: "Main Bank Account", current_balance: 0, initial_balance: 0, profile_id: "dummy-profile-id-1" },
   ];
 
   return (

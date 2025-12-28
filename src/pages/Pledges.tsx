@@ -126,7 +126,7 @@ const Pledges = () => {
     if (currentUser) {
       const { data: accountsData, error: accountsError } = await supabase
         .from('financial_accounts')
-        .select('id, name, current_balance')
+        .select('id, name, current_balance, initial_balance, profile_id') // Added initial_balance and profile_id
         .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
 
@@ -322,7 +322,7 @@ const Pledges = () => {
 
     if (transactionError) {
       console.error("Error marking pledge as paid and updating balance:", transactionError);
-      showError(`Failed to mark pledge as paid: ${transactionError.message}`);
+      showError(`Failed to update pledge: ${transactionError.message}`);
     } else {
       showSuccess(`Pledge payment of ${currency.symbol}${pledgeToMark.amount.toFixed(2)} recorded successfully!`);
       fetchInitialData();
