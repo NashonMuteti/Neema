@@ -40,7 +40,7 @@ const Header = () => {
           <div className="flex items-center">
             <Link to="/" className="text-xl font-bold text-foreground flex items-center">
               <img src={brandLogoUrl} alt="Logo" className="h-8 w-auto mr-2" />
-              Group Finance {/* Use static headerTitle */}
+              {headerTitle} {/* Use dynamic headerTitle */}
               {viewingMemberName && (
                 <span className="ml-2 text-base font-normal text-muted-foreground">
                   {" - " + viewingMemberName}
