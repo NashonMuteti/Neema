@@ -26,6 +26,7 @@ import { format, getMonth, getYear, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
 import { Member, MonthYearOption } from "@/types/common"; // Updated import
+import { Label } from "@/components/ui/label"; // Added missing import
 
 interface MemberProfile {
   id: string;

@@ -52,7 +52,7 @@ const PettyCashReport = () => {
   const currentMonth = getMonth(new Date()); // 0-indexed
 
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
-  const [filterYear, React.useState<string>(currentYear.toString());
+  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
 
   const months: MonthYearOption[] = Array.from({ length: 12 }, (_, i) => ({
