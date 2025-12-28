@@ -12,18 +12,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
-}
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
+import { FinancialAccount, Member, MonthYearOption } from "@/types/common";
 
 interface IncomeFormProps {
   financialAccounts: FinancialAccount[];

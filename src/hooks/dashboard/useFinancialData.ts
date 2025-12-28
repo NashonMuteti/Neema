@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { getYear, format, parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
+import { FinancialAccount, Member, MonthYearOption, Project, Transaction } from "@/types/common";
 
 interface MonthlyFinancialData {
   year: number;

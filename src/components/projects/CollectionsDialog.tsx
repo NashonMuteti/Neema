@@ -32,23 +32,12 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import { useQueryClient } from "@tanstack/react-query"; // New import
+import { FinancialAccount, Member, MonthYearOption } from "@/types/common"; // Updated import
 
 interface CollectionsDialogProps {
   projectId: string;
   projectName: string;
   onCollectionAdded: () => void;
-}
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
 }
 
 const paymentMethods = [

@@ -19,6 +19,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import { useQueryClient } from "@tanstack/react-query"; // New import
+import { Project as CommonProject, FinancialAccount, MonthYearOption } from "@/types/common"; // Import Project and FinancialAccount from common.ts
 
 interface Project {
   id: string;
@@ -318,7 +319,7 @@ const Projects = () => {
     }
   };
 
-  if (loading || loadingFinancials) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Project Accounts</h1>

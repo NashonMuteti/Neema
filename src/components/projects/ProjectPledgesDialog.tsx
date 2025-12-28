@@ -15,6 +15,7 @@ import { useSystemSettings } from "@/context/SystemSettingsContext";
 import ProjectPledgeForm from "./project-pledges/ProjectPledgeForm";
 import ProjectPledgeTable from "./project-pledges/ProjectPledgeTable";
 import { useProjectPledges } from "@/hooks/projects/useProjectPledges";
+import { FinancialAccount, Pledge } from "@/types/common"; // Updated import
 
 interface ProjectPledgesDialogProps {
   projectId: string;
