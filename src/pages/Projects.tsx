@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useQueryClient } from "@tanstack/react-query"; // New import
 
 interface Project {
   id: string;
@@ -34,6 +35,7 @@ const Projects = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings(); // Use currency from context
+  const queryClient = useQueryClient(); // Initialize queryClient
   
   // Calculate canManageProjects using useMemo for stability
   const { canManageProjects } = useMemo(() => {
@@ -61,6 +63,14 @@ const Projects = () => {
   const [error, setError] = React.useState<string | null>(null);
   const [projectFinancialSummaries, setProjectFinancialSummaries] = useState<Map<string, { totalCollections: number; totalPledged: number }>>(new Map());
   const [loadingFinancials, setLoadingFinancials] = useState(false);
+
+  const invalidateDashboardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['financialData'] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
+    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
+  };
 
   // New useEffect to fetch active members count
   useEffect(() => {
@@ -189,6 +199,7 @@ const Projects = () => {
     } else {
       showSuccess("Project added successfully!");
       fetchProjects(); // Re-fetch projects to update the list
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
@@ -216,6 +227,7 @@ const Projects = () => {
     } else {
       showSuccess(`Project '${updatedProject.name}' updated successfully!`);
       fetchProjects(); // Re-fetch projects to update the list
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
@@ -249,6 +261,7 @@ const Projects = () => {
     } else {
       showSuccess(`Project status updated to '${newStatus}'!`);
       fetchProjects(); // Re-fetch projects to update the list
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
@@ -271,6 +284,7 @@ const Projects = () => {
     } else {
       showSuccess(`Project '${projectName}' moved to deleted status.`);
       fetchProjects(); // Re-fetch projects to update the list
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
@@ -300,6 +314,7 @@ const Projects = () => {
     } else {
       showSuccess(`Thumbnail for project updated successfully!`);
       fetchProjects(); // Re-fetch projects to update the list
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 

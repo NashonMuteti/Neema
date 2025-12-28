@@ -201,7 +201,7 @@ const Income = () => {
         amount: incomeAmount,
         account_id: incomeAccount,
         source: incomeSource,
-        profile_id: transactionProfileId,
+        profile_id: transactionProfileId, // Use the determined profile_id
       });
       
     if (insertError) {
@@ -213,7 +213,7 @@ const Income = () => {
         .from('financial_accounts')
         .update({ current_balance: newBalance })
         .eq('id', incomeAccount)
-        .eq('profile_id', currentUser.id);
+        .eq('profile_id', currentUser.id); // Ensure user owns the account
         
       if (updateBalanceError) {
         console.error("Error updating account balance:", updateBalanceError);
@@ -221,8 +221,8 @@ const Income = () => {
       }
       
       showSuccess("Income posted successfully!");
-      await fetchIncomeTransactions();
-      await fetchFinancialAccountsAndMembers();
+      await fetchIncomeTransactions(); // Refresh transactions
+      await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
       invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
@@ -312,8 +312,8 @@ const Income = () => {
 
     showSuccess("Income transaction updated successfully!");
     setEditingTransaction(null);
-    await fetchIncomeTransactions();
-    await fetchFinancialAccountsAndMembers();
+    await fetchIncomeTransactions(); // Refresh transactions
+    await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
     invalidateDashboardQueries(); // Invalidate dashboard queries
   };
 
@@ -341,7 +341,7 @@ const Income = () => {
     } else {
       const currentAccount = financialAccounts.find(acc => acc.id === account_id);
       if (currentAccount) {
-        const newBalance = currentAccount.current_balance - amount;
+        const newBalance = currentAccount.current_balance - amount; // Correctly debiting the account
         const { error: updateBalanceError } = await supabase
           .from('financial_accounts')
           .update({ current_balance: newBalance })
@@ -356,8 +356,8 @@ const Income = () => {
       
       showSuccess("Income transaction deleted successfully!");
       setDeletingTransaction(null);
-      await fetchIncomeTransactions();
-      await fetchFinancialAccountsAndMembers();
+      await fetchIncomeTransactions(); // Refresh transactions
+      await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
       invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };

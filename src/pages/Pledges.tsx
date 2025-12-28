@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Member, FinancialAccount, Pledge } from "@/types/common"; // Updated Pledge import
+import { useQueryClient } from "@tanstack/react-query"; // New import
 
 interface Project {
   id: string;
@@ -47,6 +48,7 @@ const Pledges = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
+  const queryClient = useQueryClient(); // Initialize queryClient
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -190,6 +192,14 @@ const Pledges = () => {
     fetchInitialData();
   }, [fetchInitialData]);
 
+  const invalidateDashboardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['financialData'] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
+    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
+  };
+
   const handleRecordPledge = async (pledgeData: {
     member_id: string;
     project_id: string;
@@ -220,11 +230,13 @@ const Pledges = () => {
     } else {
       showSuccess("Pledge recorded successfully!");
       fetchInitialData();
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
   const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => {
     fetchInitialData();
+    invalidateDashboardQueries(); // Invalidate dashboard queries
   };
 
   const handleDeletePledge = async (id: string) => {
@@ -271,6 +283,7 @@ const Pledges = () => {
 
     showSuccess("Pledge deleted successfully!");
     fetchInitialData();
+    invalidateDashboardQueries(); // Invalidate dashboard queries
   };
 
   const handleMarkAsPaid = async (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => {
@@ -304,6 +317,7 @@ const Pledges = () => {
     } else {
       showSuccess(`Pledge payment of ${currency.symbol}${amountPaid.toFixed(2)} recorded successfully!`);
       fetchInitialData();
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 

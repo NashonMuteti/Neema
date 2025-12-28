@@ -18,6 +18,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useQueryClient } from "@tanstack/react-query"; // New import
 
 interface FinancialAccount {
   id: string;
@@ -44,6 +45,7 @@ const Expenditure = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
+  const queryClient = useQueryClient(); // Initialize queryClient
   
   const { canManageExpenditure } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -166,6 +168,14 @@ const Expenditure = () => {
     fetchExpenditureTransactions();
   }, [fetchFinancialAccountsAndMembers, fetchExpenditureTransactions]);
 
+  const invalidateDashboardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['financialData'] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
+    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
+  };
+
   const handlePostExpenditure = async () => {
     if (!currentUser) {
       showError("You must be logged in to post expenditure.");
@@ -230,13 +240,7 @@ const Expenditure = () => {
       showSuccess("Expenditure posted successfully!");
       fetchExpenditureTransactions();
       fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
-      
-      // Reset form
-      setExpenditureDate(new Date());
-      setExpenditureAmount("");
-      setExpenditureAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
-      setExpenditurePurpose("");
-      setSelectedExpenditureMemberId(undefined); // Reset selected member
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
@@ -281,6 +285,7 @@ const Expenditure = () => {
       showSuccess("Expenditure transaction deleted successfully!");
       fetchExpenditureTransactions();
       fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 

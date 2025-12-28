@@ -18,6 +18,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useQueryClient } from "@tanstack/react-query"; // New import
 
 interface FinancialAccount {
   id: string;
@@ -44,6 +45,7 @@ const PettyCash = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
+  const queryClient = useQueryClient(); // Initialize queryClient
   
   const { canManagePettyCash } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -171,6 +173,14 @@ const PettyCash = () => {
     fetchPettyCashTransactions();
   }, [fetchFinancialAccountsAndMembers, fetchPettyCashTransactions]);
 
+  const invalidateDashboardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['financialData'] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
+    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
+  };
+
   const handlePostExpense = async () => {
     if (!currentUser) {
       showError("You must be logged in to post petty cash expense.");
@@ -235,13 +245,7 @@ const PettyCash = () => {
       showSuccess("Petty cash expense posted successfully!");
       fetchPettyCashTransactions();
       fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
-      
-      // Reset form
-      setExpenseDate(new Date());
-      setExpenseAmount("");
-      setExpenseAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
-      setExpensePurpose("");
-      setSelectedPettyCashMemberId(undefined); // Reset selected member
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
@@ -286,6 +290,7 @@ const PettyCash = () => {
       showSuccess("Petty cash transaction deleted successfully!");
       fetchPettyCashTransactions();
       fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 

@@ -31,6 +31,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
+import { useQueryClient } from "@tanstack/react-query"; // New import
 
 interface CollectionsDialogProps {
   projectId: string;
@@ -65,6 +66,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
+  const queryClient = useQueryClient(); // Initialize queryClient
 
   const { canManageCollections } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -138,6 +140,14 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
     }
   }, [isOpen, fetchMembersAndAccounts]);
 
+  const invalidateDashboardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['financialData'] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
+    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
+  };
+
   const handleAddCollection = async () => {
     if (!amount || !memberId || !receivedIntoAccount || !collectionDate || !paymentMethod) {
       showError("All collection fields are required.");
@@ -177,6 +187,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
     } else {
       showSuccess("Collection added successfully!");
       onCollectionAdded();
+      invalidateDashboardQueries(); // Invalidate dashboard queries
       setIsOpen(false);
     }
     setIsProcessing(false);
