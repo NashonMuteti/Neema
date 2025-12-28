@@ -44,6 +44,7 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog"; // New import
 import { Member, FinancialAccount } from "@/types/common"; // Updated import
+import { useQueryClient } from "@tanstack/react-query"; // New import
 
 interface ProjectPledge {
   id: string;
@@ -99,6 +100,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
+  const queryClient = useQueryClient(); // Initialize queryClient
 
   const { canManagePledges } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -206,6 +208,14 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
     }
   }, [isOpen, fetchPledges, fetchMembersAndAccounts]);
 
+  const invalidateDashboardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['financialData'] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
+    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
+    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
+  };
+
   const handleMarkPledgeAsPaid = async (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => {
     if (!canManagePledges) {
       showError("You do not have permission to update pledge status.");
@@ -232,17 +242,22 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
 
     if (transactionError) {
       console.error("Error marking pledge as paid and updating balance:", transactionError);
-      showError(`Failed to update pledge: ${transactionError.message}`);
+      showError(`Failed to record pledge payment: ${transactionError.message}`);
     } else {
-      showSuccess("Pledge marked as paid and account balance updated successfully!");
-      fetchPledges();
-      onPledgesUpdated();
+      showSuccess(`Pledge payment of ${currency.symbol}${amountPaid.toFixed(2)} recorded successfully!`);
+      fetchPledges(); // Re-fetch pledges to update their paid_amount and status
+      onPledgesUpdated(); // Notify parent component (Projects.tsx) to re-fetch its data
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
 
   const handleAddPledge = async () => {
     if (!newPledgeAmount || !newPledgeMember || !newPledgeDueDate) {
       showError("All new pledge fields are required.");
+      return;
+    }
+    if (!currentUser) {
+      showError("User not logged in to perform this action.");
       return;
     }
 
@@ -252,29 +267,128 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
       return;
     }
 
-    const { error } = await supabase
+    const { error: insertError } = await supabase
       .from('project_pledges')
       .insert({
-        project_id: projectId,
         member_id: newPledgeMember,
+        project_id: projectId,
         amount: parsedAmount,
         paid_amount: 0, // New pledges start with 0 paid_amount
         due_date: newPledgeDueDate.toISOString(),
         status: "Active",
       });
 
-    if (error) {
-      console.error("Error adding new pledge:", error);
-      showError("Failed to add new pledge.");
+    if (insertError) {
+      console.error("Error adding new pledge:", insertError);
+      showError(`Failed to add new pledge: ${insertError.message}`);
     } else {
       showSuccess("New pledge added successfully!");
-      fetchPledges();
-      onPledgesUpdated();
       setNewPledgeAmount("");
-      setNewPledgeMember(members.length > 0 ? members[0].id : undefined);
       setNewPledgeDueDate(new Date());
+      fetchPledges(); // Re-fetch pledges to update the list
+      onPledgesUpdated(); // Notify parent component (Projects.tsx) to re-fetch its data
+      invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
+
+  const [editingPledge, setEditingPledge] = React.useState<ProjectPledge | null>(null);
+  const [markAsPaidPledge, setMarkAsPaidPledge] = React.useState<ProjectPledge | null>(null);
+
+  const handleEditPledge = (pledge: ProjectPledge) => {
+    // This would typically open an EditPledgeDialog
+    console.log("Editing pledge:", pledge.id);
+    showError("Edit functionality for pledges within this dialog is not yet implemented.");
+    // For now, we'll just set it to null to close any potential dialog
+    // setEditingPledge(pledge);
+  };
+
+  const handleDeletePledge = async (pledgeId: string) => {
+    if (!canManagePledges) {
+      showError("You do not have permission to delete pledges.");
+      return;
+    }
+    if (!currentUser) {
+      showError("You must be logged in to delete pledges.");
+      return;
+    }
+
+    const pledgeToDelete = pledges.find(p => p.id === pledgeId);
+    if (!pledgeToDelete) {
+      showError("Pledge not found.");
+      return;
+    }
+
+    if (pledgeToDelete.paid_amount > 0) {
+      const { error: rpcError } = await supabase.rpc('reverse_paid_pledge_atomic', {
+        p_pledge_id: pledgeId,
+        p_profile_id: currentUser.id,
+      });
+
+      if (rpcError) {
+        console.error("Error reversing paid pledge:", rpcError);
+        showError(`Failed to delete paid pledge: ${rpcError.message}`);
+        return;
+      }
+    } else {
+      const { error: deleteError } = await supabase
+        .from('project_pledges')
+        .delete()
+        .eq('id', pledgeId);
+
+      if (deleteError) {
+        console.error("Error deleting pledge:", deleteError);
+        showError("Failed to delete pledge.");
+        return;
+      }
+    }
+
+    showSuccess("Pledge deleted successfully!");
+    fetchPledges();
+    onPledgesUpdated();
+    invalidateDashboardQueries();
+  };
+
+  if (loadingPledges || loadingMembers || loadingAccounts) {
+    return (
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" disabled={!canManagePledges}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Manage Pledges
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Manage Pledges for {projectName}</DialogTitle>
+            <DialogDescription>
+              View, add, and manage financial pledges for this project.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-muted-foreground">Loading pledges and accounts...</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (error) {
+    return (
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" disabled={!canManagePledges}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Manage Pledges
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Manage Pledges for {projectName}</DialogTitle>
+            <DialogDescription>
+              View, add, and manage financial pledges for this project.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-destructive">Error: {error}</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -287,18 +401,19 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Manage Pledges for {projectName}</DialogTitle>
           <DialogDescription>
-            View, add, and update the status of financial pledges for this project.
+            View, add, and manage financial pledges for this project.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-6 py-4">
-          <div className="border p-4 rounded-lg space-y-4">
-            <h3 className="text-lg font-semibold flex items-center">
-              <PlusCircle className="mr-2 h-5 w-5" /> Add New Pledge
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid gap-4 py-4">
+          {/* New Pledge Form */}
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Add New Pledge</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="new-pledge-member">Member</Label>
-                <Select value={newPledgeMember} onValueChange={setNewPledgeMember} disabled={!canManagePledges || loadingMembers}>
+                <Select value={newPledgeMember} onValueChange={setNewPledgeMember} disabled={!canManagePledges || members.length === 0}>
                   <SelectTrigger id="new-pledge-member">
                     <SelectValue placeholder="Select a member" />
                   </SelectTrigger>
@@ -313,7 +428,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                {loadingMembers && <p className="text-sm text-muted-foreground">Loading members...</p>}
+                {members.length === 0 && <p className="text-sm text-destructive">No members found. Please add one in Admin Settings.</p>}
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="new-pledge-amount">Amount</Label>
@@ -353,25 +468,24 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
                   </PopoverContent>
                 </Popover>
               </div>
-            </div>
-            <Button onClick={handleAddPledge} className="w-full" disabled={!canManagePledges || !newPledgeAmount || !newPledgeMember || !newPledgeDueDate}>
-              Add Pledge
-            </Button>
-          </div>
+              <div className="md:col-span-3 flex justify-end">
+                <Button onClick={handleAddPledge} disabled={!canManagePledges || !newPledgeAmount || !newPledgeMember || !newPledgeDueDate || members.length === 0}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Pledge
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-          <h3 className="text-lg font-semibold">Existing Pledges</h3>
-          {loadingPledges ? (
-            <p className="text-muted-foreground">Loading pledges...</p>
-          ) : error ? (
-            <p className="text-destructive">{error}</p>
-          ) : pledges.length > 0 ? (
+          {/* Existing Pledges Table */}
+          <h3 className="text-lg font-semibold mb-2">Existing Pledges</h3>
+          {pledges.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Member</TableHead>
-                  <TableHead>Pledged</TableHead>
-                  <TableHead>Paid</TableHead>
-                  <TableHead>Remaining</TableHead>
+                  <TableHead className="text-right">Pledged</TableHead>
+                  <TableHead className="text-right">Paid</TableHead>
+                  <TableHead className="text-right">Remaining</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
@@ -380,14 +494,14 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
               <TableBody>
                 {pledges.map((pledge) => {
                   const displayStatus = getDisplayPledgeStatus(pledge);
-                  const remaining = pledge.original_amount - pledge.paid_amount;
+                  const remainingAmount = pledge.original_amount - pledge.paid_amount;
                   return (
                     <TableRow key={pledge.id}>
-                      <TableCell className="font-medium">{pledge.member_name}</TableCell>
-                      <TableCell>{currency.symbol}{pledge.original_amount.toFixed(2)}</TableCell>
-                      <TableCell>{currency.symbol}{pledge.paid_amount.toFixed(2)}</TableCell>
-                      <TableCell>{currency.symbol}{remaining.toFixed(2)}</TableCell>
-                      <TableCell>{format(pledge.due_date, "PPP")}</TableCell>
+                      <TableCell>{pledge.member_name}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{pledge.original_amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{pledge.paid_amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{remainingAmount.toFixed(2)}</TableCell>
+                      <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-center">
                         <Badge className={getStatusBadgeClasses(displayStatus)}>
                           {displayStatus}
@@ -396,15 +510,24 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
                       {canManagePledges && (
                         <TableCell className="text-center">
                           <div className="flex justify-center space-x-2">
-                            {displayStatus !== "Paid" && (
-                              <MarkPledgeAsPaidDialog
-                                pledge={pledge}
-                                onConfirmPayment={handleMarkPledgeAsPaid}
-                                financialAccounts={financialAccounts}
-                                canManagePledges={canManagePledges}
-                              />
+                            {remainingAmount > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setMarkAsPaidPledge(pledge)}
+                                disabled={!canManagePledges}
+                              >
+                                Pay
+                              </Button>
                             )}
-                            {/* Removed "Mark as Overdue" button */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeletePledge(pledge.id)}
+                              disabled={!canManagePledges}
+                            >
+                              Delete
+                            </Button>
                           </div>
                         </TableCell>
                       )}
@@ -414,10 +537,21 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center mt-4">No pledges found for this project.</p>
+            <p className="text-muted-foreground text-center">No pledges found for this project.</p>
           )}
         </div>
       </DialogContent>
+
+      {markAsPaidPledge && (
+        <MarkPledgeAsPaidDialog
+          isOpen={!!markAsPaidPledge}
+          setIsOpen={() => setMarkAsPaidPledge(null)}
+          pledge={markAsPaidPledge}
+          onMarkAsPaid={handleMarkPledgeAsPaid}
+          financialAccounts={financialAccounts}
+          currency={currency}
+        />
+      )}
     </Dialog>
   );
 };
