@@ -134,7 +134,7 @@ const Pledges = () => {
         console.error("Error fetching financial accounts:", accountsError);
         showError("Failed to load financial accounts.");
       } else {
-        financialAccountsData = accountsData || [];
+        financialAccountsData = (accountsData || []) as FinancialAccount[];
       }
     }
 

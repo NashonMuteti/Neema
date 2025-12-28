@@ -189,7 +189,7 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
         console.error("Error fetching financial accounts:", accountsError);
         showError("Failed to load financial accounts for pledges.");
       } else {
-        setFinancialAccounts(accountsData || []);
+        setFinancialAccounts((accountsData || []) as FinancialAccount[]);
       }
     }
     setLoadingAccounts(false);

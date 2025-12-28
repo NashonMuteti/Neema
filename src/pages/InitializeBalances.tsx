@@ -42,7 +42,7 @@ const InitializeBalances = () => {
       setError("Failed to load financial accounts for initialization.");
       setFinancialAccounts([]);
     } else {
-      setFinancialAccounts(data || []);
+      setFinancialAccounts((data || []) as FinancialAccount[]);
     }
     setLoading(false);
   }, []);

@@ -101,7 +101,7 @@ const TableBankingSummary: React.FC = () => {
       setError("Failed to load financial accounts.");
       setFinancialAccounts([]);
     } else {
-      setFinancialAccounts(accountsData || []);
+      setFinancialAccounts((accountsData || []) as FinancialAccount[]);
     }
 
     const { data: collectionsData, error: collectionsError } = await supabase
