@@ -11,27 +11,19 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { useSystemSettings } from "@/context/SystemSettingsContext";
-import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "./EditPledgeDialog";
-import MarkPledgeAsPaidDialog from "./MarkPledgeAsPaidDialog"; // New import
-import { Member, FinancialAccount, Pledge } from "@/types/common"; // Updated Pledge import
+import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog";
+import { FinancialAccount, Pledge } from "@/types/common";
+import { Trash2 } from "lucide-react";
 
-interface Project {
-  id: string;
-  name: string;
-}
-
-interface PledgeTableProps {
+interface ProjectPledgeTableProps {
   pledges: Pledge[];
   canManagePledges: boolean;
-  onMarkAsPaid: (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => void; // Updated signature
-  onEditPledge: (updatedPledge: EditPledgeDialogPledge) => void;
-  onDeletePledge: (id: string) => void;
-  members: Member[];
-  projects: Project[];
+  onMarkAsPaid: (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => Promise<void>;
+  onDeletePledge: (pledgeId: string) => Promise<void>;
   financialAccounts: FinancialAccount[];
+  currency: { code: string; symbol: string };
+  isProcessing: boolean;
 }
 
 const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
@@ -50,18 +42,15 @@ const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
   }
 };
 
-const PledgeTable: React.FC<PledgeTableProps> = ({
+const PledgeTable: React.FC<ProjectPledgeTableProps> = ({
   pledges,
   canManagePledges,
   onMarkAsPaid,
-  onEditPledge,
   onDeletePledge,
-  members,
-  projects,
   financialAccounts,
+  currency,
+  isProcessing,
 }) => {
-  const { currency } = useSystemSettings();
-
   return (
     <>
       {pledges.length > 0 ? (
@@ -106,15 +95,9 @@ const PledgeTable: React.FC<PledgeTableProps> = ({
                             onConfirmPayment={onMarkAsPaid}
                             financialAccounts={financialAccounts}
                             canManagePledges={canManagePledges}
+                            isProcessing={isProcessing}
                           />
                         )}
-                        <EditPledgeDialog
-                          initialData={pledge as EditPledgeDialogPledge}
-                          onSave={onEditPledge}
-                          members={members}
-                          projects={projects}
-                          financialAccounts={financialAccounts}
-                        />
                         <Button variant="ghost" size="icon" onClick={() => onDeletePledge(pledge.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

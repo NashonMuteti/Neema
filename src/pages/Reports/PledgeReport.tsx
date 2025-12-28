@@ -73,6 +73,7 @@ const PledgeReport = () => {
   const [pledges, setPledges] = React.useState<Pledge[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = React.useState(false); // New state for processing status
 
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
@@ -237,6 +238,7 @@ const PledgeReport = () => {
       return;
     }
 
+    setIsProcessing(true); // Start processing
     // Call the new atomic RPC function for pledge payments
     const { error: rpcError } = await supabase.rpc('record_pledge_payment_atomic', {
       p_pledge_id: pledgeId,
@@ -253,6 +255,7 @@ const PledgeReport = () => {
       showSuccess(`Pledge payment of ${currency.symbol}${amountPaid.toFixed(2)} recorded successfully!`);
       fetchReportData(); // Re-fetch all data to update lists
     }
+    setIsProcessing(false); // End processing
   };
 
   const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => {
@@ -277,6 +280,7 @@ const PledgeReport = () => {
       return;
     }
 
+    setIsProcessing(true); // Start processing
     if (pledgeToDelete.paid_amount > 0) { // Check paid_amount instead of status
       // Use the atomic reversal function for paid pledges
       const { error: rpcError } = await supabase.rpc('reverse_paid_pledge_atomic', {
@@ -287,6 +291,7 @@ const PledgeReport = () => {
       if (rpcError) {
         console.error("Error reversing paid pledge:", rpcError);
         showError(`Failed to delete paid pledge: ${rpcError.message}`);
+        setIsProcessing(false); // End processing
         return;
       }
     } else {
@@ -299,12 +304,14 @@ const PledgeReport = () => {
       if (deleteError) {
         console.error("Error deleting pledge:", deleteError);
         showError("Failed to delete pledge.");
+        setIsProcessing(false); // End processing
         return;
       }
     }
 
     showSuccess("Pledge deleted successfully!");
     fetchReportData(); // Re-fetch all data to update lists
+    setIsProcessing(false); // End processing
   };
 
   const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
@@ -448,6 +455,7 @@ const PledgeReport = () => {
                                 onConfirmPayment={handleMarkAsPaid}
                                 financialAccounts={financialAccounts}
                                 canManagePledges={canManagePledges}
+                                isProcessing={isProcessing} // Pass isProcessing prop
                               />
                             )}
                             <EditPledgeDialog

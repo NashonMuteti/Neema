@@ -139,7 +139,7 @@ const ProjectPledgeForm: React.FC<ProjectPledgeFormProps> = ({
           </Popover>
         </div>
         <div className="md:col-span-3 flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManagePledges || !newPledgeAmount || !newPledgeMember || !newPledgeDueDate || members.length === 0 || isProcessing}>
+          <Button onClick={handleSubmit} disabled={!canManagePledges || !newPledgeAmount || !newPledgeMemberId || !newPledgeDueDate || members.length === 0 || isProcessing}>
             {isProcessing ? "Adding..." : <><PlusCircle className="mr-2 h-4 w-4" /> Add Pledge</>}
           </Button>
         </div>

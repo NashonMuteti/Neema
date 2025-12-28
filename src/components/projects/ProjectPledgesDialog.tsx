@@ -109,7 +109,9 @@ const ProjectPledgesDialog: React.FC<ProjectPledgesDialogProps> = ({
           <ProjectPledgeTable
             pledges={pledges}
             canManagePledges={canManagePledges}
-            onMarkAsPaid={markPledgeAsPaid}
+            onMarkAsPaid={async (pledgeId, amountPaid, receivedIntoAccountId, paymentDate) => {
+              await markPledgeAsPaid({ pledgeId, amountPaid, receivedIntoAccountId, paymentDate });
+            }}
             onDeletePledge={deletePledge}
             financialAccounts={financialAccounts}
             currency={currency}
