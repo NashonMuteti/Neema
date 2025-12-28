@@ -3,7 +3,9 @@
 export interface FinancialAccount {
   id: string;
   name: string;
+  initial_balance: number; // Added initial_balance
   current_balance: number;
+  profile_id: string; // Added profile_id
 }
 
 export interface Member {
