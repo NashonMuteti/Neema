@@ -42,9 +42,9 @@ const PledgeFilters: React.FC<PledgeFiltersProps> = ({
   return (
     <div className="flex flex-wrap gap-4 mb-4">
       <div className="grid gap-1.5 flex-1 min-w-[120px]">
-        <Label htmlFor="filter-status">Status</Label>
+        <Label htmlFor="pledge-filter-status">Status</Label>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger id="filter-status">
+          <SelectTrigger id="pledge-filter-status">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -58,9 +58,9 @@ const PledgeFilters: React.FC<PledgeFiltersProps> = ({
       </div>
       {/* Removed Month Filter */}
       <div className="grid gap-1.5 flex-1 min-w-[100px]">
-        <Label htmlFor="filter-year">Year</Label>
+        <Label htmlFor="pledge-filter-year">Year</Label>
         <Select value={filterYear} onValueChange={setFilterYear}>
-          <SelectTrigger id="filter-year">
+          <SelectTrigger id="pledge-filter-year">
             <SelectValue placeholder="Select year" />
           </SelectTrigger>
           <SelectContent>
@@ -79,6 +79,7 @@ const PledgeFilters: React.FC<PledgeFiltersProps> = ({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-8"
+          id="pledge-search-query"
         />
         <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
       </div>

@@ -357,7 +357,7 @@ const PledgeReport = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
             <div className="flex flex-wrap items-center gap-4">
               <Select value={filterStatus} onValueChange={(value: "All" | "Paid" | "Unpaid") => setFilterStatus(value)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger id="pledge-report-filter-status" className="w-[180px]">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -369,7 +369,7 @@ const PledgeReport = () => {
                 </SelectContent>
               </Select>
               <Select value={filterMonth} onValueChange={setFilterMonth}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger id="pledge-report-filter-month" className="w-[140px]">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
                   <SelectContent>
@@ -384,7 +384,7 @@ const PledgeReport = () => {
                   </SelectContent>
                 </Select>
               <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="w-[120px]">
+                <SelectTrigger id="pledge-report-filter-year" className="w-[120px]">
                   <SelectValue placeholder="Select year" />
                 </SelectTrigger>
                 <SelectContent>
@@ -405,6 +405,7 @@ const PledgeReport = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-8"
+                  id="pledge-report-search-query"
                 />
                 <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
               </div>

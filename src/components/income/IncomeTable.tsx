@@ -64,9 +64,9 @@ const IncomeTable: React.FC<IncomeTableProps> = ({
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 mb-4">
           <div className="grid gap-1.5 flex-1 min-w-[120px]">
-            <Label htmlFor="filter-month">Month</Label>
+            <Label htmlFor="income-table-filter-month">Month</Label>
             <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger id="filter-month">
+              <SelectTrigger id="income-table-filter-month">
                 <SelectValue placeholder="Select month" />
               </SelectTrigger>
               <SelectContent>
@@ -79,9 +79,9 @@ const IncomeTable: React.FC<IncomeTableProps> = ({
             </Select>
           </div>
           <div className="grid gap-1.5 flex-1 min-w-[100px]">
-            <Label htmlFor="filter-year">Year</Label>
+            <Label htmlFor="income-table-filter-year">Year</Label>
             <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger id="filter-year">
+              <SelectTrigger id="income-table-filter-year">
                 <SelectValue placeholder="Select year" />
               </SelectTrigger>
               <SelectContent>
@@ -100,6 +100,7 @@ const IncomeTable: React.FC<IncomeTableProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8"
+              id="income-table-search-query"
             />
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
           </div>

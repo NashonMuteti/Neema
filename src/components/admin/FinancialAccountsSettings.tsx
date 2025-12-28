@@ -413,8 +413,8 @@ const FinancialAccountsSettings = () => {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label>Current Balance</Label>
-              <Input value={`${currency.symbol}${editingAccount?.current_balance.toFixed(2) || "0.00"}`} disabled />
+              <Label htmlFor="edit-account-current-balance">Current Balance</Label>
+              <Input id="edit-account-current-balance" value={`${currency.symbol}${editingAccount?.current_balance.toFixed(2) || "0.00"}`} disabled />
               <p className="text-sm text-muted-foreground">Current balance is updated by transactions, not directly editable here.</p>
             </div>
           </div>

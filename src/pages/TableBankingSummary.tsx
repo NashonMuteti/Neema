@@ -226,9 +226,9 @@ const TableBankingSummary: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-4 mb-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="filter-period">View By</Label>
+              <Label htmlFor="table-banking-filter-period">View By</Label>
               <Select value={filterPeriod} onValueChange={(value: typeof filterPeriod) => setFilterPeriod(value)}>
-                <SelectTrigger id="filter-period" className="w-[150px]">
+                <SelectTrigger id="table-banking-filter-period" className="w-[150px]">
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -244,7 +244,7 @@ const TableBankingSummary: React.FC = () => {
 
             {(filterPeriod === "daily" || filterPeriod === "weekly") && (
               <div className="grid gap-1.5">
-                <Label htmlFor="select-date">Select Date</Label>
+                <Label htmlFor="table-banking-select-date">Select Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -253,6 +253,7 @@ const TableBankingSummary: React.FC = () => {
                         "w-[180px] justify-start text-left font-normal",
                         !selectedDate && "text-muted-foreground"
                       )}
+                      id="table-banking-select-date"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
@@ -273,9 +274,9 @@ const TableBankingSummary: React.FC = () => {
             {filterPeriod === "monthly" && (
               <>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="filter-month">Month</Label>
+                  <Label htmlFor="table-banking-filter-month">Month</Label>
                   <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger id="filter-month" className="w-[120px]">
+                    <SelectTrigger id="table-banking-filter-month" className="w-[120px]">
                       <SelectValue placeholder="Select month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -288,9 +289,9 @@ const TableBankingSummary: React.FC = () => {
                   </Select>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="filter-year">Year</Label>
+                  <Label htmlFor="table-banking-filter-year">Year</Label>
                   <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger id="filter-year" className="w-[100px]">
+                    <SelectTrigger id="table-banking-filter-year" className="w-[100px]">
                       <SelectValue placeholder="Select year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -307,9 +308,9 @@ const TableBankingSummary: React.FC = () => {
 
             {filterPeriod === "yearly" && (
               <div className="grid gap-1.5">
-                <Label htmlFor="filter-year">Year</Label>
+                <Label htmlFor="table-banking-filter-year-yearly">Year</Label>
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger id="filter-year" className="w-[100px]">
+                  <SelectTrigger id="table-banking-filter-year-yearly" className="w-[100px]">
                     <SelectValue placeholder="Select year" />
                   </SelectTrigger>
                   <SelectContent>

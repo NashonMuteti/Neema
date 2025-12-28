@@ -212,9 +212,9 @@ const TransferFunds = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="source-account">From Account</Label>
+            <Label htmlFor="transfer-source-account">From Account</Label>
             <Select value={sourceAccount} onValueChange={setSourceAccount} disabled={!canManageFundsTransfer || isTransferring || financialAccounts.length === 0}>
-              <SelectTrigger id="source-account">
+              <SelectTrigger id="transfer-source-account">
                 <SelectValue placeholder="Select source account" />
               </SelectTrigger>
               <SelectContent>
@@ -232,9 +232,9 @@ const TransferFunds = () => {
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="destination-account">To Account</Label>
+            <Label htmlFor="transfer-destination-account">To Account</Label>
             <Select value={destinationAccount} onValueChange={setDestinationAccount} disabled={!canManageFundsTransfer || isTransferring || financialAccounts.length < 2}>
-              <SelectTrigger id="destination-account">
+              <SelectTrigger id="transfer-destination-account">
                 <SelectValue placeholder="Select destination account" />
               </SelectTrigger>
               <SelectContent>
@@ -268,9 +268,9 @@ const TransferFunds = () => {
 
           {/* New Transaction Cost Field */}
           <div className="grid gap-1.5">
-            <Label htmlFor="transaction-cost">Transaction Cost ({currency.symbol})</Label>
+            <Label htmlFor="transfer-transaction-cost">Transaction Cost ({currency.symbol})</Label>
             <Input
-              id="transaction-cost"
+              id="transfer-transaction-cost"
               type="number"
               step="0.01"
               placeholder="0.00"

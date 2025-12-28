@@ -52,7 +52,7 @@ const PettyCashReport = () => {
   const currentMonth = getMonth(new Date()); // 0-indexed
 
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
-  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
+  const [filterYear, React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
 
   const months: MonthYearOption[] = Array.from({ length: 12 }, (_, i) => ({
@@ -99,9 +99,9 @@ const PettyCashReport = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
             <div className="flex flex-wrap items-center gap-4">
               <div className="grid gap-1.5">
-                <Label htmlFor="filter-month">Month</Label>
+                <Label htmlFor="petty-cash-report-filter-month">Month</Label>
                 <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger id="filter-month" className="w-[140px]">
+                  <SelectTrigger id="petty-cash-report-filter-month" className="w-[140px]">
                     <SelectValue placeholder="Select month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -117,9 +117,9 @@ const PettyCashReport = () => {
                 </Select>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="filter-year">Year</Label>
+                <Label htmlFor="petty-cash-report-filter-year">Year</Label>
                 <Select value={filterYear} onValueChange={setFilterYear}>
-                  <SelectTrigger id="filter-year" className="w-[120px]">
+                  <SelectTrigger id="petty-cash-report-filter-year" className="w-[120px]">
                     <SelectValue placeholder="Select year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -141,6 +141,7 @@ const PettyCashReport = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-8"
+                  id="petty-cash-report-search-query"
                 />
                 <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
               </div>

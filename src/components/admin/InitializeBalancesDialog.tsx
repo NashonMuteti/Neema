@@ -94,11 +94,11 @@ const InitializeBalancesDialog: React.FC<InitializeBalancesDialogProps> = ({ onI
           {financialAccounts.length > 0 ? (
             financialAccounts.map((account) => (
               <div key={account.id} className="grid grid-cols-3 items-center gap-4">
-                <Label htmlFor={`balance-${account.id}`} className="col-span-1">
+                <Label htmlFor={`initialize-balance-${account.id}`} className="col-span-1">
                   {account.name}
                 </Label>
                 <Input
-                  id={`balance-${account.id}`}
+                  id={`initialize-balance-${account.id}`}
                   type="number"
                   step="0.01"
                   value={newBalances[account.id] || ""}
