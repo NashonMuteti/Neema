@@ -165,9 +165,9 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-pledge-member">Member</Label>
+            <Label htmlFor="edit-pledge-dialog-member">Member</Label>
             <Select value={memberId} onValueChange={setMemberId} disabled={!canManagePledges || members.length === 0 || isSaving}>
-              <SelectTrigger id="edit-pledge-member">
+              <SelectTrigger id="edit-pledge-dialog-member">
                 <SelectValue placeholder="Select a member" />
               </SelectTrigger>
               <SelectContent>
@@ -185,9 +185,9 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-pledge-project">Project</Label>
+            <Label htmlFor="edit-pledge-dialog-project">Project</Label>
             <Select value={projectId} onValueChange={setProjectId} disabled={!canManagePledges || projects.length === 0 || isSaving}>
-              <SelectTrigger id="edit-pledge-project">
+              <SelectTrigger id="edit-pledge-dialog-project">
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
               <SelectContent>
@@ -205,9 +205,9 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-pledge-original-amount">Original Pledged Amount</Label>
+            <Label htmlFor="edit-pledge-dialog-original-amount">Original Pledged Amount</Label>
             <Input
-              id="edit-pledge-original-amount"
+              id="edit-pledge-dialog-original-amount"
               type="number"
               step="0.01"
               placeholder="0.00"
@@ -218,9 +218,9 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-pledge-paid-amount">Amount Paid</Label>
+            <Label htmlFor="edit-pledge-dialog-paid-amount">Amount Paid</Label>
             <Input
-              id="edit-pledge-paid-amount"
+              id="edit-pledge-dialog-paid-amount"
               type="number"
               value={initialData.paid_amount.toFixed(2)}
               disabled // This field is not editable directly
@@ -229,11 +229,12 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-pledge-due-date">Due Date</Label>
+            <Label htmlFor="edit-pledge-dialog-due-date">Due Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
+                  id="edit-pledge-dialog-due-date"
                   className={cn(
                     "w-full justify-start text-left font-normal",
                     !dueDate && "text-muted-foreground"
@@ -256,9 +257,9 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-pledge-status">Status</Label>
+            <Label htmlFor="edit-pledge-dialog-status">Status</Label>
             <Input
-              id="edit-pledge-status"
+              id="edit-pledge-dialog-status"
               value={initialData.paid_amount >= initialData.original_amount ? "Paid" : "Active"}
               disabled // Status is derived, not directly editable
             />
@@ -266,9 +267,9 @@ const EditPledgeDialog: React.FC<EditPledgeDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-pledge-comments">Comments (Optional)</Label>
+            <Label htmlFor="edit-pledge-dialog-comments">Comments (Optional)</Label>
             <Textarea
-              id="edit-pledge-comments"
+              id="edit-pledge-dialog-comments"
               placeholder="Add any relevant comments about this pledge..."
               value={comments}
               onChange={(e) => setComments(e.target.value)}

@@ -95,11 +95,12 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-1.5">
-          <Label htmlFor="income-date">Date Received</Label>
+          <Label htmlFor="income-form-date">Date Received</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
+                id="income-form-date"
                 className={cn(
                   "w-full justify-start text-left font-normal",
                   !incomeDate && "text-muted-foreground"
@@ -122,9 +123,9 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
         </div>
         
         <div className="grid gap-1.5">
-          <Label htmlFor="income-amount">Amount</Label>
+          <Label htmlFor="income-form-amount">Amount</Label>
           <Input
-            id="income-amount"
+            id="income-form-amount"
             type="number"
             step="0.01"
             placeholder="0.00"
@@ -135,9 +136,9 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
         </div>
         
         <div className="grid gap-1.5">
-          <Label htmlFor="income-account">Received Into Account</Label>
+          <Label htmlFor="income-form-account">Received Into Account</Label>
           <Select value={incomeAccount} onValueChange={setIncomeAccount} disabled={!canManageIncome || financialAccounts.length === 0}>
-            <SelectTrigger id="income-account">
+            <SelectTrigger id="income-form-account">
               <SelectValue placeholder="Select an account" />
             </SelectTrigger>
             <SelectContent>
@@ -155,9 +156,9 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="income-member">Received From Member (Optional)</Label>
+          <Label htmlFor="income-form-member">Received From Member (Optional)</Label>
           <Select value={selectedIncomeMemberId} onValueChange={setSelectedIncomeMemberId} disabled={!canManageIncome || members.length === 0}>
-            <SelectTrigger id="income-member">
+            <SelectTrigger id="income-form-member">
               <SelectValue placeholder="Select a member" />
             </SelectTrigger>
             <SelectContent>
@@ -175,9 +176,9 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
         </div>
         
         <div className="grid gap-1.5">
-          <Label htmlFor="income-source">Source/Description</Label>
+          <Label htmlFor="income-form-source">Source/Description</Label>
           <Textarea
-            id="income-source"
+            id="income-form-source"
             placeholder="e.g., Grant from Film Fund, Donation from Sponsor"
             value={incomeSource}
             onChange={(e) => setIncomeSource(e.target.value)}

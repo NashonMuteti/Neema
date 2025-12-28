@@ -327,11 +327,12 @@ const PettyCash = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="expense-date">Date of Expense</Label>
+              <Label htmlFor="petty-cash-form-date">Date of Expense</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant={"outline"}
+                    id="petty-cash-form-date"
                     className={cn(
                       "w-full justify-start text-left font-normal",
                       !expenseDate && "text-muted-foreground"
@@ -354,9 +355,9 @@ const PettyCash = () => {
             </div>
             
             <div className="grid gap-1.5">
-              <Label htmlFor="expense-amount">Amount</Label>
+              <Label htmlFor="petty-cash-form-amount">Amount</Label>
               <Input
-                id="expense-amount"
+                id="petty-cash-form-amount"
                 type="number"
                 step="0.01"
                 placeholder="0.00"
@@ -367,9 +368,9 @@ const PettyCash = () => {
             </div>
             
             <div className="grid gap-1.5">
-              <Label htmlFor="expense-account">Debited From Account</Label>
+              <Label htmlFor="petty-cash-form-account">Debited From Account</Label>
               <Select value={expenseAccount} onValueChange={setExpenseAccount} disabled={!canManagePettyCash}>
-                <SelectTrigger id="expense-account">
+                <SelectTrigger id="petty-cash-form-account">
                   <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
                 <SelectContent>
@@ -386,9 +387,9 @@ const PettyCash = () => {
             </div>
 
             <div className="grid gap-1.5">
-              <Label htmlFor="expense-member">Expended On Behalf Of Member (Optional)</Label>
+              <Label htmlFor="petty-cash-form-member">Expended On Behalf Of Member (Optional)</Label>
               <Select value={selectedPettyCashMemberId} onValueChange={setSelectedPettyCashMemberId} disabled={!canManagePettyCash || members.length === 0}>
-                <SelectTrigger id="expense-member">
+                <SelectTrigger id="petty-cash-form-member">
                   <SelectValue placeholder="Select a member" />
                 </SelectTrigger>
                 <SelectContent>
@@ -406,9 +407,9 @@ const PettyCash = () => {
             </div>
             
             <div className="grid gap-1.5">
-              <Label htmlFor="expense-purpose">Purpose/Description</Label>
+              <Label htmlFor="petty-cash-form-purpose">Purpose/Description</Label>
               <Textarea
-                id="expense-purpose"
+                id="petty-cash-form-purpose"
                 placeholder="e.g., Office supplies, Snacks, Transportation"
                 value={expensePurpose}
                 onChange={(e) => setExpensePurpose(e.target.value)}
@@ -430,9 +431,9 @@ const PettyCash = () => {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-4 mb-4">
               <div className="grid gap-1.5 flex-1 min-w-[120px]">
-                <Label htmlFor="filter-month">Month</Label>
+                <Label htmlFor="petty-cash-filter-month">Month</Label>
                 <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger id="filter-month">
+                  <SelectTrigger id="petty-cash-filter-month">
                     <SelectValue placeholder="Select month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -445,9 +446,9 @@ const PettyCash = () => {
                 </Select>
               </div>
               <div className="grid gap-1.5 flex-1 min-w-[100px]">
-                <Label htmlFor="filter-year">Year</Label>
+                <Label htmlFor="petty-cash-filter-year">Year</Label>
                 <Select value={filterYear} onValueChange={setFilterYear}>
-                  <SelectTrigger id="filter-year">
+                  <SelectTrigger id="petty-cash-filter-year">
                     <SelectValue placeholder="Select year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -466,6 +467,7 @@ const PettyCash = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-8"
+                  id="petty-cash-search-query"
                 />
                 <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
               </div>

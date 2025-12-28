@@ -95,11 +95,12 @@ const EditIncomeDialog: React.FC<EditIncomeDialogProps> = ({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-income-date">Date Received</Label>
+            <Label htmlFor="edit-income-dialog-date">Date Received</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
+                  id="edit-income-dialog-date"
                   className={cn(
                     "w-full justify-start text-left font-normal",
                     !date && "text-muted-foreground"
@@ -122,9 +123,9 @@ const EditIncomeDialog: React.FC<EditIncomeDialogProps> = ({
           </div>
           
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-income-amount">Amount</Label>
+            <Label htmlFor="edit-income-dialog-amount">Amount</Label>
             <Input
-              id="edit-income-amount"
+              id="edit-income-dialog-amount"
               type="number"
               step="0.01"
               placeholder="0.00"
@@ -135,9 +136,9 @@ const EditIncomeDialog: React.FC<EditIncomeDialogProps> = ({
           </div>
           
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-income-account">Received Into Account</Label>
+            <Label htmlFor="edit-income-dialog-account">Received Into Account</Label>
             <Select value={accountId} onValueChange={setAccountId} disabled={!canManageIncome || financialAccounts.length === 0 || isSaving}>
-              <SelectTrigger id="edit-income-account">
+              <SelectTrigger id="edit-income-dialog-account">
                 <SelectValue placeholder="Select an account" />
               </SelectTrigger>
               <SelectContent>
@@ -155,9 +156,9 @@ const EditIncomeDialog: React.FC<EditIncomeDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-income-member">Received From Member (Optional)</Label>
+            <Label htmlFor="edit-income-dialog-member">Received From Member (Optional)</Label>
             <Select value={profileId} onValueChange={setProfileId} disabled={!canManageIncome || members.length === 0 || isSaving}>
-              <SelectTrigger id="edit-income-member">
+              <SelectTrigger id="edit-income-dialog-member">
                 <SelectValue placeholder="Select a member" />
               </SelectTrigger>
               <SelectContent>
@@ -175,9 +176,9 @@ const EditIncomeDialog: React.FC<EditIncomeDialogProps> = ({
           </div>
           
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-income-source">Source/Description</Label>
+            <Label htmlFor="edit-income-dialog-source">Source/Description</Label>
             <Textarea
-              id="edit-income-source"
+              id="edit-income-dialog-source"
               placeholder="e.g., Grant from Film Fund, Donation from Sponsor"
               value={source}
               onChange={(e) => setSource(e.target.value)}

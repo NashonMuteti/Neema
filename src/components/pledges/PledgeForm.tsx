@@ -99,9 +99,9 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-1.5">
-          <Label htmlFor="pledge-member">Member</Label>
+          <Label htmlFor="pledge-form-member">Member</Label>
           <Select value={newPledgeMemberId} onValueChange={setNewPledgeMemberId} disabled={!canManagePledges || members.length === 0}>
-            <SelectTrigger id="pledge-member">
+            <SelectTrigger id="pledge-form-member">
               <SelectValue placeholder="Select a member" />
             </SelectTrigger>
             <SelectContent>
@@ -119,9 +119,9 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="pledge-project">Project</Label>
+          <Label htmlFor="pledge-form-project">Project</Label>
           <Select value={newPledgeProjectId} onValueChange={setNewPledgeProjectId} disabled={!canManagePledges || projects.length === 0}>
-            <SelectTrigger id="pledge-project">
+            <SelectTrigger id="pledge-form-project">
               <SelectValue placeholder="Select a project" />
             </SelectTrigger>
             <SelectContent>
@@ -139,9 +139,9 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="pledge-amount">Amount</Label>
+          <Label htmlFor="pledge-form-amount">Amount</Label>
           <Input
-            id="pledge-amount"
+            id="pledge-form-amount"
             type="number"
             step="0.01"
             placeholder="0.00"
@@ -152,11 +152,12 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="pledge-due-date">Due Date</Label>
+          <Label htmlFor="pledge-form-due-date">Due Date</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
+                id="pledge-form-due-date"
                 className={cn(
                   "w-full justify-start text-left font-normal",
                   !newPledgeDueDate && "text-muted-foreground"
@@ -179,9 +180,9 @@ const PledgeForm: React.FC<PledgeFormProps> = ({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="pledge-comments">Comments (Optional)</Label>
+          <Label htmlFor="pledge-form-comments">Comments (Optional)</Label>
           <Textarea
-            id="pledge-comments"
+            id="pledge-form-comments"
             placeholder="Add any relevant comments about this pledge..."
             value={newPledgeComments}
             onChange={(e) => setNewPledgeComments(e.target.value)}

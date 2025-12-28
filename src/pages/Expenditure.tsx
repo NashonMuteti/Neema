@@ -322,11 +322,12 @@ const Expenditure = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-date">Date of Expenditure</Label>
+              <Label htmlFor="expenditure-form-date">Date of Expenditure</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant={"outline"}
+                    id="expenditure-form-date"
                     className={cn(
                       "w-full justify-start text-left font-normal",
                       !expenditureDate && "text-muted-foreground"
@@ -349,9 +350,9 @@ const Expenditure = () => {
             </div>
             
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-amount">Amount</Label>
+              <Label htmlFor="expenditure-form-amount">Amount</Label>
               <Input
-                id="expenditure-amount"
+                id="expenditure-form-amount"
                 type="number"
                 step="0.01"
                 placeholder="0.00"
@@ -362,9 +363,9 @@ const Expenditure = () => {
             </div>
             
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-account">Debited From Account</Label>
+              <Label htmlFor="expenditure-form-account">Debited From Account</Label>
               <Select value={expenditureAccount} onValueChange={setExpenditureAccount} disabled={!canManageExpenditure}>
-                <SelectTrigger id="expenditure-account">
+                <SelectTrigger id="expenditure-form-account">
                   <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
                 <SelectContent>
@@ -381,9 +382,9 @@ const Expenditure = () => {
             </div>
 
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-member">Expended On Behalf Of Member (Optional)</Label>
+              <Label htmlFor="expenditure-form-member">Expended On Behalf Of Member (Optional)</Label>
               <Select value={selectedExpenditureMemberId} onValueChange={setSelectedExpenditureMemberId} disabled={!canManageExpenditure || members.length === 0}>
-                <SelectTrigger id="expenditure-member">
+                <SelectTrigger id="expenditure-form-member">
                   <SelectValue placeholder="Select a member" />
                 </SelectTrigger>
                 <SelectContent>
@@ -401,9 +402,9 @@ const Expenditure = () => {
             </div>
             
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-purpose">Purpose/Description</Label>
+              <Label htmlFor="expenditure-form-purpose">Purpose/Description</Label>
               <Textarea
-                id="expenditure-purpose"
+                id="expenditure-form-purpose"
                 placeholder="e.g., Equipment rental, Travel expenses, Office supplies"
                 value={expenditurePurpose}
                 onChange={(e) => setExpenditurePurpose(e.target.value)}
@@ -425,9 +426,9 @@ const Expenditure = () => {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-4 mb-4">
               <div className="grid gap-1.5 flex-1 min-w-[120px]">
-                <Label htmlFor="filter-month">Month</Label>
+                <Label htmlFor="expenditure-filter-month">Month</Label>
                 <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger id="filter-month">
+                  <SelectTrigger id="expenditure-filter-month">
                     <SelectValue placeholder="Select month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -440,9 +441,9 @@ const Expenditure = () => {
                 </Select>
               </div>
               <div className="grid gap-1.5 flex-1 min-w-[100px]">
-                <Label htmlFor="filter-year">Year</Label>
+                <Label htmlFor="expenditure-filter-year">Year</Label>
                 <Select value={filterYear} onValueChange={setFilterYear}>
-                  <SelectTrigger id="filter-year">
+                  <SelectTrigger id="expenditure-filter-year">
                     <SelectValue placeholder="Select year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -461,6 +462,7 @@ const Expenditure = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-8"
+                  id="expenditure-search-query"
                 />
                 <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
               </div>

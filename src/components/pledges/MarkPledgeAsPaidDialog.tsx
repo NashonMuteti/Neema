@@ -130,11 +130,12 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="payment-date">Payment Date</Label>
+            <Label htmlFor="mark-paid-dialog-payment-date">Payment Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
+                  id="mark-paid-dialog-payment-date"
                   className={cn(
                     "w-full justify-start text-left font-normal",
                     !paymentDate && "text-muted-foreground"
@@ -157,9 +158,9 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="amount-paid">Amount Paid</Label>
+            <Label htmlFor="mark-paid-dialog-amount-paid">Amount Paid</Label>
             <Input
-              id="amount-paid"
+              id="mark-paid-dialog-amount-paid"
               type="number"
               step="0.01"
               placeholder="0.00"
@@ -170,13 +171,13 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="received-into-account">Received Into Account</Label>
+            <Label htmlFor="mark-paid-dialog-received-into-account">Received Into Account</Label>
             <Select
               value={receivedIntoAccount}
               onValueChange={setReceivedIntoAccount}
               disabled={!canManagePledges || financialAccounts.length === 0 || isProcessing}
             >
-              <SelectTrigger id="received-into-account">
+              <SelectTrigger id="mark-paid-dialog-received-into-account">
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
