@@ -390,7 +390,6 @@ const Income = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <IncomeForm
-            key={financialAccounts.length}
             financialAccounts={financialAccounts}
             members={members}
             canManageIncome={canManageIncome}
@@ -400,7 +399,6 @@ const Income = () => {
         
         <div className="lg:col-span-2">
           <IncomeTable
-            key={transactions.length}
             transactions={transactions}
             canManageIncome={canManageIncome}
             filterMonth={filterMonth}
