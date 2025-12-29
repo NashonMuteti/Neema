@@ -27,12 +27,6 @@ interface FinancialAccount {
   profile_id: string; // Added profile_id
 }
 
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
-
 interface ExpenditureTransaction {
   id: string;
   date: Date;
@@ -60,7 +54,6 @@ const Expenditure = () => {
   }, [currentUser, definedRoles]);
 
   const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
-  const [members, setMembers] = React.useState<Member[]>([]); // New state for members
   const [transactions, setTransactions] = React.useState<ExpenditureTransaction[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -70,7 +63,6 @@ const Expenditure = () => {
   const [expenditureAmount, setExpenditureAmount] = React.useState("");
   const [expenditureAccount, setExpenditureAccount] = React.useState<string | undefined>(undefined);
   const [expenditurePurpose, setExpenditurePurpose] = React.useState("");
-  const [selectedExpenditureMemberId, setSelectedExpenditureMemberId] = React.useState<string | undefined>(undefined); // New state for member
   
   // Filter State
   const currentYear = getYear(new Date());
@@ -89,7 +81,7 @@ const Expenditure = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
+  const fetchFinancialAccounts = React.useCallback(async () => {
     let query = supabase
       .from('financial_accounts')
       .select('id, name, current_balance, initial_balance, profile_id'); // Select all fields for FinancialAccount type
@@ -109,19 +101,6 @@ const Expenditure = () => {
       if (!expenditureAccount && accountsData && accountsData.length > 0) {
         setExpenditureAccount(accountsData[0].id); // Set default account if none selected
       }
-    }
-
-    // Fetch all members for the optional selector
-    const { data: membersData, error: membersError } = await supabase
-      .from('profiles')
-      .select('id, name, email')
-      .order('name', { ascending: true });
-
-    if (membersError) {
-      console.error("Error fetching members:", membersError);
-      showError("Failed to load members for expenditure association.");
-    } else {
-      setMembers(membersData || []);
     }
   }, [expenditureAccount, currentUser]);
 
@@ -176,9 +155,9 @@ const Expenditure = () => {
   }, [currentUser, filterMonth, filterYear, searchQuery]);
 
   React.useEffect(() => {
-    fetchFinancialAccountsAndMembers();
+    fetchFinancialAccounts();
     fetchExpenditureTransactions();
-  }, [fetchFinancialAccountsAndMembers, fetchExpenditureTransactions]);
+  }, [fetchFinancialAccounts, fetchExpenditureTransactions]);
 
   const invalidateDashboardQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['financialData'] });
@@ -219,9 +198,7 @@ const Expenditure = () => {
       return;
     }
 
-    // Determine the profile_id for the transaction
-    const transactionProfileId = selectedExpenditureMemberId || currentUser.id;
-    
+    // Since petty_cash_transactions is merged, all expenses go to expenditure_transactions
     const { error: insertError } = await supabase
       .from('expenditure_transactions')
       .insert({
@@ -229,7 +206,7 @@ const Expenditure = () => {
         amount,
         account_id: expenditureAccount,
         purpose: expenditurePurpose,
-        profile_id: transactionProfileId, // Use the determined profile_id
+        profile_id: currentUser.id, // Always associate with current user for new posts
       });
       
     if (insertError) {
@@ -251,7 +228,7 @@ const Expenditure = () => {
       
       showSuccess("Expenditure posted successfully!");
       fetchExpenditureTransactions();
-      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+      fetchFinancialAccounts(); // Re-fetch accounts to update balances
       invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
@@ -296,7 +273,7 @@ const Expenditure = () => {
       
       showSuccess("Expenditure transaction deleted successfully!");
       fetchExpenditureTransactions();
-      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
+      fetchFinancialAccounts(); // Re-fetch accounts to update balances
       invalidateDashboardQueries(); // Invalidate dashboard queries
     }
   };
@@ -326,7 +303,7 @@ const Expenditure = () => {
         Record and manage all financial outflows.
       </p>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Adjusted to lg:grid-cols-3 */}
         {/* Record Expenditure Card */}
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
           <CardHeader>
@@ -392,26 +369,6 @@ const Expenditure = () => {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-form-member">Expended On Behalf Of Member (Optional)</Label>
-              <Select value={selectedExpenditureMemberId} onValueChange={setSelectedExpenditureMemberId} disabled={!canManageExpenditure || members.length === 0}>
-                <SelectTrigger id="expenditure-form-member">
-                  <SelectValue placeholder="Select a member" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Members</SelectLabel>
-                    {members.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.name} ({member.email})
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              {members.length === 0 && <p className="text-sm text-muted-foreground">No members available.</p>}
-            </div>
             
             <div className="grid gap-1.5">
               <Label htmlFor="expenditure-form-purpose">Purpose/Description</Label>
@@ -431,7 +388,7 @@ const Expenditure = () => {
         </Card>
         
         {/* Recent Expenditure Transactions Card */}
-        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+        <Card className="lg:col-span-2 transition-all duration-300 ease-in-out hover:shadow-xl"> {/* Adjusted to lg:col-span-2 */}
           <CardHeader>
             <CardTitle>Recent Expenditure Transactions</CardTitle>
           </CardHeader>

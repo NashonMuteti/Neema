@@ -4,8 +4,8 @@ export const allPrivilegeNames = [
   "View Dashboard",
   "View Project Accounts",
   "Manage Projects",
-  "View Petty Cash",
-  "Manage Petty Cash",
+  // "View Petty Cash", // Removed
+  // "Manage Petty Cash", // Removed
   "View Pledges",
   "Manage Pledges",
   "View Income",
@@ -27,7 +27,7 @@ export const allPrivilegeNames = [
   "Manage Board Members",
   "View Reports",
   "View Member Contributions Report",
-  "View Petty Cash Report",
+  // "View Petty Cash Report", // Removed
   "View Pledge Report",
   "View Table Banking Summary",
   "View User Activity Report",

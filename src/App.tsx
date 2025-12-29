@@ -16,12 +16,12 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 // Placeholder pages
 import Projects from "./pages/Projects";
-import PettyCash from "./pages/PettyCash";
+// import PettyCash from "./pages/PettyCash"; // Removed
 import UserSettings from "./pages/UserSettings";
 import Members from "./pages/Members";
 import Pledges from "./pages/Pledges";
 import MemberContributions from "./pages/Reports/MemberContributions";
-import PettyCashReport from "./pages/Reports/PettyCashReport";
+// import PettyCashReport from "./pages/Reports/PettyCashReport"; // Removed
 import PledgeReport from "./pages/Reports/PledgeReport";
 import AdminSettings from "./pages/AdminSettings";
 import UserActivityReport from "./pages/Reports/UserActivityReport";
@@ -61,7 +61,7 @@ const App = () => (
                         <Route path="/" element={<Index />} />
                         <Route path="/projects" element={<Projects />} />
                         <Route path="/projects/:projectId/financials" element={<ProjectFinancialsDetail />} />
-                        <Route path="/petty-cash" element={<PettyCash />} />
+                        {/* <Route path="/petty-cash" element={<PettyCash />} /> */}
                         <Route path="/pledges" element={<Pledges />} />
                         <Route path="/income" element={<Income />} />
                         <Route path="/expenditure" element={<Expenditure />} />
@@ -79,7 +79,7 @@ const App = () => (
                         <Route path="/members/:memberId/contributions" element={<MemberContributionsDetail />} />
                         
                         <Route path="/reports/member-contributions" element={<MemberContributions />} />
-                        <Route path="/reports/petty-cash" element={<PettyCashReport />} />
+                        {/* <Route path="/reports/petty-cash" element={<PettyCashReport />} /> */}
                         <Route path="/reports/pledges" element={<PledgeReport />} />
                         <Route path="/reports/table-banking-summary" element={<TableBankingSummary />} />
                         <Route path="/reports/user-activity" element={<UserActivityReport />} />

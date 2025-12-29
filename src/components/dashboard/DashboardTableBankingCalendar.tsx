@@ -13,7 +13,7 @@ import {
   Transaction,
   IncomeTxRow,
   ExpenditureTxRow,
-  PettyCashTxRow,
+  // Removed PettyCashTxRow
   PledgeTxRow,
   JoinedFinancialAccount, // Use JoinedFinancialAccount for the nested object
   FinancialAccount // Use FinancialAccount for the main type
@@ -78,7 +78,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         pledgeId: tx.pledge_id || undefined,
       }));
 
-      // Fetch Expenditure Transactions
+      // Fetch Expenditure Transactions (now includes former petty cash)
       let expenditureQuery = supabase
         .from('expenditure_transactions')
         .select('id, date, amount, purpose, financial_accounts(id, name)')
@@ -98,25 +98,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account', // Use JoinedFinancialAccount
       }));
 
-      // Fetch Petty Cash Transactions
-      let pettyCashQuery = supabase
-        .from('petty_cash_transactions')
-        .select('id, date, amount, purpose, financial_accounts(id, name)')
-        .gte('date', startOfRange.toISOString())
-        .lte('date', endOfRange.toISOString());
-      if (!isAdmin) {
-        pettyCashQuery = pettyCashQuery.eq('profile_id', currentUser.id);
-      }
-      const { data: pettyCashData, error: pettyCashError } = await pettyCashQuery as { data: PettyCashTxRow[] | null, error: any };
-      if (pettyCashError) console.error("Error fetching petty cash:", pettyCashError);
-      pettyCashData?.forEach(tx => fetchedTransactions.push({
-        id: tx.id,
-        type: 'petty_cash',
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account', // Use JoinedFinancialAccount
-      }));
+      // Removed Petty Cash Transactions fetch
 
       // Fetch Project Pledges (both active/unpaid and paid)
       let pledgesQuery = supabase
@@ -187,7 +169,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
     allTransactions.forEach(tx => {
       if (tx.date) {
         if (tx.type === 'income') incomeDates.add(tx.date);
-        if (tx.type === 'expenditure' || tx.type === 'petty_cash') expenditureDates.add(tx.date);
+        if (tx.type === 'expenditure') expenditureDates.add(tx.date); // Now includes former petty cash
         if (tx.type === 'pledge') pledgeDates.add(tx.date);
       }
     });
@@ -204,7 +186,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
     const dayTransactions = transactionsByDate[dateKey];
 
     const hasIncome = dayTransactions?.some(t => t.type === 'income');
-    const hasExpenditure = dayTransactions?.some(t => t.type === 'expenditure' || t.type === 'petty_cash');
+    const hasExpenditure = dayTransactions?.some(t => t.type === 'expenditure'); // Now includes former petty cash
     const hasPledge = dayTransactions?.some(t => t.type === 'pledge');
 
     return (
@@ -239,7 +221,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         if (tx.type === 'income') {
           incomeSummary[account.id] = (incomeSummary[account.id] || 0) + tx.amount;
           totalIncome += tx.amount;
-        } else if (tx.type === 'expenditure' || tx.type === 'petty_cash') {
+        } else if (tx.type === 'expenditure') { // Now includes former petty cash
           expenditureSummary[account.id] = (expenditureSummary[account.id] || 0) + tx.amount;
           totalExpenditure += tx.amount;
         }

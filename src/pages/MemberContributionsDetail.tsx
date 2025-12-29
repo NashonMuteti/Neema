@@ -16,7 +16,7 @@ import {
   MemberContribution,
   IncomeTxRow,
   ExpenditureTxRow,
-  PettyCashTxRow,
+  // Removed PettyCashTxRow
   PledgeTxRow,
   Project, // Generic Project interface for all active projects
   FinancialAccount // Use FinancialAccount for the main type
@@ -126,10 +126,28 @@ const MemberContributionsDetail: React.FC = () => {
       pledgeId: tx.pledge_id || undefined, // Include pledgeId
     }));
 
+    // Fetch Expenditure Transactions (now includes former petty cash) for the selected year
+    const { data: expenditureData, error: expenditureError } = (await supabase
+      .from('expenditure_transactions')
+      .select('id, date, amount, purpose, financial_accounts(name)')
+      .eq('profile_id', memberId)
+      .gte('date', startOfPeriod.toISOString())
+      .lte('date', endOfPeriod.toISOString())) as { data: ExpenditureTxRow[] | null, error: PostgrestError | null };
+
+    if (expenditureError) console.error("Error fetching expenditure:", expenditureError);
+    expenditureData?.forEach(tx => allContributions.push({
+      id: tx.id,
+      type: 'expenditure',
+      date: parseISO(tx.date),
+      amount: tx.amount,
+      sourceOrPurpose: tx.purpose,
+      accountName: (tx.financial_accounts as FinancialAccount)?.name || 'Unknown Account',
+    }));
+
     // Fetch Project Pledges for the selected year
     const { data: pledgesData, error: pledgesError } = await supabase
       .from('project_pledges')
-      .select('id, due_date, amount, status, comments, projects(name)')
+      .select('id, due_date, amount, paid_amount, status, comments, projects(name)') // Added paid_amount
       .eq('member_id', memberId)
       .gte('due_date', startOfPeriod.toISOString())
       .lte('due_date', endOfPeriod.toISOString()) as { data: PledgeTxRow[] | null, error: PostgrestError | null };
@@ -139,7 +157,9 @@ const MemberContributionsDetail: React.FC = () => {
       id: pledge.id,
       type: 'pledge',
       date: parseISO(pledge.due_date), // Use due_date as the transaction date for pledges
-      amount: pledge.amount,
+      amount: pledge.amount, // This is the original pledged amount
+      original_amount: pledge.amount, // Store original amount explicitly
+      paid_amount: pledge.paid_amount, // Store paid amount
       sourceOrPurpose: pledge.comments || pledge.projects?.name || 'Project Pledge',
       accountName: pledge.projects?.name || 'Unknown Project',
       status: pledge.status,

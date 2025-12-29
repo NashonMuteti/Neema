@@ -40,7 +40,7 @@ const MemberContributionsTabs: React.FC<MemberContributionsTabsProps> = ({
   totalYearlyPledgedAmount,
   totalYearlyPaidAmount,
   allActiveProjects, // Use ALL active projects
-  memberId, // Use memberId
+  memberId, // Pass memberId
   renderDay,
   memberName,
   searchQuery,

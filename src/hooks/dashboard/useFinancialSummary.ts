@@ -78,13 +78,7 @@ export const useFinancialSummary = () => {
       if (expenditureError) throw expenditureError;
       totalExpenditureAllTime += (expenditureTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
 
-      let pettyCashQuery = supabase.from('petty_cash_transactions').select('amount');
-      if (!isAdmin) {
-        pettyCashQuery = pettyCashQuery.eq('profile_id', currentUser.id);
-      }
-      const { data: pettyCashTransactions, error: pettyCashError } = await pettyCashQuery;
-      if (pettyCashError) throw pettyCashError;
-      totalExpenditureAllTime += (pettyCashTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
+      // Removed petty cash transactions from here as they are now merged into expenditure_transactions
 
       const cumulativeNetOperatingBalance = totalIncomeAllTime - totalExpenditureAllTime;
 

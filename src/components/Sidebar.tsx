@@ -64,12 +64,12 @@ export const navItems: SidebarItem[] = [
     icon: DollarSign,
     requiredPrivileges: ["View Project Accounts"],
   },
-  {
-    name: "Petty Cash",
-    href: "/petty-cash",
-    icon: Wallet,
-    requiredPrivileges: ["View Petty Cash"],
-  },
+  // {
+  //   name: "Petty Cash",
+  //   href: "/petty-cash",
+  //   icon: Wallet,
+  //   requiredPrivileges: ["View Petty Cash"],
+  // },
   {
     name: "Pledges",
     href: "/pledges",
@@ -136,12 +136,12 @@ export const navItems: SidebarItem[] = [
         icon: BarChart2,
         requiredPrivileges: ["View Member Contributions Report"],
       },
-      {
-        name: "Petty Cash Report",
-        href: "/reports/petty-cash",
-        icon: FileText,
-        requiredPrivileges: ["View Petty Cash Report"],
-      },
+      // {
+      //   name: "Petty Cash Report",
+      //   href: "/reports/petty-cash",
+      //   icon: FileText,
+      //   requiredPrivileges: ["View Petty Cash Report"],
+      // },
       {
         name: "Pledge Report",
         href: "/reports/pledges",

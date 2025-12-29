@@ -9,7 +9,6 @@ import {
   Transaction,
   IncomeTxRow,
   ExpenditureTxRow,
-  PettyCashTxRow,
   JoinedFinancialAccount // Use JoinedFinancialAccount for the nested object
 } from "@/types/common"; // Updated import path
 
@@ -47,7 +46,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
       }));
 
-      // Fetch Expenditure Transactions
+      // Fetch Expenditure Transactions (now includes former petty cash)
       let expenditureQuery = supabase
         .from('expenditure_transactions')
         .select('id, date, amount, purpose, financial_accounts(name)')
@@ -61,26 +60,6 @@ export const useRecentTransactions = (limit: number = 5) => {
       expenditureData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
         type: 'expenditure',
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
-      }));
-
-      // Fetch Petty Cash Transactions
-      let pettyCashQuery = supabase
-        .from('petty_cash_transactions')
-        .select('id, date, amount, purpose, financial_accounts(name)')
-        .order('date', { ascending: false })
-        .limit(limit);
-      if (!isAdmin) {
-        pettyCashQuery = pettyCashQuery.eq('profile_id', currentUser.id);
-      }
-      const { data: pettyCashData, error: pettyCashError } = await pettyCashQuery as { data: PettyCashTxRow[] | null, error: any };
-      if (pettyCashError) console.error("Error fetching recent petty cash:", pettyCashError);
-      pettyCashData?.forEach(tx => allFetchedTransactions.push({
-        id: tx.id,
-        type: 'petty_cash',
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,

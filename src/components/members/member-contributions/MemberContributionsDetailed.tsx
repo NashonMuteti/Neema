@@ -41,7 +41,7 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
 
   // Filter transactions to only show 'income' and 'pledge' types
   const filteredContributionsAndPledges = React.useMemo(() => {
-    return memberContributions.filter(c => c.type === 'income' || c.type === 'pledge');
+    return memberContributions.filter(c => c.type === 'income' || c.type === 'pledge' || c.type === 'expenditure'); // Added expenditure
   }, [memberContributions]);
 
   return (

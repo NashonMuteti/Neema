@@ -206,7 +206,7 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
             {selectedDate && contributionsByDate[format(selectedDate, "yyyy-MM-dd")] && (
               <>
                 {contributionsByDate[format(selectedDate, "yyyy-MM-dd")]
-                  .filter(t => t.type === 'income' || t.type === 'pledge') // Filter for contributions/pledges only
+                  .filter(t => t.type === 'income' || t.type === 'pledge' || t.type === 'expenditure') // Filter for contributions/pledges/expenditure only
                   .map((c) => {
                   const status = getContributionStatus(c.type, c.status);
                   const isIncomeOrPaidPledge = c.type === 'income' || (c.type === 'pledge' && c.status === 'Paid');

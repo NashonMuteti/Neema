@@ -31,7 +31,7 @@ export interface MonthYearOption {
 // This is a processed/display-ready transaction.
 export interface Transaction {
   id: string;
-  type: 'income' | 'expenditure' | 'petty_cash' | 'pledge';
+  type: 'income' | 'expenditure' | 'pledge'; // Removed 'petty_cash'
   date: Date;
   amount: number;
   description: string; // General description/purpose/source
@@ -78,14 +78,7 @@ export interface ExpenditureTxRow {
   profile_id: string; // Added profile_id for consistency
 }
 
-export interface PettyCashTxRow {
-  id: string;
-  date: string;
-  amount: number;
-  purpose: string;
-  financial_accounts: JoinedFinancialAccount | null;
-  profile_id: string; // Added profile_id for consistency
-}
+// Removed PettyCashTxRow
 
 export interface PledgeTxRow {
   id: string;
@@ -103,7 +96,7 @@ export interface PledgeTxRow {
 // Processed data for MemberContributionsDetail page
 export interface MemberContribution {
   id: string;
-  type: 'income' | 'expenditure' | 'petty_cash' | 'pledge';
+  type: 'income' | 'expenditure' | 'pledge'; // Removed 'petty_cash'
   sourceOrPurpose: string; // Description for income/expenditure, comments/project name for pledge
   date: Date;
   amount: number; // Actual amount for income/expenditure, original_amount for pledge

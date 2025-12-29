@@ -7,10 +7,8 @@ type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 export const getContributionStatus = (type: Transaction['type'], status?: Transaction['status']): { text: string; variant: BadgeVariant } => {
   if (type === 'income') {
     return { text: "Income", variant: "default" };
-  } else if (type === 'expenditure') {
+  } else if (type === 'expenditure') { // Now includes former petty cash
     return { text: "Expenditure", variant: "destructive" };
-  } else if (type === 'petty_cash') {
-    return { text: "Petty Cash", variant: "secondary" };
   } else if (type === 'pledge') {
     if (status === 'Paid') {
       return { text: "Pledge (Paid)", variant: "default" };

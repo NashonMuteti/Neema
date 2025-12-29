@@ -37,6 +37,7 @@ export const useFinancialData = () => {
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
       if (incomeError) throw incomeError;
 
+      // Fetch expenditure transactions (now includes former petty cash)
       let expenditureQuery = supabase.from('expenditure_transactions').select('date,amount,purpose');
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
@@ -70,7 +71,7 @@ export const useFinancialData = () => {
       };
 
       incomeTransactions?.forEach(tx => aggregateByMonth(tx.date, 'income', tx.amount));
-      expenditureTransactions?.forEach(tx => aggregateByMonth(tx.date, 'expenditure', tx.amount));
+      expenditureTransactions?.forEach(tx => aggregateByMonth(tx.date, 'expenditure', tx.amount)); // Now includes former petty cash
       
       projectPledges?.forEach(pledge => {
         const outstanding = pledge.amount - pledge.paid_amount;
