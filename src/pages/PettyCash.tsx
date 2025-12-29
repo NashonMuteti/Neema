@@ -24,6 +24,7 @@ interface FinancialAccount {
   id: string;
   name: string;
   current_balance: number;
+  profile_id: string; // Added profile_id
 }
 
 interface Member {
@@ -89,10 +90,16 @@ const PettyCash = () => {
   }));
 
   const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
-    const { data: accountsData, error: accountsError } = await supabase
+    let query = supabase
       .from('financial_accounts')
-      .select('id, name, current_balance')
-      .eq('profile_id', currentUser?.id); // Filter by profile_id
+      .select('id, name, current_balance, initial_balance, profile_id'); // Select all fields for FinancialAccount type
+      
+    const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
+    if (!isAdmin && currentUser) {
+      query = query.eq('profile_id', currentUser.id); // Filter by profile_id for non-admins
+    }
+      
+    const { data: accountsData, error: accountsError } = await query;
       
     if (accountsError) {
       console.error("Error fetching financial accounts:", accountsError);
@@ -235,7 +242,7 @@ const PettyCash = () => {
         .from('financial_accounts')
         .update({ current_balance: newBalance })
         .eq('id', expenseAccount)
-        .eq('profile_id', currentUser.id); // Ensure user owns the account
+        .eq('profile_id', currentAccount.profile_id); // Ensure user owns the account
         
       if (updateBalanceError) {
         console.error("Error updating account balance:", updateBalanceError);
@@ -255,7 +262,7 @@ const PettyCash = () => {
     showError("Edit functionality is not yet implemented for petty cash transactions.");
   };
 
-  const handleDeleteTransaction = async (id: string, amount: number, accountId: string) => {
+  const handleDeleteTransaction = async (id: string, amount: number, accountId: string, profileId: string) => {
     if (!currentUser) {
       showError("You must be logged in to delete petty cash expense.");
       return;
@@ -265,7 +272,7 @@ const PettyCash = () => {
       .from('petty_cash_transactions')
       .delete()
       .eq('id', id)
-      .eq('profile_id', currentUser.id); // Changed to profile_id
+      .eq('profile_id', profileId); // Changed to profile_id
       
     if (deleteError) {
       console.error("Error deleting petty cash transaction:", deleteError);
@@ -279,7 +286,7 @@ const PettyCash = () => {
           .from('financial_accounts')
           .update({ current_balance: newBalance })
           .eq('id', accountId)
-          .eq('profile_id', currentUser.id); // Ensure user owns the account
+          .eq('profile_id', currentAccount.profile_id); // Ensure user owns the account
           
         if (updateBalanceError) {
           console.error("Error reverting account balance:", updateBalanceError);
@@ -497,7 +504,7 @@ const PettyCash = () => {
                             <Button variant="ghost" size="icon" onClick={() => handleEditTransaction(tx.id)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx.id, tx.amount, tx.account_id)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx.id, tx.amount, tx.account_id, tx.profile_id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
