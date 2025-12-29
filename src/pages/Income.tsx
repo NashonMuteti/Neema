@@ -213,7 +213,7 @@ const Income = () => {
         .from('financial_accounts')
         .update({ current_balance: newBalance })
         .eq('id', incomeAccount)
-        .eq('profile_id', currentUser.id); // Ensure user owns the account
+        .eq('profile_id', currentAccount.profile_id); // Use the account's profile_id
         
       if (updateBalanceError) {
         console.error("Error updating account balance:", updateBalanceError);
@@ -250,6 +250,7 @@ const Income = () => {
       return;
     }
 
+    // Update the income transaction itself
     const { error: updateTxError } = await supabase
       .from('income_transactions')
       .update({
@@ -260,7 +261,7 @@ const Income = () => {
         profile_id: updatedTx.profile_id,
       })
       .eq('id', updatedTx.id)
-      .eq('profile_id', currentUser.id);
+      .eq('profile_id', oldTx.profile_id); // Use the transaction's original profile_id
 
     if (updateTxError) {
       console.error("Error updating income transaction:", updateTxError);
@@ -277,18 +278,20 @@ const Income = () => {
     }
 
     if (oldTx.account_id === updatedTx.account_id) {
+      // If account is the same, just adjust its balance
       const amountDifference = parsedAmount - oldTx.amount;
       const newBalance = oldAccount.current_balance + amountDifference;
       const { error: updateBalanceError } = await supabase
         .from('financial_accounts')
         .update({ current_balance: newBalance })
         .eq('id', oldAccount.id)
-        .eq('profile_id', currentUser.id);
+        .eq('profile_id', oldAccount.profile_id); // Use the account's profile_id
       if (updateBalanceError) {
         console.error("Error updating account balance for same account:", updateBalanceError);
         showError("Transaction updated, but failed to adjust account balance.");
       }
     } else {
+      // If account changed, debit old account and credit new account
       const oldAccountNewBalance = oldAccount.current_balance - oldTx.amount;
       const newAccountNewBalance = newAccount.current_balance + parsedAmount;
 
@@ -296,13 +299,13 @@ const Income = () => {
         .from('financial_accounts')
         .update({ current_balance: oldAccountNewBalance })
         .eq('id', oldAccount.id)
-        .eq('profile_id', currentUser.id);
+        .eq('profile_id', oldAccount.profile_id); // Use the old account's profile_id
 
       const { error: updateNewAccountError } = await supabase
         .from('financial_accounts')
         .update({ current_balance: newAccountNewBalance })
         .eq('id', newAccount.id)
-        .eq('profile_id', currentUser.id);
+        .eq('profile_id', newAccount.profile_id); // Use the new account's profile_id
 
       if (updateOldAccountError || updateNewAccountError) {
         console.error("Error updating account balances for different accounts:", updateOldAccountError, updateNewAccountError);
@@ -327,18 +330,20 @@ const Income = () => {
       return;
     }
     
-    const { id, amount, account_id } = deletingTransaction;
+    const { id, amount, account_id, profile_id } = deletingTransaction;
 
+    // Delete the income transaction
     const { error: deleteError } = await supabase
       .from('income_transactions')
       .delete()
       .eq('id', id)
-      .eq('profile_id', currentUser.id);
+      .eq('profile_id', profile_id); // Use the transaction's profile_id
       
     if (deleteError) {
       console.error("Error deleting income transaction:", deleteError);
       showError("Failed to delete income transaction.");
     } else {
+      // Revert account balance
       const currentAccount = financialAccounts.find(acc => acc.id === account_id);
       if (currentAccount) {
         const newBalance = currentAccount.current_balance - amount; // Correctly debiting the account
@@ -346,7 +351,7 @@ const Income = () => {
           .from('financial_accounts')
           .update({ current_balance: newBalance })
           .eq('id', account_id)
-          .eq('profile_id', currentUser.id);
+          .eq('profile_id', currentAccount.profile_id); // Use the account's profile_id
           
         if (updateBalanceError) {
           console.error("Error reverting account balance:", updateBalanceError);
