@@ -47,24 +47,6 @@ const AdminSettings = () => {
   const canManageHeaderCustomization = currentUserPrivileges.includes("Manage Header Customization") ||
                                        currentUser?.role === "Super Admin";
   
-  // --- START DEBUG LOGS ---
-  console.log("AdminSettings Debug:");
-  console.log("  currentUser.role:", currentUser?.role);
-  console.log("  currentUserPrivileges (from role definition):", currentUserPrivileges);
-  console.log("  canAccessAdminSettings:", canAccessAdminSettings);
-  console.log("  canManageUserProfiles:", canManageUserProfiles);
-  console.log("  canManageUserRoles:", canManageUserRoles);
-  console.log("  canManageAppCustomization:", canManageAppCustomization);
-  console.log("  canManageSystemCurrency:", canManageSystemCurrency);
-  console.log("  canManageMemberFields:", canManageMemberFields);
-  console.log("  canManageReportsTemplates:", canManageReportsTemplates);
-  console.log("  canManageSecurity:", canManageSecurity);
-  console.log("  canManageDatabaseMaintenance:", canManageDatabaseMaintenance);
-  console.log("  canInitializeBalances:", canInitializeBalances);
-  console.log("  canManageFinancialAccounts:", canManageFinancialAccounts);
-  console.log("  canManageHeaderCustomization:", canManageHeaderCustomization);
-  // --- END DEBUG LOGS ---
-
   // If user doesn't have access to admin settings, show a message
   if (!canAccessAdminSettings) {
     return (

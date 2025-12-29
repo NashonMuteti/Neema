@@ -17,23 +17,23 @@ interface SystemSettingsContextType {
   isLoading: boolean;
 }
 
-const currencyMap: Record<string, string> = {
-  "USD": "$",
-  "EUR": "€",
-  "GBP": "£",
-  "JPY": "¥",
-  "KES": "KSh",
-  "TZS": "Tsh",
-  "CAD": "C$",
-  "AUD": "A$",
-};
-
 const SystemSettingsContext = createContext<SystemSettingsContextType | undefined>(undefined);
 
 export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currency, setCurrencyState] = useState<CurrencyInfo>({ code: "USD", symbol: "$" });
   const [defaultTheme, setDefaultThemeState] = useState("system"); // New: Default theme state
   const [isLoading, setIsLoading] = useState(true);
+
+  const currencyMap: Record<string, string> = {
+    "USD": "$",
+    "EUR": "€",
+    "GBP": "£",
+    "JPY": "¥",
+    "KES": "KSh",
+    "TZS": "Tsh",
+    "CAD": "C$",
+    "AUD": "A$",
+  };
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
