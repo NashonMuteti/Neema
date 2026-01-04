@@ -14,9 +14,9 @@ export const allPrivilegeNames = [
   "Manage Expenditure",
   "View Sales Management",
   "View Stocks",
-  "Manage Stocks", // New privilege
+  "Manage Stocks",
   "View Daily Sales",
-  "Manage Daily Sales",
+  "Manage Daily Sales", // New privilege
   "View Debts",
   "Manage Debts",
   "View Members",
@@ -35,7 +35,7 @@ export const allPrivilegeNames = [
   "Manage Reports Templates",
   "Perform Admin Actions",
   "Initialize Balances",
-  "Manage Funds Transfer", // New privilege
+  "Manage Funds Transfer",
   "View My Contributions",
   "Access Admin Settings",
   "Manage User Profiles",
