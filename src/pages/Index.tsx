@@ -16,6 +16,17 @@ import { useDashboardProjects } from "@/hooks/dashboard/useDashboardProjects";
 import { useContributionsProgress } from "@/hooks/dashboard/useContributionsProgress";
 import { useFinancialSummary } from "@/hooks/dashboard/useFinancialSummary";
 
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+
 
 const Index = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
@@ -35,6 +46,15 @@ const Index = () => {
     loadingSummary,
     summaryError,
   } = useFinancialSummary();
+
+  const [selectedYear, setSelectedYear] = React.useState<string>(new Date().getFullYear().toString());
+
+  // Set initial selected year once availableYears are loaded
+  React.useEffect(() => {
+    if (availableYears.length > 0 && !selectedYear) {
+      setSelectedYear(availableYears[0].toString());
+    }
+  }, [availableYears, selectedYear]);
 
   const isLoading = authLoading || loadingFinancials || loadingProjects || loadingContributions || loadingSummary;
   const anyError = financialsError || projectsError || contributionsError || summaryError;
@@ -71,7 +91,27 @@ const Index = () => {
         cumulativeNetOperatingBalance={cumulativeNetOperatingBalance}
       />
 
-      <IncomeExpenditureGraph financialData={monthlyFinancialData} selectedYear={availableYears[0]} />
+      <div className="flex items-center gap-4 mb-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor="financial-graph-year">Select Year</Label>
+          <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <SelectTrigger id="financial-graph-year" className="w-[120px]">
+              <SelectValue placeholder="Select year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Year</SelectLabel>
+                {availableYears.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <IncomeExpenditureGraph financialData={monthlyFinancialData} selectedYear={parseInt(selectedYear)} />
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <SoonDueProjectsGraph projects={dashboardProjects} />

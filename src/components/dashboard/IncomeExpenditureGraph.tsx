@@ -34,7 +34,29 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
 }) => {
   const { currency } = useSystemSettings(); // Use currency from context
 
-  const filteredData = financialData.filter((data) => data.year === selectedYear);
+  const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  // Create a full 12-month data structure for the selected year
+  const fullYearData: MonthlyFinancialData[] = monthOrder.map(monthName => ({
+    year: selectedYear,
+    month: monthName,
+    income: 0,
+    expenditure: 0,
+    outstandingPledges: 0,
+  }));
+
+  // Merge actual financial data into the full year structure
+  financialData
+    .filter((data) => data.year === selectedYear)
+    .forEach((dataPoint) => {
+      const monthIndex = monthOrder.indexOf(dataPoint.month);
+      if (monthIndex !== -1) {
+        fullYearData[monthIndex] = {
+          ...fullYearData[monthIndex],
+          ...dataPoint,
+        };
+      }
+    });
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -60,7 +82,7 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart
-            data={filteredData}
+            data={fullYearData} // Use fullYearData to ensure all 12 months are displayed
             margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
