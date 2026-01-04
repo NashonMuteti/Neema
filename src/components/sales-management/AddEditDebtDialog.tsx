@@ -110,6 +110,7 @@ const AddEditDebtDialog: React.FC<AddEditDebtDialogProps> = ({
     setIsSaving(true);
 
     const debtData: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description'> & { id?: string } = {
+      id: initialData?.id, // Added this line
       description: description.trim(),
       original_amount: parsedOriginalAmount,
       amount_due: initialData?.amount_due ?? parsedOriginalAmount, // Keep existing amount_due or set to original for new debt

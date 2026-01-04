@@ -34,6 +34,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { FinancialAccount, Member, MonthYearOption } from "@/types/common";
+import { Label } from "@/components/ui/label"; // Added missing import
 
 import AddEditDebtDialog, { Debt } from "@/components/sales-management/AddEditDebtDialog";
 import DebtListTable from "@/components/sales-management/DebtListTable";
@@ -107,7 +108,7 @@ const Debts = () => {
     // Fetch Financial Accounts
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance')
+      .select('id, name, current_balance, initial_balance, profile_id') // Added initial_balance and profile_id
       .eq('profile_id', currentUser.id) // Only show accounts owned by the current user
       .order('name', { ascending: true });
 
@@ -137,8 +138,8 @@ const Debts = () => {
         status,
         notes,
         created_at,
-        profiles!debts_created_by_profile_id_fkey(name, email), -- Creator profile
-        profiles!debts_debtor_profile_id_fkey(name, email), -- Debtor profile
+        createdByProfile: profiles!debts_created_by_profile_id_fkey(name, email), -- Creator profile
+        debtorProfile: profiles!debts_debtor_profile_id_fkey(name, email), -- Debtor profile
         sales_transactions(notes) -- Sale description
       `)
       .gte('created_at', startOfMonth.toISOString())
@@ -153,7 +154,7 @@ const Debts = () => {
     }
 
     if (searchQuery) {
-      debtsQuery = debtsQuery.or(`description.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%,profiles!debts_debtor_profile_id_fkey.name.ilike.%${searchQuery}%`);
+      debtsQuery = debtsQuery.or(`description.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%,createdByProfile.name.ilike.%${searchQuery}%,debtorProfile.name.ilike.%${searchQuery}%`);
     }
 
     const { data: debtsData, error: debtsError } = await debtsQuery.order('due_date', { ascending: true });
@@ -165,8 +166,8 @@ const Debts = () => {
       setDebts([]);
     } else {
       const fetchedDebts: Debt[] = (debtsData || []).map((debt: any) => {
-        const createdByProfile = debt.profiles!debts_created_by_profile_id_fkey;
-        const debtorProfile = debt.profiles!debts_debtor_profile_id_fkey;
+        const createdByProfile = debt.createdByProfile;
+        const debtorProfile = debt.debtorProfile;
         const saleTransaction = debt.sales_transactions;
 
         let status = debt.status as Debt['status'];

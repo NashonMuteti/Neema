@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { format, isPast } from "date-fns";
+import { format, isPast, isSameDay } from "date-fns"; // Added isSameDay import
 import { Edit, Trash2, DollarSign } from "lucide-react";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { Debt } from "./AddEditDebtDialog"; // Import Debt interface

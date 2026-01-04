@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { showError } from "@/utils/toast";
 import { logUserActivity } from "@/utils/activityLogger"; // Import the new logger
+import { JoinedProfile } from "@/types/common"; // Import JoinedProfile
 
 interface UserActivityLog {
   id: string;
@@ -34,7 +35,7 @@ interface UserActivityLog {
   action: string;
   details: Record<string, any>;
   timestamp: string; // ISO string
-  profiles: { name: string; email: string } | null; // Joined profile data
+  profiles: JoinedProfile | null; // Joined profile data
 }
 
 const UserActivityReport = () => {
@@ -95,7 +96,14 @@ const UserActivityReport = () => {
       showError("Failed to load user activity logs.");
       setActivityLogs([]);
     } else {
-      setActivityLogs(data || []);
+      setActivityLogs((data || []).map((activity: any) => ({
+        id: activity.id,
+        user_id: activity.user_id,
+        action: activity.action,
+        details: activity.details,
+        timestamp: activity.timestamp,
+        profiles: activity.profiles as JoinedProfile | null,
+      })));
     }
     setLoading(false);
   }, [currentUser, filterMonth, filterYear, searchQuery]);
