@@ -23,33 +23,31 @@ import {
 import { Search } from "lucide-react";
 import { format, getMonth, getYear, parseISO } from "date-fns";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { showError } from "@/utils/toast";
+import { logUserActivity } from "@/utils/activityLogger"; // Import the new logger
 
-interface UserActivity {
+interface UserActivityLog {
   id: string;
-  user: string;
+  user_id: string;
   action: string;
+  details: Record<string, any>;
   timestamp: string; // ISO string
+  profiles: { name: string; email: string } | null; // Joined profile data
 }
 
-const dummyUserActivity: UserActivity[] = [
-  { id: "ua1", user: "Alice Johnson", action: "Logged in", timestamp: "2023-10-26T10:00:00Z" },
-  { id: "ua2", user: "Bob Williams", action: "Edited Project X", timestamp: "2023-10-26T10:15:00Z" },
-  { id: "ua3", user: "Charlie Brown", action: "Added new pledge", timestamp: "2023-10-26T10:30:00Z" },
-  { id: "ua4", user: "Alice Johnson", action: "Viewed Petty Cash Report", timestamp: "2023-10-26T11:00:00Z" },
-  { id: "ua5", user: "David Green", action: "Created Project Y", timestamp: "2024-07-01T09:00:00Z" },
-  { id: "ua6", user: "Alice Johnson", action: "Updated Member Profile", timestamp: "2024-07-05T14:30:00Z" },
-  { id: "ua7", user: "Bob Williams", action: "Deleted Project Z", timestamp: "2024-07-10T16:00:00Z" },
-  { id: "ua8", user: "Charlie Brown", action: "Posted Income", timestamp: "2024-08-01T11:00:00Z" },
-  { id: "ua9", user: "David Green", action: "Viewed Pledge Report", timestamp: "2024-08-05T10:00:00Z" },
-];
-
 const UserActivityReport = () => {
+  const { currentUser } = useAuth();
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
 
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [activityLogs, setActivityLogs] = React.useState<UserActivityLog[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -60,15 +58,73 @@ const UserActivityReport = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const filteredActivity = React.useMemo(() => {
-    return dummyUserActivity.filter(activity => {
-      const activityDate = parseISO(activity.timestamp);
-      const matchesDate = getMonth(activityDate).toString() === filterMonth && getYear(activityDate).toString() === filterYear;
-      const matchesSearch = activity.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            activity.action.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesDate && matchesSearch;
-    }).sort((a, b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime()); // Sort by date descending
-  }, [filterMonth, filterYear, searchQuery]);
+  const fetchActivityLogs = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
+    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
+
+    let query = supabase
+      .from('user_activity_logs')
+      .select(`
+        id,
+        user_id,
+        action,
+        details,
+        timestamp,
+        profiles ( name, email )
+      `)
+      .gte('timestamp', startOfMonth.toISOString())
+      .lte('timestamp', endOfMonth.toISOString());
+
+    if (searchQuery) {
+      query = query.or(`action.ilike.%${searchQuery}%,profiles.name.ilike.%${searchQuery}%,profiles.email.ilike.%${searchQuery}%`);
+    }
+
+    const { data, error } = await query.order('timestamp', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching user activity logs:", error);
+      setError("Failed to load user activity logs.");
+      showError("Failed to load user activity logs.");
+      setActivityLogs([]);
+    } else {
+      setActivityLogs(data || []);
+    }
+    setLoading(false);
+  }, [currentUser, filterMonth, filterYear, searchQuery]);
+
+  React.useEffect(() => {
+    fetchActivityLogs();
+    // Log a dummy activity when the report is viewed (for demonstration)
+    if (currentUser) {
+      logUserActivity(currentUser, "Viewed User Activity Report", { month: format(new Date(parseInt(filterYear), parseInt(filterMonth)), "MMMM yyyy") });
+    }
+  }, [fetchActivityLogs, currentUser, filterMonth, filterYear]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">User Activity Report</h1>
+        <p className="text-lg text-muted-foreground">Loading user activity logs...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-foreground">User Activity Report</h1>
+        <p className="text-lg text-destructive">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -132,21 +188,27 @@ const UserActivityReport = () => {
             </div>
           </div>
 
-          {filteredActivity.length > 0 ? (
+          {activityLogs.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Timestamp</TableHead>
+                  <TableHead>Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredActivity.map((activity) => (
+                {activityLogs.map((activity) => (
                   <TableRow key={activity.id}>
-                    <TableCell className="font-medium">{activity.user}</TableCell>
+                    <TableCell className="font-medium">{activity.profiles?.name || activity.profiles?.email || 'Unknown User'}</TableCell>
                     <TableCell>{activity.action}</TableCell>
                     <TableCell>{format(parseISO(activity.timestamp), "MMM dd, yyyy hh:mm a")}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                      {activity.details && Object.keys(activity.details).length > 0
+                        ? JSON.stringify(activity.details)
+                        : '-'}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
