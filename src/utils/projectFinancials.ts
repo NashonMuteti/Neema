@@ -56,6 +56,7 @@ interface CollectionRowWithProfile {
   member_id: string;
   amount: number;
   date: string; // ISO string from DB
+  payment_method: string; // Added payment_method
   profiles: JoinedProfile | null; // Joined profile data
 }
 
@@ -98,7 +99,7 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
     member_name: c.profiles?.name || 'Unknown Member', // Access name directly from typed profiles
     amount: c.amount,
     date: new Date(c.date),
-    payment_method: c.payment_method,
+    payment_method: c.payment_method, // Now correctly accessed
   }));
 
   // Fetch pledges
