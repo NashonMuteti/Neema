@@ -29,7 +29,7 @@ export const useRecentTransactions = (limit: number = 5) => {
       // Fetch Income Transactions
       let incomeQuery = supabase
         .from('income_transactions')
-        .select('id, date, amount, source, financial_accounts(name)')
+        .select('id, date, amount, source, financial_accounts(id, name)')
         .order('date', { ascending: false })
         .limit(limit);
       if (!isAdmin) {
@@ -44,12 +44,13 @@ export const useRecentTransactions = (limit: number = 5) => {
         amount: tx.amount,
         description: tx.source,
         accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
+        accountId: (tx.financial_accounts as JoinedFinancialAccount)?.id || undefined, // Added accountId
       }));
 
       // Fetch Expenditure Transactions (now includes former petty cash)
       let expenditureQuery = supabase
         .from('expenditure_transactions')
-        .select('id, date, amount, purpose, financial_accounts(name)')
+        .select('id, date, amount, purpose, financial_accounts(id, name)')
         .order('date', { ascending: false })
         .limit(limit);
       if (!isAdmin) {
@@ -64,6 +65,7 @@ export const useRecentTransactions = (limit: number = 5) => {
         amount: tx.amount,
         description: tx.purpose,
         accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
+        accountId: (tx.financial_accounts as JoinedFinancialAccount)?.id || undefined, // Added accountId
       }));
 
       const sortedAndLimited = allFetchedTransactions

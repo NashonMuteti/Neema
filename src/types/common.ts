@@ -36,6 +36,7 @@ export interface Transaction {
   amount: number;
   description: string; // General description/purpose/source
   accountOrProjectName: string; // Name of the associated account or project
+  accountId?: string; // New: ID of the associated financial account, if applicable
   status?: "Active" | "Paid" | "Overdue"; // Only for pledges
   dueDate?: Date; // Only for pledges
   pledgeId?: string; // To link income transactions to pledges

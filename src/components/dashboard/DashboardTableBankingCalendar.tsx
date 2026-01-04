@@ -68,13 +68,14 @@ const DashboardTableBankingCalendar: React.FC = () => {
       }
       const { data: incomeData, error: incomeError } = await incomeQuery as { data: IncomeTxRow[] | null, error: any };
       if (incomeError) console.error("Error fetching income:", incomeError);
-      incomeData?.forEach(tx => fetchedTransactions.push({
+      incomeData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
         type: 'income',
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.source,
-        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account', // Use JoinedFinancialAccount
+        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
+        accountId: (tx.financial_accounts as JoinedFinancialAccount)?.id || undefined, // Added accountId
         pledgeId: tx.pledge_id || undefined,
       }));
 
@@ -89,13 +90,14 @@ const DashboardTableBankingCalendar: React.FC = () => {
       }
       const { data: expenditureData, error: expenditureError } = await expenditureQuery as { data: ExpenditureTxRow[] | null, error: any };
       if (expenditureError) console.error("Error fetching expenditure:", expenditureError);
-      expenditureData?.forEach(tx => fetchedTransactions.push({
+      expenditureData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
         type: 'expenditure',
         date: parseISO(tx.date),
         amount: tx.amount,
         description: tx.purpose,
-        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account', // Use JoinedFinancialAccount
+        accountOrProjectName: (tx.financial_accounts as JoinedFinancialAccount)?.name || 'Unknown Account',
+        accountId: (tx.financial_accounts as JoinedFinancialAccount)?.id || undefined, // Added accountId
       }));
 
       // Removed Petty Cash Transactions fetch
@@ -216,7 +218,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
     selectedDayTransactions.forEach(tx => {
       // For the summary bar, we only care about direct income/expenditure to financial accounts.
       // Pledges are commitments, not direct cash flow on a given day for the account summary.
-      const account = financialAccounts.find(acc => acc.id === tx.accountOrProjectName); // This is incorrect, tx.accountOrProjectName is the name, not the ID
+      const account = financialAccounts.find(acc => acc.id === tx.accountId); // Corrected lookup to use accountId
       if (account) { // Only include transactions linked to a known financial account
         if (tx.type === 'income') {
           incomeSummary[account.id] = (incomeSummary[account.id] || 0) + tx.amount;
