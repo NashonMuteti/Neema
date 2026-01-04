@@ -55,7 +55,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
       const startOfRange = startOfMonth(subMonths(month, 1)); // Start from 1 month before current view
       const endOfRange = endOfMonth(addMonths(month, 1));   // End 1 month after current view
 
-      const fetchedTransactions: Transaction[] = [];
+      const allFetchedTransactions: Transaction[] = []; // Declared here
 
       // Fetch Income Transactions
       let incomeQuery = supabase
@@ -113,7 +113,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
       }
       const { data: pledgesData, error: pledgesError } = await pledgesQuery as { data: PledgeTxRow[] | null, error: any };
       if (pledgesError) console.error("Error fetching pledges:", pledgesError);
-      pledgesData?.forEach(pledge => fetchedTransactions.push({
+      pledgesData?.forEach(pledge => allFetchedTransactions.push({
         id: pledge.id,
         type: 'pledge',
         date: parseISO(pledge.due_date),
@@ -124,7 +124,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
         dueDate: parseISO(pledge.due_date),
       }));
 
-      setAllTransactions(fetchedTransactions);
+      setAllTransactions(allFetchedTransactions);
 
       // Fetch Financial Accounts
       let accountsQuery = supabase
