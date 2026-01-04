@@ -183,7 +183,7 @@ const DeletedProjectsReport = () => {
                             size="sm"
                             onClick={() => setProjectToDeletePermanently({ id: project.id, name: project.name })}
                           >
-                            Permanent Delete
+                            Purge
                           </Button>
                         </div>
                       </TableCell>
@@ -211,7 +211,7 @@ const DeletedProjectsReport = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handlePermanentDeleteProject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete Permanently
+              Purge
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
