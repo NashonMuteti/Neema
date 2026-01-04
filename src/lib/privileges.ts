@@ -16,9 +16,9 @@ export const allPrivilegeNames = [
   "View Stocks",
   "Manage Stocks",
   "View Daily Sales",
-  "Manage Daily Sales", // New privilege
+  "Manage Daily Sales",
   "View Debts",
-  "Manage Debts",
+  "Manage Debts", // New privilege
   "View Members",
   "Manage Members",
   "Export Member List PDF",
