@@ -99,7 +99,7 @@ const Debts = () => {
     // Fetch Products (only active ones for sale)
     const { data: productsData, error: productsError } = await supabase
       .from('products')
-      .select('id, name, price, current_stock')
+      .select('id, name, price, current_stock, reorder_point, profile_id, is_active') // Corrected: Fetch all fields for Product type
       .eq('is_active', true)
       .order('name', { ascending: true });
 
