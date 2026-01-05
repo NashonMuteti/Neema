@@ -108,7 +108,7 @@ const Debts = () => {
     // Fetch Financial Accounts
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance, initial_balance, profile_id') // Include initial_balance and profile_id
+      .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Include can_receive_payments
       .eq('profile_id', currentUser.id) // Only show accounts owned by the current user
       .order('name', { ascending: true });
 

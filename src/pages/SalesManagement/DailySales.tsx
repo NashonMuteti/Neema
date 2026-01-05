@@ -22,6 +22,9 @@ interface FinancialAccount {
   id: string;
   name: string;
   current_balance: number;
+  initial_balance: number; // Added
+  profile_id: string; // Added
+  can_receive_payments: boolean; // Added
 }
 
 interface SaleItem {
@@ -108,12 +111,12 @@ const DailySales = () => {
     // Fetch Financial Accounts
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance')
+      .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Added initial_balance, profile_id, can_receive_payments
       .eq('profile_id', currentUser.id) // Only show accounts owned by the current user
       .order('name', { ascending: true });
 
     if (accountsError) {
-      console.error("Error fetching financial accounts:", accountsError);
+  console.error("Error fetching financial accounts:", accountsError);
       showError("Failed to load financial accounts.");
     } else {
       setFinancialAccounts(accountsData || []);

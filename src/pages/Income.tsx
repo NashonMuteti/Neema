@@ -72,7 +72,7 @@ const Income = () => {
   const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
     let query = supabase
       .from('financial_accounts')
-      .select('id, name, current_balance, initial_balance, profile_id'); // Select all fields for FinancialAccount type
+      .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments'); // Select all fields for FinancialAccount type
       
     const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
     if (!isAdmin && currentUser) {

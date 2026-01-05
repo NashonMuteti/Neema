@@ -108,7 +108,7 @@ const ProjectFinancialsDetail: React.FC = () => {
       }
       const { data, error } = await supabase
         .from('financial_accounts')
-        .select('id, name, current_balance, initial_balance, profile_id') // Select all fields for FinancialAccount type
+        .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Added can_receive_payments
         .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
 

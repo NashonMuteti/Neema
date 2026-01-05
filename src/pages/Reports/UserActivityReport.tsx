@@ -24,7 +24,7 @@ import { Search } from "lucide-react";
 import { format, getMonth, getYear, parseISO } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } => "@/context/AuthContext";
 import { showError } from "@/utils/toast";
 import { logUserActivity } from "@/utils/activityLogger"; // Import the new logger
 import { JoinedProfile } from "@/types/common"; // Import JoinedProfile
@@ -79,8 +79,8 @@ const UserActivityReport = () => {
         action,
         details,
         timestamp,
-        profiles ( name, email )
-      `)
+        profiles ( id, name, email )
+      `) // Added 'id' to profiles select
       .gte('timestamp', startOfMonth.toISOString())
       .lte('timestamp', endOfMonth.toISOString());
 
@@ -102,7 +102,7 @@ const UserActivityReport = () => {
         action: activity.action,
         details: activity.details,
         timestamp: activity.timestamp,
-        profiles: activity.profiles ? { name: activity.profiles.name, email: activity.profiles.email } : null, // Explicitly map to JoinedProfile
+        profiles: activity.profiles ? { id: activity.profiles.id, name: activity.profiles.name, email: activity.profiles.email } : null, // Explicitly map to JoinedProfile
       })));
     }
     setLoading(false);

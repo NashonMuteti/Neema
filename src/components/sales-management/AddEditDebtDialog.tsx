@@ -53,7 +53,7 @@ interface AddEditDebtDialogProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   initialData?: Debt; // For editing existing debt
-  onSave: (debt: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string }) => void;
+  onSave: (debt: Omit<Debt, 'id' | 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string }) => void;
   canManageDebts: boolean;
   members: Member[]; // List of members to select as debtor
 }
@@ -109,7 +109,9 @@ const AddEditDebtDialog: React.FC<AddEditDebtDialogProps> = ({
 
     setIsSaving(true);
 
-    const debtData: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string } = {
+    // Construct the payload for onSave, explicitly omitting 'id' and 'created_by_profile_id'
+    // and then adding 'id' back as optional.
+    const debtData: Omit<Debt, 'id' | 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string } = {
       description: description.trim(),
       original_amount: parsedOriginalAmount,
       amount_due: initialData?.amount_due ?? parsedOriginalAmount, // Keep existing amount_due or set to original for new debt
