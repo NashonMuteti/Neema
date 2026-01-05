@@ -143,3 +143,16 @@ export interface Pledge {
   project_name: string;
   comments?: string;
 }
+
+// Product interface for sales management
+export interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  sku?: string;
+  price: number;
+  current_stock: number;
+  reorder_point: number;
+  profile_id: string;
+  is_active: boolean; // New: Whether the product is active or inactive
+}

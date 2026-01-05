@@ -15,6 +15,7 @@ export const allPrivilegeNames = [
   "View Sales Management",
   "View Stocks",
   "Manage Stocks",
+  "Manage Stock Status", // New privilege
   "View Daily Sales",
   "Manage Daily Sales",
   "View Debts",

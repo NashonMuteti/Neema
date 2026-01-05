@@ -15,17 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Save } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-
-export interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  sku?: string;
-  price: number;
-  current_stock: number;
-  reorder_point: number;
-  profile_id: string;
-}
+import { Product } from "@/types/common"; // Import Product from common.ts
+import { Switch } from "@/components/ui/switch"; // Import Switch
 
 interface AddEditProductDialogProps {
   isOpen: boolean;
@@ -33,6 +24,7 @@ interface AddEditProductDialogProps {
   initialData?: Product; // For editing existing product
   onSave: (product: Omit<Product, 'id' | 'profile_id'> & { id?: string; profile_id?: string }) => void;
   canManageStocks: boolean;
+  canManageStockStatus: boolean; // New prop for privilege
 }
 
 const AddEditProductDialog: React.FC<AddEditProductDialogProps> = ({
@@ -41,6 +33,7 @@ const AddEditProductDialog: React.FC<AddEditProductDialogProps> = ({
   initialData,
   onSave,
   canManageStocks,
+  canManageStockStatus, // Destructure new prop
 }) => {
   const { currency } = useSystemSettings();
 
@@ -50,6 +43,7 @@ const AddEditProductDialog: React.FC<AddEditProductDialogProps> = ({
   const [price, setPrice] = React.useState(initialData?.price.toString() || "0");
   const [currentStock, setCurrentStock] = React.useState(initialData?.current_stock.toString() || "0");
   const [reorderPoint, setReorderPoint] = React.useState(initialData?.reorder_point.toString() || "0");
+  const [isActive, setIsActive] = React.useState(initialData?.is_active ?? true); // New state for is_active, default true
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -60,6 +54,7 @@ const AddEditProductDialog: React.FC<AddEditProductDialogProps> = ({
       setPrice(initialData?.price.toString() || "0");
       setCurrentStock(initialData?.current_stock.toString() || "0");
       setReorderPoint(initialData?.reorder_point.toString() || "0");
+      setIsActive(initialData?.is_active ?? true); // Set initial state for is_active
       setIsSaving(false);
     }
   }, [isOpen, initialData]);
@@ -94,6 +89,7 @@ const AddEditProductDialog: React.FC<AddEditProductDialogProps> = ({
       price: parsedPrice,
       current_stock: parsedCurrentStock,
       reorder_point: parsedReorderPoint,
+      is_active: isActive, // Include is_active in the payload
     };
 
     if (initialData?.id) {
@@ -180,6 +176,17 @@ const AddEditProductDialog: React.FC<AddEditProductDialogProps> = ({
               disabled={!canManageStocks || isSaving}
             />
           </div>
+          {canManageStockStatus && ( // Only show if user has privilege
+            <div className="flex items-center justify-between">
+              <Label htmlFor="product-is-active" className="text-sm font-medium">Is Active</Label>
+              <Switch
+                id="product-is-active"
+                checked={isActive}
+                onCheckedChange={setIsActive}
+                disabled={isSaving}
+              />
+            </div>
+          )}
         </div>
         <div className="flex justify-end">
           <Button onClick={handleSubmit} disabled={!canManageStocks || isSaving}>

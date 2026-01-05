@@ -28,22 +28,24 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import AddEditProductDialog, { Product } from "@/components/sales-management/AddEditProductDialog";
+import AddEditProductDialog from "@/components/sales-management/AddEditProductDialog";
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import { Product } from "@/types/common"; // Import Product from common.ts
 
 const Stocks = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
 
-  const { canManageStocks } = useMemo(() => {
+  const { canManageStocks, canManageStockStatus } = useMemo(() => {
     if (!currentUser || !definedRoles) {
-      return { canManageStocks: false };
+      return { canManageStocks: false, canManageStockStatus: false };
     }
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageStocks = currentUserPrivileges.includes("Manage Stocks");
-    return { canManageStocks };
+    const canManageStockStatus = currentUserPrivileges.includes("Manage Stock Status");
+    return { canManageStocks, canManageStockStatus };
   }, [currentUser, definedRoles]);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -52,6 +54,8 @@ const Stocks = () => {
   
   const [localSearchQuery, setLocalSearchQuery] = useState(""); // Local state for input
   const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+
+  const [filterStatus, setFilterStatus] = useState<"All" | "Active" | "Inactive">("Active"); // New state for status filter, default to Active
 
   const [isAddEditProductDialogOpen, setIsAddEditProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
@@ -62,6 +66,12 @@ const Stocks = () => {
     setError(null);
 
     let query = supabase.from('products').select('*');
+
+    if (filterStatus === "Active") {
+      query = query.eq('is_active', true);
+    } else if (filterStatus === "Inactive") {
+      query = query.eq('is_active', false);
+    }
 
     if (debouncedSearchQuery) { // Use debounced query
       query = query.or(`name.ilike.%${debouncedSearchQuery}%,description.ilike.%${debouncedSearchQuery}%,sku.ilike.%${debouncedSearchQuery}%`);
@@ -78,7 +88,7 @@ const Stocks = () => {
       setProducts(data || []);
     }
     setLoading(false);
-  }, [debouncedSearchQuery]); // Depend on debounced query
+  }, [debouncedSearchQuery, filterStatus]); // Depend on debounced query and filterStatus
 
   useEffect(() => {
     fetchProducts();
@@ -101,6 +111,7 @@ const Stocks = () => {
           price: productData.price,
           current_stock: productData.current_stock,
           reorder_point: productData.reorder_point,
+          is_active: productData.is_active, // Include is_active
         })
         .eq('id', productData.id)
         .eq('profile_id', productData.profile_id || currentUser.id); // Ensure user owns the product or is admin
@@ -124,6 +135,7 @@ const Stocks = () => {
           price: productData.price,
           current_stock: productData.current_stock,
           reorder_point: productData.reorder_point,
+          is_active: productData.is_active, // Include is_active
         });
       
       if (error) {
@@ -202,6 +214,20 @@ const Stocks = () => {
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
+            <div className="grid gap-1.5 flex-1 min-w-[120px]">
+              <Select value={filterStatus} onValueChange={(value: "All" | "Active" | "Inactive") => setFilterStatus(value)}>
+                <SelectTrigger id="filter-status">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="All">All</SelectItem>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
             {canManageStocks && (
               <Button onClick={() => { setEditingProduct(undefined); setIsAddEditProductDialogOpen(true); }}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Product
@@ -220,6 +246,7 @@ const Stocks = () => {
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Current Stock</TableHead>
                   <TableHead className="text-right">Reorder Point</TableHead>
+                  <TableHead className="text-center">Status</TableHead> {/* New Status Column */}
                   {canManageStocks && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -239,6 +266,11 @@ const Stocks = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-right">{product.reorder_point}</TableCell>
+                    <TableCell className="text-center">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${product.is_active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"}`}>
+                        {product.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </TableCell>
                     {canManageStocks && (
                       <TableCell className="text-center">
                         <div className="flex justify-center space-x-2">
@@ -268,6 +300,7 @@ const Stocks = () => {
         initialData={editingProduct}
         onSave={handleSaveProduct}
         canManageStocks={canManageStocks}
+        canManageStockStatus={canManageStockStatus} // Pass new privilege
       />
 
       {/* Delete Confirmation Dialog */}
