@@ -40,6 +40,7 @@ const Index = () => {
   const { contributionsProgressData, loadingContributions, contributionsError } = useContributionsProgress();
   const {
     totalUnpaidPledges,
+    totalOutstandingDebts, // Destructure new field
     activeFinancialAccounts,
     grandTotalAccountsBalance,
     cumulativeNetOperatingBalance,
@@ -86,6 +87,7 @@ const Index = () => {
 
       <FinancialSummaryBar
         totalUnpaidPledges={totalUnpaidPledges}
+        totalOutstandingDebts={totalOutstandingDebts} // Pass new prop
         activeFinancialAccounts={activeFinancialAccounts}
         grandTotalAccountsBalance={grandTotalAccountsBalance}
         cumulativeNetOperatingBalance={cumulativeNetOperatingBalance}

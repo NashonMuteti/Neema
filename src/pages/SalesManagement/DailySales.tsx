@@ -274,27 +274,31 @@ const DailySales = () => {
         Record and track daily sales transactions.
       </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SaleForm
-          products={products}
-          financialAccounts={financialAccounts}
-          canManageDailySales={canManageDailySales}
-          isProcessing={isProcessing}
-          onRecordSale={handleRecordSale}
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Changed to lg:grid-cols-3 */}
+        <div className="lg:col-span-1"> {/* SaleForm takes 1 column */}
+          <SaleForm
+            products={products}
+            financialAccounts={financialAccounts}
+            canManageDailySales={canManageDailySales}
+            isProcessing={isProcessing}
+            onRecordSale={handleRecordSale}
+          />
+        </div>
 
-        <SalesTable
-          salesTransactions={salesTransactions}
-          canManageDailySales={canManageDailySales}
-          filterMonth={filterMonth}
-          setFilterMonth={setFilterMonth}
-          filterYear={filterYear}
-          setFilterYear={setFilterYear}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          months={months}
-          years={years}
-        />
+        <div className="lg:col-span-2"> {/* SalesTable takes 2 columns */}
+          <SalesTable
+            salesTransactions={salesTransactions}
+            canManageDailySales={canManageDailySales}
+            filterMonth={filterMonth}
+            setFilterMonth={setFilterMonth}
+            filterYear={filterYear}
+            setFilterYear={setFilterYear}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            months={months}
+            years={years}
+          />
+        </div>
       </div>
     </div>
   );

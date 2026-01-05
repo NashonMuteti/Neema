@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Wallet, Banknote, Handshake } from "lucide-react"; // Added Handshake
+import { DollarSign, Wallet, Banknote, Handshake, Scale } from "lucide-react"; // Added Scale icon for debts
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { cn } from "@/lib/utils";
 import { FinancialAccount } from "@/types/common"; // Import FinancialAccount from common.ts
@@ -15,16 +15,18 @@ interface FinancialAccountSummary {
 
 interface FinancialSummaryBarProps {
   totalUnpaidPledges: number;
+  totalOutstandingDebts: number; // New prop
   activeFinancialAccounts: FinancialAccountSummary[];
   grandTotalAccountsBalance: number;
-  cumulativeNetOperatingBalance: number; // New prop
+  cumulativeNetOperatingBalance: number;
 }
 
 const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
   totalUnpaidPledges,
+  totalOutstandingDebts, // Destructure new prop
   activeFinancialAccounts,
   grandTotalAccountsBalance,
-  cumulativeNetOperatingBalance, // Destructure new prop
+  cumulativeNetOperatingBalance,
 }) => {
   const { currency } = useSystemSettings();
 
@@ -40,6 +42,20 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
           <div className="text-xl font-bold text-destructive">{currency.symbol}{totalUnpaidPledges.toFixed(2)}</div> {/* Decreased font size */}
           <p className="text-xs text-muted-foreground">
             Outstanding commitments from members.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Total Outstanding Debts Card (New) */}
+      <Card className="flex-1 min-w-[150px] transition-all duration-300 ease-in-out hover:shadow-xl bg-yellow-100/10 border-yellow-500">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-yellow-600">Total Outstanding Debts</CardTitle>
+          <Scale className="h-4 w-4 text-yellow-600" />
+        </CardHeader>
+        <CardContent className="p-3">
+          <div className="text-xl font-bold text-yellow-600">{currency.symbol}{totalOutstandingDebts.toFixed(2)}</div>
+          <p className="text-xs text-muted-foreground">
+            Total amount owed to the organization.
           </p>
         </CardContent>
       </Card>

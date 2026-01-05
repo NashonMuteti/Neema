@@ -14,6 +14,7 @@ interface FinancialAccountSummary {
 
 interface FinancialSummaryResult {
   totalUnpaidPledges: number;
+  totalOutstandingDebts: number; // New: Total outstanding debts
   activeFinancialAccounts: FinancialAccountSummary[];
   grandTotalAccountsBalance: number;
   cumulativeNetOperatingBalance: number;
@@ -29,6 +30,7 @@ export const useFinancialSummary = () => {
     if (!currentUser) {
       return {
         totalUnpaidPledges: 0,
+        totalOutstandingDebts: 0, // Default for new field
         activeFinancialAccounts: [],
         grandTotalAccountsBalance: 0,
         cumulativeNetOperatingBalance: 0,
@@ -45,6 +47,20 @@ export const useFinancialSummary = () => {
       const { data: unpaidPledgesData, error: unpaidPledgesError } = await unpaidPledgesQuery;
       if (unpaidPledgesError) throw unpaidPledgesError;
       const totalUnpaidPledges = (unpaidPledgesData || []).reduce((sum, pledge) => sum + (pledge.amount - pledge.paid_amount), 0);
+
+      // New: Fetch total outstanding debts
+      let outstandingDebtsQuery = supabase
+        .from('debts')
+        .select('amount_due')
+        .neq('status', 'Paid'); // Only count debts that are not fully paid
+      if (!isAdmin) {
+        // If not admin, only show debts created by or owed by the current user
+        outstandingDebtsQuery = outstandingDebtsQuery.or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`);
+      }
+      const { data: outstandingDebtsData, error: outstandingDebtsError } = await outstandingDebtsQuery;
+      if (outstandingDebtsError) throw outstandingDebtsError;
+      const totalOutstandingDebts = (outstandingDebtsData || []).reduce((sum, debt) => sum + debt.amount_due, 0);
+
 
       let accountsQuery = supabase
         .from('financial_accounts')
@@ -84,6 +100,7 @@ export const useFinancialSummary = () => {
 
       return {
         totalUnpaidPledges,
+        totalOutstandingDebts, // Return new field
         activeFinancialAccounts,
         grandTotalAccountsBalance,
         cumulativeNetOperatingBalance,
@@ -105,6 +122,7 @@ export const useFinancialSummary = () => {
 
   return {
     totalUnpaidPledges: data?.totalUnpaidPledges || 0,
+    totalOutstandingDebts: data?.totalOutstandingDebts || 0, // Return new field
     activeFinancialAccounts: data?.activeFinancialAccounts || [],
     grandTotalAccountsBalance: data?.grandTotalAccountsBalance || 0,
     cumulativeNetOperatingBalance: data?.cumulativeNetOperatingBalance || 0,
