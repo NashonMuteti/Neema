@@ -129,7 +129,7 @@ const DashboardTableBankingCalendar: React.FC = () => {
       // Fetch Financial Accounts
       let accountsQuery = supabase
         .from('financial_accounts')
-        .select('id, name, current_balance, initial_balance, profile_id'); // Select all fields for FinancialAccount type
+        .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments'); // Select all fields for FinancialAccount type
       if (!isAdmin) {
         accountsQuery = accountsQuery.eq('profile_id', currentUser.id);
       }
