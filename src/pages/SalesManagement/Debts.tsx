@@ -31,6 +31,8 @@ import { useSystemSettings } from "@/context/SystemSettingsContext";
 import AddEditDebtDialog, { Debt } from "@/components/sales-management/AddEditDebtDialog";
 import RecordDebtPaymentDialog from "@/components/sales-management/RecordDebtPaymentDialog";
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import { format } from "date-fns"; // Added import for format
+import { Member, FinancialAccount } from "@/types/common"; // Added import for Member and FinancialAccount
 
 const Debts = () => {
   const { currentUser } = useAuth();
@@ -48,6 +50,8 @@ const Debts = () => {
   }, [currentUser, definedRoles]);
 
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [members, setMembers] = useState<Member[]>([]); // State for members
+  const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]); // State for financial accounts
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -59,12 +63,44 @@ const Debts = () => {
   const [deletingDebtId, setDeletingDebtId] = useState<string | undefined>(undefined);
   const [isRecordPaymentDialogOpen, setIsRecordPaymentDialogOpen] = useState(false);
   const [selectedDebtForPayment, setSelectedDebtForPayment] = useState<Debt | undefined>(undefined);
+  const [isProcessing, setIsProcessing] = useState(false); // New state for processing
 
-  const fetchDebts = useCallback(async () => {
+  const fetchInitialData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    let query = supabase.from('debts').select('*');
+    // Fetch Members
+    const { data: membersData, error: membersError } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .order('name', { ascending: true });
+
+    if (membersError) {
+      console.error("Error fetching members:", membersError);
+      showError("Failed to load members for debt association.");
+    } else {
+      setMembers(membersData || []);
+    }
+
+    // Fetch Financial Accounts
+    const { data: accountsData, error: accountsError } = await supabase
+      .from('financial_accounts')
+      .select('id, name, current_balance, can_receive_payments')
+      .order('name', { ascending: true });
+
+    if (accountsError) {
+      console.error("Error fetching financial accounts:", accountsError);
+      showError("Failed to load financial accounts.");
+    } else {
+      setFinancialAccounts(accountsData || []);
+    }
+
+    let query = supabase.from('debts').select(`
+      *,
+      created_by_profile:profiles!debts_created_by_profile_id_fkey(name, email),
+      debtor_profile:profiles!debts_debtor_profile_id_fkey(name, email),
+      sales_transactions(notes)
+    `);
 
     if (debouncedSearchQuery) { // Use debounced query
       query = query.or(`customer_name.ilike.%${debouncedSearchQuery}%,description.ilike.%${debouncedSearchQuery}%`);
@@ -78,20 +114,38 @@ const Debts = () => {
       showError("Failed to load debts.");
       setDebts([]);
     } else {
-      setDebts(data || []);
+      setDebts((data || []).map((d: any) => ({
+        id: d.id,
+        created_by_profile_id: d.created_by_profile_id,
+        sale_id: d.sale_id || undefined,
+        debtor_profile_id: d.debtor_profile_id || undefined,
+        customer_name: d.customer_name || undefined,
+        description: d.description,
+        original_amount: d.original_amount,
+        amount_due: d.amount_due,
+        due_date: d.due_date ? parseISO(d.due_date) : undefined,
+        status: d.status,
+        notes: d.notes || undefined,
+        created_at: parseISO(d.created_at),
+        created_by_name: d.created_by_profile?.name || d.created_by_profile?.email || 'N/A',
+        debtor_name: d.debtor_profile?.name || d.debtor_profile?.email || d.customer_name || 'N/A',
+        sale_description: d.sales_transactions?.notes || undefined,
+      })) || []);
     }
     setLoading(false);
-  }, [debouncedSearchQuery]); // Depend on debounced query
+  }, [debouncedSearchQuery, currentUser]); // Depend on debounced query and currentUser
 
   useEffect(() => {
-    fetchDebts();
-  }, [fetchDebts]);
+    fetchInitialData();
+  }, [fetchInitialData]);
 
-  const handleSaveDebt = async (debtData: Omit<Debt, 'id' | 'profile_id'> & { id?: string; profile_id?: string }) => {
+  const handleSaveDebt = async (debtData: Omit<Debt, 'id' | 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string }) => {
     if (!currentUser) {
       showError("You must be logged in to manage debts.");
       return;
     }
+
+    setIsProcessing(true);
 
     if (debtData.id) {
       // Update existing debt
@@ -99,33 +153,36 @@ const Debts = () => {
         .from('debts')
         .update({
           customer_name: debtData.customer_name,
-          amount_owed: debtData.amount_owed,
-          amount_paid: debtData.amount_paid,
-          due_date: debtData.due_date,
           description: debtData.description,
+          original_amount: debtData.original_amount,
+          amount_due: debtData.amount_due, // This should be managed by payments, but for initial edit, it might be set
+          due_date: debtData.due_date?.toISOString() || null,
+          debtor_profile_id: debtData.debtor_profile_id || null,
+          notes: debtData.notes || null,
           status: debtData.status,
         })
-        .eq('id', debtData.id)
-        .eq('profile_id', debtData.profile_id || currentUser.id);
+        .eq('id', debtData.id);
       
       if (error) {
         console.error("Error updating debt:", error);
         showError("Failed to update debt.");
       } else {
         showSuccess("Debt updated successfully!");
-        fetchDebts();
+        fetchInitialData();
       }
     } else {
       // Add new debt
       const { error } = await supabase
         .from('debts')
         .insert({
-          profile_id: currentUser.id,
-          customer_name: debtData.customer_name,
-          amount_owed: debtData.amount_owed,
-          amount_paid: 0, // New debts start with 0 paid
-          due_date: debtData.due_date,
+          created_by_profile_id: currentUser.id,
+          customer_name: debtData.customer_name || null,
           description: debtData.description,
+          original_amount: debtData.original_amount,
+          amount_due: debtData.original_amount, // New debts start with amount_due equal to original_amount
+          due_date: debtData.due_date?.toISOString() || null,
+          debtor_profile_id: debtData.debtor_profile_id || null,
+          notes: debtData.notes || null,
           status: "Outstanding", // New debts are outstanding by default
         });
       
@@ -134,52 +191,56 @@ const Debts = () => {
         showError("Failed to add debt.");
       } else {
         showSuccess("Debt added successfully!");
-        fetchDebts();
+        fetchInitialData();
       }
     }
+    setIsProcessing(false);
   };
 
   const handleDeleteDebt = async () => {
-    if (deletingDebtId) {
-      const { error } = await supabase
-        .from('debts')
-        .delete()
-        .eq('id', deletingDebtId);
-
-      if (error) {
-        console.error("Error deleting debt:", error);
-        showError("Failed to delete debt.");
-      } else {
-        showSuccess("Debt deleted successfully!");
-        setDeletingDebtId(undefined);
-        fetchDebts();
-      }
+    if (!deletingDebtId || !currentUser) {
+      showError("No debt selected for deletion or user not logged in.");
+      return;
     }
+    setIsProcessing(true);
+    const { error } = await supabase
+      .from('debts')
+      .delete()
+      .eq('id', deletingDebtId);
+
+    if (error) {
+      console.error("Error deleting debt:", error);
+      showError("Failed to delete debt.");
+    } else {
+      showSuccess("Debt deleted successfully!");
+      setDeletingDebtId(undefined);
+      fetchInitialData();
+    }
+    setIsProcessing(false);
   };
 
-  const handleRecordPayment = async (debtId: string, paymentAmount: number, receivedIntoAccountId: string) => {
+  const handleRecordPayment = async (paymentData: {
+    debtId: string;
+    amount: number;
+    paymentDate: Date;
+    paymentMethod: string;
+    receivedIntoAccountId: string;
+    notes?: string;
+  }) => {
     if (!currentUser) {
       showError("You must be logged in to record payments.");
       return;
     }
 
-    const debtToUpdate = debts.find(d => d.id === debtId);
-    if (!debtToUpdate) {
-      showError("Debt not found.");
-      return;
-    }
+    setIsProcessing(true);
 
-    const newAmountPaid = debtToUpdate.amount_paid + paymentAmount;
-    let newStatus = debtToUpdate.status;
-    if (newAmountPaid >= debtToUpdate.amount_owed) {
-      newStatus = "Paid";
-    }
-
-    // Use the atomic RPC function for debt payments
     const { error: rpcError } = await supabase.rpc('record_debt_payment_atomic', {
-      p_debt_id: debtId,
-      p_amount_paid: paymentAmount,
-      p_received_into_account_id: receivedIntoAccountId,
+      p_debt_id: paymentData.debtId,
+      p_amount: paymentData.amount,
+      p_payment_date: paymentData.paymentDate.toISOString(),
+      p_payment_method: paymentData.paymentMethod,
+      p_received_into_account_id: paymentData.receivedIntoAccountId,
+      p_notes: paymentData.notes || null,
       p_actor_profile_id: currentUser.id,
     });
 
@@ -187,9 +248,10 @@ const Debts = () => {
       console.error("Error recording debt payment:", rpcError);
       showError(`Failed to record debt payment: ${rpcError.message}`);
     } else {
-      showSuccess(`Payment of ${currency.symbol}${paymentAmount.toFixed(2)} recorded successfully!`);
-      fetchDebts(); // Re-fetch to update the list and status
+      showSuccess(`Payment of ${currency.symbol}${paymentData.amount.toFixed(2)} recorded successfully!`);
+      fetchInitialData(); // Re-fetch to update the list and status
     }
+    setIsProcessing(false);
   };
 
   const openEditDialog = (debt: Debt) => {
@@ -257,9 +319,9 @@ const Debts = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[150px]">Customer Name</TableHead>
+                  <TableHead className="w-[150px]">Debtor</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount Owed</TableHead>
+                  <TableHead className="text-right">Original Amount</TableHead>
                   <TableHead className="text-right">Amount Paid</TableHead>
                   <TableHead className="text-right">Balance Due</TableHead>
                   <TableHead>Due Date</TableHead>
@@ -270,14 +332,14 @@ const Debts = () => {
               <TableBody>
                 {debts.map((debt) => (
                   <TableRow key={debt.id}>
-                    <TableCell className="font-medium">{debt.customer_name}</TableCell>
+                    <TableCell className="font-medium">{debt.debtor_name}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{debt.description || "-"}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{debt.amount_owed.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{debt.amount_paid.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{debt.original_amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{(debt.original_amount - debt.amount_due).toFixed(2)}</TableCell>
                     <TableCell className="text-right font-semibold">
-                      {currency.symbol}{(debt.amount_owed - debt.amount_paid).toFixed(2)}
+                      {currency.symbol}{debt.amount_due.toFixed(2)}
                     </TableCell>
-                    <TableCell>{debt.due_date ? format(new Date(debt.due_date), "MMM dd, yyyy") : "-"}</TableCell>
+                    <TableCell>{debt.due_date ? format(debt.due_date, "MMM dd, yyyy") : "-"}</TableCell>
                     <TableCell>
                       <span className={`font-medium ${debt.status === "Paid" ? "text-green-600" : debt.status === "Overdue" ? "text-destructive" : "text-yellow-600"}`}>
                         {debt.status}
@@ -286,15 +348,20 @@ const Debts = () => {
                     {canManageDebts && (
                       <TableCell className="text-center">
                         <div className="flex justify-center space-x-2">
-                          {debt.status !== "Paid" && (
-                            <Button variant="outline" size="sm" onClick={() => openRecordPaymentDialog(debt)}>
+                          {debt.amount_due > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openRecordPaymentDialog(debt)}
+                              disabled={isProcessing}
+                            >
                               <DollarSign className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button variant="outline" size="sm" onClick={() => openEditDialog(debt)}>
+                          <Button variant="outline" size="sm" onClick={() => openEditDialog(debt)} disabled={isProcessing}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(debt.id)}>
+                          <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(debt.id)} disabled={isProcessing}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -305,7 +372,7 @@ const Debts = () => {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center mt-4">No debts found matching your search.</p>
+            <p className="text-muted-foreground text-center mt-4">No debts found matching your search or filters.</p>
           )}
         </CardContent>
       </Card>
@@ -317,6 +384,7 @@ const Debts = () => {
         initialData={editingDebt}
         onSave={handleSaveDebt}
         canManageDebts={canManageDebts}
+        members={members} {/* Pass members here */}
       />
 
       {/* Record Payment Dialog */}
@@ -326,6 +394,9 @@ const Debts = () => {
           setIsOpen={setIsRecordPaymentDialogOpen}
           debt={selectedDebtForPayment}
           onRecordPayment={handleRecordPayment}
+          canManageDebts={canManageDebts}
+          financialAccounts={financialAccounts} {/* Pass financialAccounts here */}
+          isProcessing={isProcessing}
         />
       )}
 
@@ -340,7 +411,7 @@ const Debts = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteDebt} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={handleDeleteDebt} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isProcessing}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

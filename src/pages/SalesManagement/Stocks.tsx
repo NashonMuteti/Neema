@@ -24,6 +24,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select, // Added import
+  SelectContent, // Added import
+  SelectGroup, // Added import
+  SelectItem, // Added import
+  SelectLabel, // Added import
+  SelectTrigger, // Added import
+  SelectValue, // Added import
+} from "@/components/ui/select"; // Added import
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
