@@ -108,7 +108,7 @@ const Debts = () => {
     // Fetch Financial Accounts
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance, initial_balance, profile_id') // Added initial_balance and profile_id
+      .select('id, name, current_balance, initial_balance, profile_id') // Include initial_balance and profile_id
       .eq('profile_id', currentUser.id) // Only show accounts owned by the current user
       .order('name', { ascending: true });
 
@@ -138,8 +138,8 @@ const Debts = () => {
         status,
         notes,
         created_at,
-        createdByProfile: profiles!debts_created_by_profile_id_fkey(name, email), -- Creator profile
-        debtorProfile: profiles!debts_debtor_profile_id_fkey(name, email), -- Debtor profile
+        createdByProfile:profiles!debts_created_by_profile_id_fkey(name, email), -- Creator profile
+        debtorProfile:profiles!debts_debtor_profile_id_fkey(name, email), -- Debtor profile
         sales_transactions(notes) -- Sale description
       `)
       .gte('created_at', startOfMonth.toISOString())
@@ -166,8 +166,8 @@ const Debts = () => {
       setDebts([]);
     } else {
       const fetchedDebts: Debt[] = (debtsData || []).map((debt: any) => {
-        const createdByProfile = debt.createdByProfile;
-        const debtorProfile = debt.debtorProfile;
+        const createdByProfile = debt.createdByProfile; // Corrected access
+        const debtorProfile = debt.debtorProfile;     // Corrected access
         const saleTransaction = debt.sales_transactions;
 
         let status = debt.status as Debt['status'];
@@ -208,7 +208,7 @@ const Debts = () => {
     queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
   };
 
-  const handleSaveDebt = async (debtData: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description'> & { id?: string }) => {
+  const handleSaveDebt = async (debtData: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string }) => {
     if (!canManageDebts) {
       showError("You do not have permission to manage debts.");
       return;
@@ -245,7 +245,7 @@ const Debts = () => {
         const { error } = await supabase
           .from('debts')
           .insert({
-            created_by_profile_id: currentUser.id,
+            created_by_profile_id: currentUser.id, // Set created_by_profile_id here
             description: debtData.description,
             original_amount: debtData.original_amount,
             amount_due: debtData.original_amount, // New debts start with amount_due = original_amount

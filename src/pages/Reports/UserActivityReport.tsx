@@ -102,7 +102,7 @@ const UserActivityReport = () => {
         action: activity.action,
         details: activity.details,
         timestamp: activity.timestamp,
-        profiles: activity.profiles as JoinedProfile | null,
+        profiles: activity.profiles ? { name: activity.profiles.name, email: activity.profiles.email } : null, // Explicitly map to JoinedProfile
       })));
     }
     setLoading(false);

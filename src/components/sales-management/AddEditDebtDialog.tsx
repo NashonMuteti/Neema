@@ -53,7 +53,7 @@ interface AddEditDebtDialogProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   initialData?: Debt; // For editing existing debt
-  onSave: (debt: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description'> & { id?: string }) => void;
+  onSave: (debt: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string }) => void;
   canManageDebts: boolean;
   members: Member[]; // List of members to select as debtor
 }
@@ -109,8 +109,7 @@ const AddEditDebtDialog: React.FC<AddEditDebtDialogProps> = ({
 
     setIsSaving(true);
 
-    const debtData: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description'> & { id?: string } = {
-      id: initialData?.id, // Added this line
+    const debtData: Omit<Debt, 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string } = {
       description: description.trim(),
       original_amount: parsedOriginalAmount,
       amount_due: initialData?.amount_due ?? parsedOriginalAmount, // Keep existing amount_due or set to original for new debt
@@ -119,7 +118,6 @@ const AddEditDebtDialog: React.FC<AddEditDebtDialogProps> = ({
       customer_name: customerName.trim() || undefined,
       notes: notes.trim() || undefined,
       status: initialData?.status || (parsedOriginalAmount === (initialData?.amount_due ?? parsedOriginalAmount) ? "Outstanding" : "Partially Paid"), // Default status
-      created_by_profile_id: initialData?.created_by_profile_id || "", // Will be set by backend
       sale_id: initialData?.sale_id || undefined,
     };
 

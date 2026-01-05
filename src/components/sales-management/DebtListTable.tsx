@@ -37,7 +37,7 @@ interface DebtListTableProps {
 
 const getStatusBadgeClasses = (status: Debt['status'], dueDate?: Date) => {
   const today = new Date();
-  const isOverdue = dueDate && isPast(dueDate) && status !== "Paid";
+  const isOverdue = dueDate && isPast(dueDate) && status !== "Paid" && !isSameDay(dueDate, today); // Added !isSameDay
 
   if (isOverdue) {
     return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
