@@ -30,8 +30,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import AddEditDebtDialog, { Debt } from "@/components/sales-management/AddEditDebtDialog";
 import RecordDebtPaymentDialog from "@/components/sales-management/RecordDebtPaymentDialog";
-import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
-import { format } from "date-fns"; // Added import for format
+import { useDebounce } from "@/hooks/use-debounce";
+import { format, parseISO } from "date-fns"; // Added parseISO import
 import { Member, FinancialAccount } from "@/types/common"; // Added import for Member and FinancialAccount
 
 const Debts = () => {
@@ -85,7 +85,7 @@ const Debts = () => {
     // Fetch Financial Accounts
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance, can_receive_payments')
+      .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Added initial_balance and profile_id
       .order('name', { ascending: true });
 
     if (accountsError) {
@@ -384,7 +384,7 @@ const Debts = () => {
         initialData={editingDebt}
         onSave={handleSaveDebt}
         canManageDebts={canManageDebts}
-        members={members} {/* Pass members here */}
+        members={members} // Pass members here
       />
 
       {/* Record Payment Dialog */}
@@ -395,7 +395,7 @@ const Debts = () => {
           debt={selectedDebtForPayment}
           onRecordPayment={handleRecordPayment}
           canManageDebts={canManageDebts}
-          financialAccounts={financialAccounts} {/* Pass financialAccounts here */}
+          financialAccounts={financialAccounts} // Pass financialAccounts here
           isProcessing={isProcessing}
         />
       )}
