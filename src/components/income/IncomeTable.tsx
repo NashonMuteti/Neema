@@ -32,8 +32,8 @@ interface IncomeTableProps {
   setFilterMonth: (month: string) => void;
   filterYear: string;
   setFilterYear: (year: string) => void;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
+  searchQuery: string; // This is now the localSearchQuery from parent
+  setSearchQuery: (query: string) => void; // This is now setLocalSearchQuery from parent
   months: MonthYearOption[];
   years: MonthYearOption[];
   onEditTransaction: (transaction: IncomeTransaction) => void; // Updated signature

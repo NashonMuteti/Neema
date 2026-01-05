@@ -29,6 +29,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import AddEditProductDialog, { Product } from "@/components/sales-management/AddEditProductDialog";
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
 const Stocks = () => {
   const { currentUser } = useAuth();
@@ -48,7 +49,9 @@ const Stocks = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  
+  const [localSearchQuery, setLocalSearchQuery] = useState(""); // Local state for input
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
 
   const [isAddEditProductDialogOpen, setIsAddEditProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
@@ -60,8 +63,8 @@ const Stocks = () => {
 
     let query = supabase.from('products').select('*');
 
-    if (searchQuery) {
-      query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%`);
+    if (debouncedSearchQuery) { // Use debounced query
+      query = query.or(`name.ilike.%${debouncedSearchQuery}%,description.ilike.%${debouncedSearchQuery}%,sku.ilike.%${debouncedSearchQuery}%`);
     }
 
     const { data, error } = await query.order('name', { ascending: true });
@@ -75,7 +78,7 @@ const Stocks = () => {
       setProducts(data || []);
     }
     setLoading(false);
-  }, [searchQuery]);
+  }, [debouncedSearchQuery]); // Depend on debounced query
 
   useEffect(() => {
     fetchProducts();
@@ -193,8 +196,8 @@ const Stocks = () => {
               <Input
                 type="text"
                 placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={localSearchQuery} // Use local state for input
+                onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
                 className="pl-8"
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />

@@ -25,6 +25,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Member, FinancialAccount, Pledge } from "@/types/common"; // Updated Pledge import
 import { useQueryClient } from "@tanstack/react-query"; // New import
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
 interface Project {
   id: string;
@@ -69,9 +70,10 @@ const Pledges = () => {
 
   const currentYear = getYear(new Date());
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All");
-  // Removed filterMonth state
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  const [searchQuery, setSearchQuery] = React.useState("");
+  
+  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -169,9 +171,9 @@ const Pledges = () => {
       }));
 
       const filteredBySearch = fetchedPledges.filter(pledge =>
-        (pledge.member_name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (pledge.project_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (pledge.comments || "").toLowerCase().includes(searchQuery.toLowerCase())
+        (pledge.member_name || "").toLowerCase().includes(debouncedSearchQuery.toLowerCase()) || // Use debounced query
+        (pledge.project_name || "").toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        (pledge.comments || "").toLowerCase().includes(debouncedSearchQuery.toLowerCase())
       );
 
       const sortedPledges = filteredBySearch.sort((a, b) => {
@@ -187,7 +189,7 @@ const Pledges = () => {
       setPledges(sortedPledges);
     }
     setLoading(false);
-  }, [filterYear, filterStatus, searchQuery]);
+  }, [filterYear, filterStatus, debouncedSearchQuery]); // Depend on debounced query
 
   React.useEffect(() => {
     fetchInitialData();
@@ -365,8 +367,8 @@ const Pledges = () => {
               setFilterStatus={setFilterStatus}
               filterYear={filterYear}
               setFilterYear={setFilterYear}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
+              searchQuery={localSearchQuery} // Pass local state to filter component
+              setSearchQuery={setLocalSearchQuery} // Pass local state setter
               months={months}
               years={years}
             />

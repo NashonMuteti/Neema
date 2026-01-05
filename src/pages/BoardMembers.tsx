@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
 const BoardMembers = () => {
   const { currentUser } = useAuth();
@@ -47,7 +48,10 @@ const BoardMembers = () => {
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = React.useState(false);
   const [editingMember, setEditingMember] = React.useState<BoardMember | undefined>(undefined);
   const [deletingMemberId, setDeletingMemberId] = React.useState<string | undefined>(undefined);
-  const [searchQuery, setSearchQuery] = React.useState("");
+  
+  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -57,8 +61,8 @@ const BoardMembers = () => {
 
     let query = supabase.from('board_members').select('*');
 
-    if (searchQuery) {
-      query = query.or(`name.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%`);
+    if (debouncedSearchQuery) { // Use debounced query
+      query = query.or(`name.ilike.%${debouncedSearchQuery}%,role.ilike.%${debouncedSearchQuery}%,email.ilike.%${debouncedSearchQuery}%,phone.ilike.%${debouncedSearchQuery}%`);
     }
 
     const { data, error } = await query.order('name', { ascending: true });
@@ -72,7 +76,7 @@ const BoardMembers = () => {
       setBoardMembers(data || []);
     }
     setLoading(false);
-  }, [searchQuery]);
+  }, [debouncedSearchQuery]); // Depend on debounced query
 
   useEffect(() => {
     fetchBoardMembers();
@@ -169,8 +173,8 @@ const BoardMembers = () => {
               <Input
                 type="text"
                 placeholder="Search board members..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={localSearchQuery} // Use local state for input
+                onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
                 className="pl-8"
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />

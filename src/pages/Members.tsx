@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import MemberFilters from "@/components/members/MemberFilters";
 import MemberListTable from "@/components/members/MemberListTable";
 import MemberActions from "@/components/members/MemberActions";
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
 const Members = () => {
   const { currentUser } = useAuth();
@@ -33,7 +34,10 @@ const Members = () => {
 
   const [members, setMembers] = React.useState<User[]>([]);
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Inactive" | "Suspended">("All");
-  const [searchQuery, setSearchQuery] = React.useState("");
+  
+  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -56,8 +60,8 @@ const Members = () => {
       query = query.eq('status', filterStatus);
     }
 
-    if (searchQuery) {
-      query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+    if (debouncedSearchQuery) { // Use debounced query
+      query = query.or(`name.ilike.%${debouncedSearchQuery}%,email.ilike.%${debouncedSearchQuery}%`);
     }
 
     const { data, error } = await query.order('name', { ascending: true });
@@ -80,7 +84,7 @@ const Members = () => {
       })));
     }
     setLoading(false);
-  }, [filterStatus, searchQuery, currentUser, canManageMembers]);
+  }, [filterStatus, debouncedSearchQuery, currentUser, canManageMembers]); // Depend on debounced query
 
   useEffect(() => {
     fetchMembers();
@@ -172,8 +176,8 @@ const Members = () => {
           <MemberFilters
             filterStatus={filterStatus}
             setFilterStatus={setFilterStatus}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
+            searchQuery={localSearchQuery} // Pass local state to filter component
+            setSearchQuery={setLocalSearchQuery} // Pass local state setter
           />
           <MemberActions
             canExportPdf={canExportPdf}

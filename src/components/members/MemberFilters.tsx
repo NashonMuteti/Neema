@@ -16,8 +16,8 @@ import { Search } from "lucide-react";
 interface MemberFiltersProps {
   filterStatus: "All" | "Active" | "Inactive" | "Suspended";
   setFilterStatus: (status: "All" | "Active" | "Inactive" | "Suspended") => void;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
+  searchQuery: string; // This is now the localSearchQuery from parent
+  setSearchQuery: (query: string) => void; // This is now setLocalSearchQuery from parent
 }
 
 const MemberFilters: React.FC<MemberFiltersProps> = ({

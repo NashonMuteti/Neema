@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client"; // Import Supabase cl
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import { useQueryClient } from "@tanstack/react-query"; // New import
 import { Project as CommonProject, FinancialAccount, MonthYearOption } from "@/types/common"; // Import Project and FinancialAccount from common.ts
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
 interface Project {
   id: string;
@@ -59,7 +60,10 @@ const Projects = () => {
   const [activeMembersCount, setActiveMembersCount] = useState(0); // New state for active members count
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [filterStatus, setFilterStatus] = React.useState<"Open" | "Closed" | "Suspended" | "All">("Open");
-  const [searchQuery, setSearchQuery] = React.useState("");
+  
+  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [projectFinancialSummaries, setProjectFinancialSummaries] = useState<Map<string, { totalCollections: number; totalPledged: number }>>(new Map());
@@ -105,8 +109,8 @@ const Projects = () => {
       query = query.neq('status', 'Deleted');
     }
     
-    if (searchQuery) {
-      query = query.ilike('name', `%${searchQuery}%`);
+    if (debouncedSearchQuery) { // Use debounced query
+      query = query.ilike('name', `%${debouncedSearchQuery}%`);
     }
     
     const { data, error } = await query.order('created_at', { ascending: false });
@@ -130,7 +134,7 @@ const Projects = () => {
     }
     
     setLoading(false);
-  }, [filterStatus, searchQuery]);
+  }, [filterStatus, debouncedSearchQuery]); // Depend on debounced query
 
   useEffect(() => {
     fetchProjects();
@@ -366,8 +370,8 @@ const Projects = () => {
             <Input 
               type="text" 
               placeholder="Search projects..." 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
+              value={localSearchQuery} // Use local state for input
+              onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
               className="pl-8" 
             />
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />

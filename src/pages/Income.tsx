@@ -14,6 +14,7 @@ import IncomeTable from "@/components/income/IncomeTable";
 import EditIncomeDialog from "@/components/income/EditIncomeDialog"; // New import
 import DeleteIncomeDialog from "@/components/income/DeleteIncomeDialog"; // New import
 import { FinancialAccount, Member, MonthYearOption } from "@/types/common"; // Unified imports
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
 interface IncomeTransaction {
   id: string;
@@ -57,7 +58,9 @@ const Income = () => {
   const currentMonth = getMonth(new Date()); // 0-indexed
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  const [searchQuery, setSearchQuery] = React.useState("");
+  
+  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
 
   const months: MonthYearOption[] = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -127,8 +130,8 @@ const Income = () => {
       query = query.eq('profile_id', currentUser.id); // Use profile_id
     }
       
-    if (searchQuery) {
-      query = query.ilike('source', `%${searchQuery}%`);
+    if (debouncedSearchQuery) { // Use debounced query
+      query = query.ilike('source', `%${debouncedSearchQuery}%`);
     }
     
     const { data, error } = await query.order('date', { ascending: false });
@@ -151,7 +154,7 @@ const Income = () => {
     }
     
     setLoading(false);
-  }, [currentUser, filterMonth, filterYear, searchQuery]);
+  }, [currentUser, filterMonth, filterYear, debouncedSearchQuery]); // Depend on debounced query
 
   React.useEffect(() => {
     fetchFinancialAccountsAndMembers();
@@ -410,8 +413,8 @@ const Income = () => {
             setFilterMonth={setFilterMonth}
             filterYear={filterYear}
             setFilterYear={setFilterYear}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
+            searchQuery={localSearchQuery} // Pass local state to table component
+            setSearchQuery={setLocalSearchQuery} // Pass local state setter
             months={months}
             years={years}
             onEditTransaction={handleEditTransaction}

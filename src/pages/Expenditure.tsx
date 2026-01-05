@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import { useQueryClient } from "@tanstack/react-query"; // New import
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
 interface FinancialAccount {
   id: string;
@@ -77,7 +78,9 @@ const Expenditure = () => {
   const currentMonth = getMonth(new Date()); // 0-indexed
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  const [searchQuery, setSearchQuery] = React.useState("");
+  
+  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i.toString(),
@@ -149,8 +152,8 @@ const Expenditure = () => {
       query = query.eq('profile_id', currentUser.id);
     }
       
-    if (searchQuery) {
-      query = query.ilike('purpose', `%${searchQuery}%`);
+    if (debouncedSearchQuery) { // Use debounced query
+      query = query.ilike('purpose', `%${debouncedSearchQuery}%`);
     }
     
     const { data, error } = await query.order('date', { ascending: false });
@@ -173,7 +176,7 @@ const Expenditure = () => {
     }
     
     setLoading(false);
-  }, [currentUser, filterMonth, filterYear, searchQuery]);
+  }, [currentUser, filterMonth, filterYear, debouncedSearchQuery]); // Depend on debounced query
 
   React.useEffect(() => {
     fetchFinancialAccountsAndMembers();
@@ -471,8 +474,8 @@ const Expenditure = () => {
                 <Input
                   type="text"
                   placeholder="Search purpose..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={localSearchQuery} // Use local state for input
+                  onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
                   className="pl-8"
                   id="expenditure-search-query"
                 />
