@@ -108,7 +108,7 @@ export const useProjectPledges = ({ projectId, projectName, onPledgesUpdated }: 
       if (!currentUser) return [];
       const { data, error } = await supabase
         .from('financial_accounts')
-        .select('id, name, current_balance, initial_balance, profile_id')
+        .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Added can_receive_payments
         .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
       if (error) throw error;
