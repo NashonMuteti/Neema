@@ -76,17 +76,12 @@ const PledgeReport = () => {
   const [isProcessing, setIsProcessing] = React.useState(false); // New state for processing status
 
   const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date()); // 0-indexed
 
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All"); // Updated filter options
-  const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
+  // Removed filterMonth state
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  const months = Array.from({ length: 12 }, (_, i) => ({
-    value: i.toString(),
-    label: format(new Date(0, i), "MMMM"),
-  }));
   const years = Array.from({ length: 5 }, (_, i) => ({
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
@@ -117,7 +112,7 @@ const PledgeReport = () => {
     if (currentUser) {
       const { data: accountsData, error: accountsError } = await supabase
         .from('financial_accounts')
-        .select('id, name, current_balance, initial_balance, profile_id') // Added initial_balance and profile_id
+        .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Added initial_balance and profile_id
         .order('name', { ascending: true });
 
       if (accountsError) {
@@ -136,7 +131,7 @@ const PledgeReport = () => {
     if (projectsError) { console.error("Error fetching projects:", projectsError); setError("Failed to load projects."); }
     else { setProjects(projectsData || []); }
 
-    // Fetch pledges for the entire selected year, not just a month
+    // Fetch pledges for the entire selected year
     const startOfYear = new Date(parseInt(filterYear), 0, 1);
     const endOfYear = new Date(parseInt(filterYear), 11, 31, 23, 59, 59);
 
@@ -368,21 +363,7 @@ const PledgeReport = () => {
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              <Select value={filterMonth} onValueChange={setFilterMonth}>
-                <SelectTrigger id="pledge-report-filter-month" className="w-[140px]">
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Month</SelectLabel>
-                      {months.map((month) => (
-                        <SelectItem key={month.value} value={month.value}>
-                          {month.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              {/* Removed month filter */}
               <Select value={filterYear} onValueChange={setFilterYear}>
                 <SelectTrigger id="pledge-report-filter-year" className="w-[120px]">
                   <SelectValue placeholder="Select year" />

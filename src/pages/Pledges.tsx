@@ -69,6 +69,7 @@ const Pledges = () => {
 
   const currentYear = getYear(new Date());
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All");
+  // Removed filterMonth state
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
   const [searchQuery, setSearchQuery] = React.useState("");
 
