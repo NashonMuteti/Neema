@@ -9,9 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { showSuccess, showError } from "@/utils/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,310 +20,84 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Search, Edit, Trash2, CheckCircle } from "lucide-react";
-import { format, getMonth, getYear, isBefore, startOfDay, parseISO } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { Search } from "lucide-react";
+import { format, getMonth, getYear, parseISO } from "date-fns";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { PostgrestError } from "@supabase/supabase-js";
-import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-import EditPledgeDialog, { Pledge as EditPledgeDialogPledge } from "@/components/pledges/EditPledgeDialog"; // Import the new dialog and its Pledge type
-import MarkPledgeAsPaidDialog from "@/components/pledges/MarkPledgeAsPaidDialog"; // Added this import
-import { FinancialAccount, Pledge } from "@/types/common"; // Updated Pledge import
+import { showError } from "@/utils/toast";
+import { useSystemSettings } from "@/context/SystemSettingsContext";
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
-// Add interfaces for fetched data
-interface Member { id: string; name: string; email: string; } // Added email for dialog
-interface Project { id: string; name: string; }
-
-// Define the expected structure of a pledge row with joined profile and project data
-interface PledgeRowWithJoinedData {
-  id: string;
-  member_id: string;
-  project_id: string;
-  amount: number; // This is now original_amount
-  paid_amount: number; // New field
-  due_date: string; // ISO string from DB
-  status: "Active" | "Paid" | "Overdue"; // Fixed: Added "Overdue"
-  profiles: { name: string; email: string } | null; // Joined profile data, added email
-  projects: { name: string } | null; // Joined project data
-  comments?: string; // Added comments
+interface PledgeReportEntry {
+  pledge_id: string;
+  member_name: string;
+  project_name: string;
+  original_amount: number;
+  paid_amount: number;
+  balance_due: number;
+  due_date: string; // ISO string
+  status: "Active" | "Paid" | "Overdue";
 }
 
 const PledgeReport = () => {
-  const { currentUser } = useAuth();
-  const { userRoles: definedRoles } = useUserRoles();
-  const { currency } = useSystemSettings(); // Use currency from context
+  const { currency } = useSystemSettings();
+  const currentYear = getYear(new Date());
+  const currentMonth = getMonth(new Date()); // 0-indexed
 
-  const { canManagePledges } = React.useMemo(() => {
-    if (!currentUser || !definedRoles) {
-      return { canManagePledges: false };
-    }
-    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
-    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-    const canManagePledges = currentUserPrivileges.includes("Manage Pledges");
-    return { canManagePledges };
-  }, [currentUser, definedRoles]);
+  const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
+  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
+  const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Paid" | "Overdue">("All");
+  
+  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
 
-  const [members, setMembers] = React.useState<Member[]>([]);
-  const [projects, setProjects] = React.useState<Project[]>([]);
-  const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]); // New state for financial accounts
-  const [pledges, setPledges] = React.useState<Pledge[]>([]);
+  const [pledgeReport, setPledgeReport] = React.useState<PledgeReportEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = React.useState(false); // New state for processing status
 
-  const currentYear = getYear(new Date());
-
-  const [filterStatus, setFilterStatus] = React.useState<"All" | "Paid" | "Unpaid">("All"); // Updated filter options
-  // Removed filterMonth state
-  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  const [searchQuery, setSearchQuery] = React.useState("");
-
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    value: i.toString(),
+    label: format(new Date(0, i), "MMMM"),
+  }));
   const years = Array.from({ length: 5 }, (_, i) => ({
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
   }));
 
-  // Helper to determine display status (Unpaid for Active/Overdue)
-  const getDisplayPledgeStatus = (pledge: Pledge): "Paid" | "Unpaid" => {
-    if (pledge.paid_amount >= pledge.original_amount) return "Paid";
-    return "Unpaid";
-  };
-
-  const fetchReportData = useCallback(async () => {
+  const fetchPledgeReport = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const { data: membersData, error: membersError } = await supabase
-      .from('profiles')
-      .select('id, name, email') // Fetch email for dialog
-      .order('name', { ascending: true });
+    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
+    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
-    const { data: projectsData, error: projectsError } = await supabase
-      .from('projects')
-      .select('id, name')
-      .order('name', { ascending: true });
-
-    // Fetch all financial accounts (not filtered by currentUser.id)
-    let financialAccountsData: FinancialAccount[] = [];
-    if (currentUser) {
-      const { data: accountsData, error: accountsError } = await supabase
-        .from('financial_accounts')
-        .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Added initial_balance and profile_id
-        .order('name', { ascending: true });
-
-      if (accountsError) {
-        console.error("Error fetching financial accounts:", accountsError);
-        showError("Failed to load financial accounts.");
-      } else {
-        financialAccountsData = (accountsData || []) as FinancialAccount[];
-      }
-    }
-    setFinancialAccounts(financialAccountsData);
-
-
-    if (membersError) { console.error("Error fetching members:", membersError); setError("Failed to load members."); }
-    else { setMembers(membersData || []); }
-
-    if (projectsError) { console.error("Error fetching projects:", projectsError); setError("Failed to load projects."); }
-    else { setProjects(projectsData || []); }
-
-    // Fetch pledges for the entire selected year
-    const startOfYear = new Date(parseInt(filterYear), 0, 1);
-    const endOfYear = new Date(parseInt(filterYear), 11, 31, 23, 59, 59);
-
-    let query = supabase
-      .from('project_pledges')
-      .select(`
-        id,
-        member_id,
-        project_id,
-        amount,
-        paid_amount,
-        due_date,
-        status,
-        comments,
-        profiles ( name, email ),
-        projects ( name )
-      `)
-      .gte('due_date', startOfYear.toISOString())
-      .lte('due_date', endOfYear.toISOString());
-      
-    if (filterStatus === "Paid") {
-      query = query.eq('status', 'Paid');
-    } else if (filterStatus === "Unpaid") {
-      query = query.in('status', ['Active', 'Overdue']);
-    }
-    // If filterStatus is "All", no status filter is applied to the DB query
-
-    const { data: pledgesData, error: pledgesError } = (await query.order('due_date', { ascending: false })) as { data: PledgeRowWithJoinedData[] | null, error: PostgrestError | null };
-
-    if (pledgesError) {
-      console.error("Error fetching pledges:", pledgesError);
-      setError("Failed to load pledges.");
-      setPledges([]);
-    } else {
-      const fetchedPledges: Pledge[] = (pledgesData || []).map(p => ({
-        id: p.id,
-        member_id: p.member_id,
-        project_id: p.project_id,
-        original_amount: p.amount,
-        paid_amount: p.paid_amount,
-        due_date: parseISO(p.due_date),
-        status: p.status === "Overdue" ? "Active" : p.status as "Active" | "Paid",
-        member_name: p.profiles?.name || 'Unknown Member',
-        project_name: p.projects?.name || 'Unknown Project',
-        comments: p.comments || undefined,
-      }));
-
-      const filteredBySearch = fetchedPledges.filter(pledge => {
-        const memberName = (pledge.member_name || "").toLowerCase();
-        const projectName = (pledge.project_name || "").toLowerCase();
-        const comments = (pledge.comments || "").toLowerCase();
-        const matchesSearch = memberName.includes(searchQuery.toLowerCase()) || 
-                              projectName.includes(searchQuery.toLowerCase()) ||
-                              comments.includes(searchQuery.toLowerCase());
-        return matchesSearch;
-      });
-
-      // Sort pledges: Unpaid first, then by due_date descending
-      const sortedPledges = filteredBySearch.sort((a, b) => {
-        const statusA = getDisplayPledgeStatus(a);
-        const statusB = getDisplayPledgeStatus(b);
-
-        if (statusA === "Unpaid" && statusB === "Paid") return -1;
-        if (statusA === "Paid" && statusB === "Unpaid") return 1;
-
-        return b.due_date.getTime() - a.due_date.getTime(); // Sort by due_date descending
-      });
-
-      setPledges(sortedPledges);
-    }
-    setLoading(false);
-  }, [filterYear, filterStatus, searchQuery, currentUser]);
-
-  useEffect(() => {
-    fetchReportData();
-  }, [fetchReportData]);
-
-  const filteredPledges = React.useMemo(() => {
-    return pledges.filter(pledge => {
-      const displayStatus = getDisplayPledgeStatus(pledge);
-      const matchesStatus = filterStatus === "All" || displayStatus === filterStatus;
-      return matchesStatus;
-    }).sort((a, b) => b.due_date.getTime() - a.due_date.getTime()); // Sort by due date descending
-  }, [pledges, filterStatus]);
-
-  const handleMarkAsPaid = async (pledgeId: string, amountPaid: number, receivedIntoAccountId: string, paymentDate: Date) => {
-    if (!canManagePledges) {
-      showError("You do not have permission to mark pledges as paid.");
-      return;
-    }
-    if (!currentUser) {
-      showError("You must be logged in to mark pledges as paid.");
-      return;
-    }
-
-    const pledgeToMark = pledges.find(p => p.id === pledgeId);
-    if (!pledgeToMark) {
-      showError("Pledge not found.");
-      return;
-    }
-
-    setIsProcessing(true); // Start processing
-    // Call the new atomic RPC function for pledge payments
-    const { error: rpcError } = await supabase.rpc('record_pledge_payment_atomic', {
-      p_pledge_id: pledgeId,
-      p_amount_paid: amountPaid,
-      p_received_into_account_id: receivedIntoAccountId,
-      p_actor_profile_id: currentUser.id,
-      p_payment_date: paymentDate.toISOString(),
+    const { data, error } = await supabase.rpc('get_pledge_report', {
+      p_start_date: startOfMonth.toISOString(),
+      p_end_date: endOfMonth.toISOString(),
+      p_status_filter: filterStatus === "All" ? null : filterStatus,
+      p_search_query: debouncedSearchQuery, // Use debounced query
     });
 
-    if (rpcError) {
-      console.error("Error recording pledge payment:", rpcError);
-      showError(`Failed to record pledge payment: ${rpcError.message}`);
+    if (error) {
+      console.error("Error fetching pledge report:", error);
+      setError("Failed to load pledge report.");
+      showError("Failed to load pledge report.");
+      setPledgeReport([]);
     } else {
-      showSuccess(`Pledge payment of ${currency.symbol}${amountPaid.toFixed(2)} recorded successfully!`);
-      fetchReportData(); // Re-fetch all data to update lists
+      setPledgeReport(data || []);
     }
-    setIsProcessing(false); // End processing
-  };
+    setLoading(false);
+  }, [filterMonth, filterYear, filterStatus, debouncedSearchQuery]); // Depend on debounced query
 
-  const handleEditPledge = (updatedPledge: EditPledgeDialogPledge) => {
-    // This function is called by the EditPledgeDialog on successful save
-    // We just need to re-fetch the data to update the table
-    fetchReportData();
-  };
-
-  const handleDeletePledge = async (id: string) => {
-    if (!canManagePledges) {
-      showError("You do not have permission to delete pledges.");
-      return;
-    }
-    if (!currentUser) {
-      showError("You must be logged in to delete pledges.");
-      return;
-    }
-
-    const pledgeToDelete = pledges.find(p => p.id === id);
-    if (!pledgeToDelete) {
-      showError("Pledge not found.");
-      return;
-    }
-
-    setIsProcessing(true); // Start processing
-    if (pledgeToDelete.paid_amount > 0) { // Check paid_amount instead of status
-      // Use the atomic reversal function for paid pledges
-      const { error: rpcError } = await supabase.rpc('reverse_paid_pledge_atomic', {
-        p_pledge_id: id,
-        p_profile_id: currentUser.id,
-      });
-
-      if (rpcError) {
-        console.error("Error reversing paid pledge:", rpcError);
-        showError(`Failed to delete paid pledge: ${rpcError.message}`);
-        setIsProcessing(false); // End processing
-        return;
-      }
-    } else {
-      // For unpaid pledges, proceed with direct deletion
-      const { error: deleteError } = await supabase
-        .from('project_pledges')
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) {
-        console.error("Error deleting pledge:", deleteError);
-        showError("Failed to delete pledge.");
-        setIsProcessing(false); // End processing
-        return;
-      }
-    }
-
-    showSuccess("Pledge deleted successfully!");
-    fetchReportData(); // Re-fetch all data to update lists
-    setIsProcessing(false); // End processing
-  };
-
-  const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
-    switch (displayStatus) {
-      case "Paid":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Unpaid":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-    }
-  };
+  useEffect(() => {
+    fetchPledgeReport();
+  }, [fetchPledgeReport]);
 
   if (loading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Pledge Report</h1>
-        <p className="text-lg text-muted-foreground">Loading pledges data...</p>
+        <p className="text-lg text-muted-foreground">Loading pledge report...</p>
       </div>
     );
   }
@@ -342,124 +115,116 @@ const PledgeReport = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Pledge Report</h1>
       <p className="text-lg text-muted-foreground">
-        View and manage pledges from members across all projects.
+        Comprehensive overview of all pledges, their status, and financial details.
       </p>
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
-          <CardTitle>Pledge List</CardTitle>
+          <CardTitle>Pledge Details</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
             <div className="flex flex-wrap items-center gap-4">
-              <Select value={filterStatus} onValueChange={(value: "All" | "Paid" | "Unpaid") => setFilterStatus(value)}>
-                <SelectTrigger id="pledge-report-filter-status" className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="All">All Pledges</SelectItem>
-                    <SelectItem value="Paid">Paid</SelectItem>
-                    <SelectItem value="Unpaid">Unpaid</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              {/* Removed month filter */}
-              <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger id="pledge-report-filter-year" className="w-[120px]">
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Year</SelectLabel>
-                    {years.map((year) => (
-                      <SelectItem key={year.value} value={year.value}>
-                        {year.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <div className="grid gap-1.5">
+                <Label htmlFor="filter-month">Month</Label>
+                <Select value={filterMonth} onValueChange={setFilterMonth}>
+                  <SelectTrigger id="filter-month" className="w-[140px]">
+                    <SelectValue placeholder="Select month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Month</SelectLabel>
+                      {months.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="filter-year">Year</Label>
+                <Select value={filterYear} onValueChange={setFilterYear}>
+                  <SelectTrigger id="filter-year" className="w-[120px]">
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Year</SelectLabel>
+                      {years.map((year) => (
+                        <SelectItem key={year.value} value={year.value}>
+                          {year.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="filter-status">Status</Label>
+                <Select value={filterStatus} onValueChange={(value: "All" | "Active" | "Paid" | "Overdue") => setFilterStatus(value)}>
+                  <SelectTrigger id="filter-status" className="w-[140px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Status</SelectLabel>
+                      <SelectItem value="All">All</SelectItem>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Paid">Paid</SelectItem>
+                      <SelectItem value="Overdue">Overdue</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="relative flex items-center">
                 <Input
                   type="text"
-                  placeholder="Search member/project..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search member or project..."
+                  value={localSearchQuery} // Use local state for input
+                  onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
                   className="pl-8"
-                  id="pledge-report-search-query"
                 />
                 <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
               </div>
             </div>
           </div>
 
-          {filteredPledges.length > 0 ? (
+          {pledgeReport.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead className="text-right">Pledged</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Remaining</TableHead>
+                  <TableHead>Member Name</TableHead>
+                  <TableHead>Project Name</TableHead>
+                  <TableHead className="text-right">Original Amount</TableHead>
+                  <TableHead className="text-right">Paid Amount</TableHead>
+                  <TableHead className="text-right">Balance Due</TableHead>
                   <TableHead>Due Date</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead>Comments</TableHead>
-                  {canManagePledges && <TableHead className="text-center">Actions</TableHead>}
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPledges.map((pledge) => {
-                  const displayStatus = getDisplayPledgeStatus(pledge);
-                  const memberName = members.find(m => m.id === pledge.member_id)?.name;
-                  const projectName = projects.find(p => p.id === pledge.project_id)?.name;
-                  const remaining = pledge.original_amount - pledge.paid_amount;
-                  return (
-                    <TableRow key={pledge.id}>
-                      <TableCell className="font-medium">{memberName}</TableCell>
-                      <TableCell>{projectName}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{pledge.original_amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{pledge.paid_amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{remaining.toFixed(2)}</TableCell>
-                      <TableCell>{format(pledge.due_date, "MMM dd, yyyy")}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge className={getStatusBadgeClasses(displayStatus)}>
-                          {displayStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[150px] truncate">{pledge.comments || "-"}</TableCell>
-                      {canManagePledges && (
-                        <TableCell className="text-center">
-                          <div className="flex justify-center space-x-2">
-                            {displayStatus !== "Paid" && (
-                              <MarkPledgeAsPaidDialog
-                                pledge={pledge}
-                                onConfirmPayment={handleMarkAsPaid}
-                                financialAccounts={financialAccounts}
-                                canManagePledges={canManagePledges}
-                                isProcessing={isProcessing} // Pass isProcessing prop
-                              />
-                            )}
-                            <EditPledgeDialog
-                              initialData={pledge as EditPledgeDialogPledge}
-                              onSave={handleEditPledge}
-                              members={members}
-                              projects={projects}
-                              financialAccounts={financialAccounts} // Pass financial accounts
-                            />
-                            <Button variant="ghost" size="icon" onClick={() => handleDeletePledge(pledge.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
+                {pledgeReport.map((pledge) => (
+                  <TableRow key={pledge.pledge_id}>
+                    <TableCell className="font-medium">{pledge.member_name}</TableCell>
+                    <TableCell>{pledge.project_name}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{pledge.original_amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{pledge.paid_amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {currency.symbol}{pledge.balance_due.toFixed(2)}
+                    </TableCell>
+                    <TableCell>{format(parseISO(pledge.due_date), "MMM dd, yyyy")}</TableCell>
+                    <TableCell>
+                      <span className={`font-medium ${pledge.status === "Paid" ? "text-green-600" : pledge.status === "Overdue" ? "text-destructive" : "text-yellow-600"}`}>
+                        {pledge.status}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center mt-4">No pledges found for the selected filters or search query.</p>
+            <p className="text-muted-foreground text-center mt-4">No pledges found for the selected period or matching your search.</p>
           )}
         </CardContent>
       </Card>

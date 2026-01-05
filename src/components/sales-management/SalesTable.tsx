@@ -46,6 +46,11 @@ interface SaleTransaction {
   sale_items: SaleItem[];
 }
 
+interface MonthYearOption {
+  value: string;
+  label: string;
+}
+
 interface SalesTableProps {
   salesTransactions: SaleTransaction[];
   canManageDailySales: boolean;
@@ -53,10 +58,10 @@ interface SalesTableProps {
   setFilterMonth: (month: string) => void;
   filterYear: string;
   setFilterYear: (year: string) => void;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  months: { value: string; label: string }[];
-  years: { value: string; label: string }[];
+  searchQuery: string; // This is now the localSearchQuery from parent
+  setSearchQuery: (query: string) => void; // This is now setLocalSearchQuery from parent
+  months: MonthYearOption[];
+  years: MonthYearOption[];
 }
 
 const SalesTable: React.FC<SalesTableProps> = ({
@@ -81,9 +86,9 @@ const SalesTable: React.FC<SalesTableProps> = ({
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 mb-4">
           <div className="grid gap-1.5 flex-1 min-w-[120px]">
-            <Label htmlFor="sales-filter-month">Month</Label>
+            <Label htmlFor="sales-table-filter-month">Month</Label>
             <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger id="sales-filter-month">
+              <SelectTrigger id="sales-table-filter-month">
                 <SelectValue placeholder="Select month" />
               </SelectTrigger>
               <SelectContent>
@@ -96,9 +101,9 @@ const SalesTable: React.FC<SalesTableProps> = ({
             </Select>
           </div>
           <div className="grid gap-1.5 flex-1 min-w-[100px]">
-            <Label htmlFor="sales-filter-year">Year</Label>
+            <Label htmlFor="sales-table-filter-year">Year</Label>
             <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger id="sales-filter-year">
+              <SelectTrigger id="sales-table-filter-year">
                 <SelectValue placeholder="Select year" />
               </SelectTrigger>
               <SelectContent>
@@ -113,11 +118,11 @@ const SalesTable: React.FC<SalesTableProps> = ({
           <div className="relative flex items-center flex-1 min-w-[180px]">
             <Input
               type="text"
-              placeholder="Search customer/notes..."
+              placeholder="Search customer or notes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8"
-              id="sales-search-query"
+              id="sales-table-search-query"
             />
             <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
           </div>
@@ -130,23 +135,39 @@ const SalesTable: React.FC<SalesTableProps> = ({
                 <TableHead>Date</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Items</TableHead>
-                <TableHead>Method</TableHead>
+                <TableHead>Payment</TableHead>
                 <TableHead>Account</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                {/* Actions column removed for simplicity in this refactor, can be added back if needed */}
+                {/* {canManageDailySales && <TableHead className="text-center">Actions</TableHead>} */}
               </TableRow>
             </TableHeader>
             <TableBody>
               {salesTransactions.map((sale) => (
                 <TableRow key={sale.id}>
                   <TableCell>{format(sale.sale_date, "MMM dd, yyyy")}</TableCell>
-                  <TableCell>{sale.customer_name || "-"}</TableCell>
+                  <TableCell>{sale.customer_name || "N/A"}</TableCell>
                   <TableCell>
-                    {sale.sale_items.map(item => `${item.quantity}x ${item.product_name}`).join(', ')}
+                    {sale.sale_items.map((item, index) => (
+                      <div key={index} className="text-xs text-muted-foreground">
+                        {item.quantity}x {item.product_name}
+                      </div>
+                    ))}
                   </TableCell>
-                  <TableCell className="capitalize">{sale.payment_method.replace(/-/g, " ")}</TableCell>
+                  <TableCell>{sale.payment_method}</TableCell>
                   <TableCell>{sale.account_name}</TableCell>
-                  <TableCell className="text-right">{currency.symbol}{sale.total_amount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-medium">{currency.symbol}{sale.total_amount.toFixed(2)}</TableCell>
+                  {/* {canManageDailySales && (
+                    <TableCell className="text-center">
+                      <div className="flex justify-center space-x-2">
+                        <Button variant="ghost" size="icon" onClick={() => console.log("Edit sale", sale.id)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => console.log("Delete sale", sale.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )} */}
                 </TableRow>
               ))}
             </TableBody>

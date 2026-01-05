@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -24,33 +24,35 @@ import { Search } from "lucide-react";
 import { format, getMonth, getYear, parseISO } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
 import { showError } from "@/utils/toast";
-import { logUserActivity } from "@/utils/activityLogger"; // Import the new logger
-import { JoinedProfile } from "@/types/common"; // Import JoinedProfile
+import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
 
-interface UserActivityLog {
-  id: string;
-  user_id: string;
-  action: string;
-  details: Record<string, any>;
-  timestamp: string; // ISO string
-  profiles: JoinedProfile | null; // Joined profile data
+interface DetailedContribution {
+  transaction_id: string;
+  member_name: string;
+  member_email: string;
+  project_name: string | null;
+  transaction_type: "Income" | "Pledge Payment";
+  amount: number;
+  transaction_date: string; // ISO string
+  account_name: string;
+  description: string | null;
 }
 
-const UserActivityReport = () => {
-  const { currentUser } = useAuth();
+const MemberContributionsDetailed = () => {
+  const { currency } = useSystemSettings();
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
 
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
+  const [filterType, setFilterType] = React.useState<"All" | "Income" | "Pledge Payment">("All");
   
   const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
   const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
 
-  const [activityLogs, setActivityLogs] = React.useState<UserActivityLog[]>([]);
+  const [detailedContributions, setDetailedContributions] = React.useState<DetailedContribution[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -63,68 +65,40 @@ const UserActivityReport = () => {
     label: (currentYear - 2 + i).toString(),
   }));
 
-  const fetchActivityLogs = React.useCallback(async () => {
+  const fetchDetailedContributions = useCallback(async () => {
     setLoading(true);
     setError(null);
-
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
 
     const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
     const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
 
-    let query = supabase
-      .from('user_activity_logs')
-      .select(`
-        id,
-        user_id,
-        action,
-        details,
-        timestamp,
-        profiles ( id, name, email )
-      `) // Added 'id' to profiles select
-      .gte('timestamp', startOfMonth.toISOString())
-      .lte('timestamp', endOfMonth.toISOString());
-
-    if (debouncedSearchQuery) { // Use debounced query
-      query = query.or(`action.ilike.%${debouncedSearchQuery}%,profiles.name.ilike.%${debouncedSearchQuery}%,profiles.email.ilike.%${debouncedSearchQuery}%`);
-    }
-
-    const { data, error } = await query.order('timestamp', { ascending: false });
+    const { data, error } = await supabase.rpc('get_detailed_member_contributions', {
+      p_start_date: startOfMonth.toISOString(),
+      p_end_date: endOfMonth.toISOString(),
+      p_transaction_type_filter: filterType === "All" ? null : filterType,
+      p_search_query: debouncedSearchQuery, // Use debounced query
+    });
 
     if (error) {
-      console.error("Error fetching user activity logs:", error);
-      setError("Failed to load user activity logs.");
-      showError("Failed to load user activity logs.");
-      setActivityLogs([]);
+      console.error("Error fetching detailed member contributions:", error);
+      setError("Failed to load detailed member contributions.");
+      showError("Failed to load detailed member contributions.");
+      setDetailedContributions([]);
     } else {
-      setActivityLogs((data || []).map((activity: any) => ({
-        id: activity.id,
-        user_id: activity.user_id,
-        action: activity.action,
-        details: activity.details,
-        timestamp: activity.timestamp,
-        profiles: activity.profiles ? { id: activity.profiles.id, name: activity.profiles.name, email: activity.profiles.email } : null, // Explicitly map to JoinedProfile
-      })));
+      setDetailedContributions(data || []);
     }
     setLoading(false);
-  }, [currentUser, filterMonth, filterYear, debouncedSearchQuery]); // Depend on debounced query
+  }, [filterMonth, filterYear, filterType, debouncedSearchQuery]); // Depend on debounced query
 
-  React.useEffect(() => {
-    fetchActivityLogs();
-    // Log a dummy activity when the report is viewed (for demonstration)
-    if (currentUser) {
-      logUserActivity(currentUser, "Viewed User Activity Report", { month: format(new Date(parseInt(filterYear), parseInt(filterMonth)), "MMMM yyyy") });
-    }
-  }, [fetchActivityLogs, currentUser, filterMonth, filterYear]);
+  useEffect(() => {
+    fetchDetailedContributions();
+  }, [fetchDetailedContributions]);
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-foreground">User Activity Report</h1>
-        <p className="text-lg text-muted-foreground">Loading user activity logs...</p>
+        <h1 className="text-3xl font-bold text-foreground">Detailed Member Contributions</h1>
+        <p className="text-lg text-muted-foreground">Loading detailed contributions...</p>
       </div>
     );
   }
@@ -132,7 +106,7 @@ const UserActivityReport = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-foreground">User Activity Report</h1>
+        <h1 className="text-3xl font-bold text-foreground">Detailed Member Contributions</h1>
         <p className="text-lg text-destructive">{error}</p>
       </div>
     );
@@ -140,13 +114,13 @@ const UserActivityReport = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">User Activity Report</h1>
+      <h1 className="text-3xl font-bold text-foreground">Detailed Member Contributions</h1>
       <p className="text-lg text-muted-foreground">
-        Track and review all user actions within the application.
+        View individual financial transactions made by members, including income and pledge payments.
       </p>
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader>
-          <CardTitle>Recent User Actions</CardTitle>
+          <CardTitle>Transaction Details</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
@@ -187,10 +161,26 @@ const UserActivityReport = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="filter-type">Transaction Type</Label>
+                <Select value={filterType} onValueChange={(value: "All" | "Income" | "Pledge Payment") => setFilterType(value)}>
+                  <SelectTrigger id="filter-type" className="w-[160px]">
+                    <SelectValue placeholder="Filter by type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Type</SelectLabel>
+                      <SelectItem value="All">All Types</SelectItem>
+                      <SelectItem value="Income">Income</SelectItem>
+                      <SelectItem value="Pledge Payment">Pledge Payment</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="relative flex items-center">
                 <Input
                   type="text"
-                  placeholder="Search user or action..."
+                  placeholder="Search member, project or description..."
                   value={localSearchQuery} // Use local state for input
                   onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
                   className="pl-8"
@@ -200,33 +190,35 @@ const UserActivityReport = () => {
             </div>
           </div>
 
-          {activityLogs.length > 0 ? (
+          {detailedContributions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Details</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Member</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activityLogs.map((activity) => (
-                  <TableRow key={activity.id}>
-                    <TableCell className="font-medium">{activity.profiles?.name || activity.profiles?.email || 'Unknown User'}</TableCell>
-                    <TableCell>{activity.action}</TableCell>
-                    <TableCell>{format(parseISO(activity.timestamp), "MMM dd, yyyy hh:mm a")}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                      {activity.details && Object.keys(activity.details).length > 0
-                        ? JSON.stringify(activity.details)
-                        : '-'}
-                    </TableCell>
+                {detailedContributions.map((contribution) => (
+                  <TableRow key={contribution.transaction_id}>
+                    <TableCell>{format(parseISO(contribution.transaction_date), "MMM dd, yyyy")}</TableCell>
+                    <TableCell className="font-medium">{contribution.member_name}</TableCell>
+                    <TableCell>{contribution.transaction_type}</TableCell>
+                    <TableCell>{contribution.project_name || "N/A"}</TableCell>
+                    <TableCell>{contribution.account_name}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{contribution.description || "N/A"}</TableCell>
+                    <TableCell className="text-right font-medium">{currency.symbol}{contribution.amount.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center mt-4">No user activity found for the selected period or matching your search.</p>
+            <p className="text-muted-foreground text-center mt-4">No detailed contributions found for the selected period or matching your search.</p>
           )}
         </CardContent>
       </Card>
@@ -234,4 +226,4 @@ const UserActivityReport = () => {
   );
 };
 
-export default UserActivityReport;
+export default MemberContributionsDetailed;
