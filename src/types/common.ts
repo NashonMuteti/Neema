@@ -7,6 +7,7 @@ export interface FinancialAccount {
   initial_balance: number;
   current_balance: number;
   profile_id: string; // Owner of the account
+  can_receive_payments: boolean; // New: Whether this account can receive payments
 }
 
 export interface Member { // Represents a profile as a member

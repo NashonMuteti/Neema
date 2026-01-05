@@ -29,18 +29,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
+import { FinancialAccount } from "@/types/common"; // Import FinancialAccount
 
 interface Product {
   id: string;
   name: string;
   price: number;
   current_stock: number;
-}
-
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
 }
 
 interface SaleItem {
@@ -96,6 +91,10 @@ const SaleForm: React.FC<SaleFormProps> = ({
   const [selectedProductId, setSelectedProductId] = useState<string | undefined>(undefined);
   const [itemQuantity, setItemQuantity] = useState("1");
 
+  const receivableAccounts = useMemo(() => {
+    return financialAccounts.filter(account => account.can_receive_payments);
+  }, [financialAccounts]);
+
   useEffect(() => {
     if (products.length > 0 && !selectedProductId) {
       setSelectedProductId(products[0].id);
@@ -103,10 +102,12 @@ const SaleForm: React.FC<SaleFormProps> = ({
   }, [products, selectedProductId]);
 
   useEffect(() => {
-    if (financialAccounts.length > 0 && !selectedReceivedIntoAccount) {
-      setSelectedReceivedIntoAccount(financialAccounts[0].id);
+    if (receivableAccounts.length > 0 && !selectedReceivedIntoAccount) {
+      setSelectedReceivedIntoAccount(receivableAccounts[0].id);
+    } else if (receivableAccounts.length === 0) {
+      setSelectedReceivedIntoAccount(undefined);
     }
-  }, [financialAccounts, selectedReceivedIntoAccount]);
+  }, [receivableAccounts, selectedReceivedIntoAccount]);
 
   const handleAddSaleItem = () => {
     if (!selectedProductId || !itemQuantity) {
@@ -194,7 +195,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
     setSaleDate(new Date());
     setCustomerName("");
     setSelectedPaymentMethod(paymentMethods[0]?.value);
-    setSelectedReceivedIntoAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
+    setSelectedReceivedIntoAccount(receivableAccounts.length > 0 ? receivableAccounts[0].id : undefined);
     setSaleNotes("");
     setCurrentSaleItems([]);
     setSelectedProductId(products.length > 0 ? products[0].id : undefined);
@@ -267,14 +268,14 @@ const SaleForm: React.FC<SaleFormProps> = ({
 
         <div className="grid gap-1.5">
           <Label htmlFor="received-into-account">Received Into Account</Label>
-          <Select value={selectedReceivedIntoAccount} onValueChange={setSelectedReceivedIntoAccount} disabled={!canManageDailySales || financialAccounts.length === 0 || isProcessing}>
+          <Select value={selectedReceivedIntoAccount} onValueChange={setSelectedReceivedIntoAccount} disabled={!canManageDailySales || receivableAccounts.length === 0 || isProcessing}>
             <SelectTrigger id="received-into-account">
               <SelectValue placeholder="Select account" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>Financial Accounts</SelectLabel>
-                {financialAccounts.map((account) => (
+                {receivableAccounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
                     {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
                   </SelectItem>
@@ -282,7 +283,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
               </SelectGroup>
             </SelectContent>
           </Select>
-          {financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
+          {receivableAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found that can receive payments. Please enable one in Admin Settings.</p>}
         </div>
 
         <div className="grid gap-1.5">
@@ -366,7 +367,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
         <Button
           onClick={handleSubmitSale}
           className="w-full mt-6"
-          disabled={!canManageDailySales || isProcessing || currentSaleItems.length === 0 || !saleDate || !selectedPaymentMethod || !selectedReceivedIntoAccount || financialAccounts.length === 0}
+          disabled={!canManageDailySales || isProcessing || currentSaleItems.length === 0 || !saleDate || !selectedPaymentMethod || !selectedReceivedIntoAccount || receivableAccounts.length === 0}
         >
           {isProcessing ? "Recording Sale..." : "Record Sale"}
         </Button>

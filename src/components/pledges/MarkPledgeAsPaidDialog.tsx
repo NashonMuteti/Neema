@@ -29,14 +29,9 @@ import { Calendar } from "@/components/ui/calendar"; // Added Calendar
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Added Popover
 import { cn } from "@/lib/utils"; // Added cn
 import { format } from "date-fns"; // Added format
+import { FinancialAccount } from "@/types/common"; // Import FinancialAccount
 
-interface FinancialAccount {
-  id: string;
-  name: string;
-  current_balance: number;
-}
-
-export interface Pledge {
+interface Pledge {
   id: string;
   member_id: string;
   project_id: string;
@@ -74,14 +69,18 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
 
   const remainingAmount = pledge.original_amount - pledge.paid_amount;
 
+  const receivableAccounts = React.useMemo(() => {
+    return financialAccounts.filter(account => account.can_receive_payments);
+  }, [financialAccounts]);
+
   React.useEffect(() => {
     if (isOpen) {
       // Reset states when dialog opens
-      setReceivedIntoAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
+      setReceivedIntoAccount(receivableAccounts.length > 0 ? receivableAccounts[0].id : undefined);
       setAmountPaid(remainingAmount.toFixed(2)); // Default to remaining amount
       setPaymentDate(new Date());
     }
-  }, [isOpen, financialAccounts, remainingAmount]);
+  }, [isOpen, receivableAccounts, remainingAmount]);
 
   const handleConfirm = async () => {
     if (!receivedIntoAccount || !amountPaid || !paymentDate) {
@@ -175,7 +174,7 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
             <Select
               value={receivedIntoAccount}
               onValueChange={setReceivedIntoAccount}
-              disabled={!canManagePledges || financialAccounts.length === 0 || isProcessing}
+              disabled={!canManagePledges || receivableAccounts.length === 0 || isProcessing}
             >
               <SelectTrigger id="mark-paid-dialog-received-into-account">
                 <SelectValue placeholder="Select account" />
@@ -183,7 +182,7 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Financial Accounts</SelectLabel>
-                  {financialAccounts.map((account) => (
+                  {receivableAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
                     </SelectItem>
@@ -191,13 +190,13 @@ const MarkPledgeAsPaidDialog: React.FC<MarkPledgeAsPaidDialogProps> = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
+            {receivableAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found that can receive payments. Please enable one in Admin Settings.</p>}
           </div>
         </div>
         <div className="flex justify-end">
           <Button
             onClick={handleConfirm}
-            disabled={!canManagePledges || !receivedIntoAccount || !amountPaid || !paymentDate || isProcessing || financialAccounts.length === 0}
+            disabled={!canManagePledges || !receivedIntoAccount || !amountPaid || !paymentDate || isProcessing || receivableAccounts.length === 0}
           >
             {isProcessing ? "Processing..." : <><DollarSign className="mr-2 h-4 w-4" /> Record Payment</>}
           </Button>

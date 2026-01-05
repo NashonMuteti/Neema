@@ -43,11 +43,17 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
   const [incomeSource, setIncomeSource] = React.useState("");
   const [selectedIncomeMemberId, setSelectedIncomeMemberId] = React.useState<string | undefined>(undefined);
 
+  const receivableAccounts = React.useMemo(() => {
+    return financialAccounts.filter(account => account.can_receive_payments);
+  }, [financialAccounts]);
+
   React.useEffect(() => {
-    if (financialAccounts.length > 0 && !incomeAccount) {
-      setIncomeAccount(financialAccounts[0].id);
+    if (receivableAccounts.length > 0 && !incomeAccount) {
+      setIncomeAccount(receivableAccounts[0].id);
+    } else if (receivableAccounts.length === 0) {
+      setIncomeAccount(undefined);
     }
-  }, [financialAccounts, incomeAccount]);
+  }, [receivableAccounts, incomeAccount]);
 
   const handleSubmit = () => {
     if (!incomeDate || !incomeAmount || !incomeAccount || !incomeSource) {
@@ -74,7 +80,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
     setIncomeSource("");
     setSelectedIncomeMemberId(undefined);
     // Keep incomeAccount as is, or reset to default if preferred
-    setIncomeAccount(financialAccounts.length > 0 ? financialAccounts[0].id : undefined);
+    setIncomeAccount(receivableAccounts.length > 0 ? receivableAccounts[0].id : undefined);
   };
 
   return (
@@ -126,14 +132,14 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
         
         <div className="grid gap-1.5">
           <Label htmlFor="income-form-account">Received Into Account</Label>
-          <Select value={incomeAccount} onValueChange={setIncomeAccount} disabled={!canManageIncome || financialAccounts.length === 0}>
+          <Select value={incomeAccount} onValueChange={setIncomeAccount} disabled={!canManageIncome || receivableAccounts.length === 0}>
             <SelectTrigger id="income-form-account">
               <SelectValue placeholder="Select an account" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>Financial Accounts</SelectLabel>
-                {financialAccounts.map((account) => (
+                {receivableAccounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
                     {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
                   </SelectItem>
@@ -141,7 +147,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
               </SelectGroup>
             </SelectContent>
           </Select>
-          {financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
+          {receivableAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found that can receive payments. Please enable one in Admin Settings.</p>}
         </div>
 
         <div className="grid gap-1.5">
@@ -175,7 +181,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({
           />
         </div>
         
-        <Button onClick={handleSubmit} className="w-full" disabled={!canManageIncome || !incomeDate || !incomeAmount || !incomeAccount || !incomeSource || financialAccounts.length === 0}>
+        <Button onClick={handleSubmit} className="w-full" disabled={!canManageIncome || !incomeDate || !incomeAmount || !incomeAccount || !incomeSource || receivableAccounts.length === 0}>
           Post Income
         </Button>
       </CardContent>

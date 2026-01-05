@@ -79,6 +79,10 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
   const [loadingAccounts, setLoadingAccounts] = React.useState(true);
   const [isProcessing, setIsProcessing] = React.useState(false);
 
+  const receivableAccounts = React.useMemo(() => {
+    return financialAccounts.filter(account => account.can_receive_payments);
+  }, [financialAccounts]);
+
   const fetchMembersAndAccounts = React.useCallback(async () => {
     setLoadingMembers(true);
     setLoadingAccounts(true);
@@ -102,7 +106,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
     if (currentUser) {
       const { data: accountsData, error: accountsError } = await supabase
         .from('financial_accounts')
-        .select('id, name, current_balance, initial_balance, profile_id') // Fetch all required fields
+        .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Fetch new field
         .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
 
@@ -112,7 +116,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
       } else {
         setFinancialAccounts(accountsData || []);
         if (accountsData && accountsData.length > 0 && !receivedIntoAccount) {
-          setReceivedIntoAccount(accountsData[0].id);
+          setReceivedIntoAccount(accountsData.find(acc => acc.can_receive_payments)?.id || undefined); // Set default to a receivable account
         }
       }
     }
@@ -263,7 +267,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
             <Select
               value={receivedIntoAccount}
               onValueChange={setReceivedIntoAccount}
-              disabled={!canManageCollections || financialAccounts.length === 0 || isProcessing}
+              disabled={!canManageCollections || receivableAccounts.length === 0 || isProcessing}
             >
               <SelectTrigger id="received-into-account">
                 <SelectValue placeholder="Select account" />
@@ -271,7 +275,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Financial Accounts</SelectLabel>
-                  {financialAccounts.map((account) => (
+                  {receivableAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
                     </SelectItem>
@@ -279,7 +283,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {financialAccounts.length === 0 && !loadingAccounts && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
+            {receivableAccounts.length === 0 && !loadingAccounts && <p className="text-sm text-destructive">No financial accounts found that can receive payments. Please enable one in Admin Settings.</p>}
           </div>
 
           <div className="grid gap-1.5">
@@ -304,7 +308,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
         <div className="flex justify-end">
           <Button
             onClick={handleAddCollection}
-            disabled={!canManageCollections || !amount || !memberId || !receivedIntoAccount || !collectionDate || !paymentMethod || isProcessing || members.length === 0 || financialAccounts.length === 0}
+            disabled={!canManageCollections || !amount || !memberId || !receivedIntoAccount || !collectionDate || !paymentMethod || isProcessing || members.length === 0 || receivableAccounts.length === 0}
           >
             {isProcessing ? "Adding..." : <><PlusCircle className="mr-2 h-4 w-4" /> Add Collection</>}
           </Button>

@@ -30,6 +30,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import { FinancialAccount } from "@/types/common"; // Updated import
+import { Switch } from "@/components/ui/switch"; // Import Switch
 
 const FinancialAccountsSettings = () => {
   const { currentUser } = useAuth();
@@ -52,10 +53,12 @@ const FinancialAccountsSettings = () => {
 
   const [newAccountName, setNewAccountName] = useState("");
   const [newAccountInitialBalance, setNewAccountInitialBalance] = useState("0");
+  const [newAccountCanReceivePayments, setNewAccountCanReceivePayments] = useState(true); // New state for new account
 
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
   const [editAccountName, setEditAccountName] = useState("");
   const [editAccountInitialBalance, setEditAccountInitialBalance] = useState("");
+  const [editAccountCanReceivePayments, setEditAccountCanReceivePayments] = useState(true); // New state for editing
 
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
 
@@ -110,6 +113,7 @@ const FinancialAccountsSettings = () => {
         name: newAccountName.trim(),
         initial_balance: initialBalance,
         current_balance: initialBalance, // Current balance starts as initial balance
+        can_receive_payments: newAccountCanReceivePayments, // Include new field
       })
       .select()
       .single();
@@ -140,6 +144,7 @@ const FinancialAccountsSettings = () => {
     
     setNewAccountName("");
     setNewAccountInitialBalance("0");
+    setNewAccountCanReceivePayments(true); // Reset to default
     fetchAccounts();
   };
 
@@ -165,6 +170,7 @@ const FinancialAccountsSettings = () => {
         name: editAccountName.trim(),
         initial_balance: initialBalance,
         current_balance: initialBalance, // Update current balance to reflect new initial balance
+        can_receive_payments: editAccountCanReceivePayments, // Update new field
       })
       .eq('id', editingAccount.id)
       .eq('profile_id', currentUser.id); // Ensure user owns the account
@@ -263,6 +269,7 @@ const FinancialAccountsSettings = () => {
     setEditingAccount(account);
     setEditAccountName(account.name);
     setEditAccountInitialBalance(account.initial_balance.toString());
+    setEditAccountCanReceivePayments(account.can_receive_payments); // Set new field
   };
 
   const openDeleteDialog = (accountId: string) => {
@@ -336,6 +343,15 @@ const FinancialAccountsSettings = () => {
               />
             </div>
           </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="new-account-can-receive-payments" className="text-sm font-medium">Can Receive Payments</Label>
+            <Switch
+              id="new-account-can-receive-payments"
+              checked={newAccountCanReceivePayments}
+              onCheckedChange={setNewAccountCanReceivePayments}
+              disabled={!canManageFinancialAccounts}
+            />
+          </div>
           <Button onClick={handleAddAccount} className="w-full" disabled={!canManageFinancialAccounts || !newAccountName.trim()}>
             Add Account
           </Button>
@@ -351,6 +367,7 @@ const FinancialAccountsSettings = () => {
                   <TableHead className="py-2 px-4 text-left text-sm font-medium text-muted-foreground">Account Name</TableHead>
                   <TableHead className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Initial Balance</TableHead>
                   <TableHead className="py-2 px-4 text-right text-sm font-medium text-muted-foreground">Current Balance</TableHead>
+                  <TableHead className="py-2 px-4 text-center text-sm font-medium text-muted-foreground">Receives Payments</TableHead> {/* New column header */}
                   {canManageFinancialAccounts && <TableHead className="py-2 px-4 text-center text-sm font-medium text-muted-foreground w-[120px]">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -360,6 +377,31 @@ const FinancialAccountsSettings = () => {
                     <TableCell className="py-2 px-4 font-medium">{account.name}</TableCell>
                     <TableCell className="py-2 px-4 text-right">{currency.symbol}{account.initial_balance.toFixed(2)}</TableCell>
                     <TableCell className="py-2 px-4 text-right">{currency.symbol}{account.current_balance.toFixed(2)}</TableCell>
+                    <TableCell className="py-2 px-4 text-center">
+                      <Switch
+                        checked={account.can_receive_payments}
+                        onCheckedChange={(checked) => {
+                          // Optimistic update
+                          setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, can_receive_payments: checked } : a));
+                          // Call API to update
+                          supabase.from('financial_accounts')
+                            .update({ can_receive_payments: checked })
+                            .eq('id', account.id)
+                            .eq('profile_id', currentUser?.id)
+                            .then(({ error }) => {
+                              if (error) {
+                                console.error("Error updating can_receive_payments:", error);
+                                showError("Failed to update account setting.");
+                                // Revert optimistic update on error
+                                setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, can_receive_payments: !checked } : a));
+                              } else {
+                                showSuccess("Account setting updated.");
+                              }
+                            });
+                        }}
+                        disabled={!canManageFinancialAccounts}
+                      />
+                    </TableCell>
                     {canManageFinancialAccounts && (
                       <TableCell className="py-2 px-4 text-center">
                         <div className="flex justify-center space-x-2">
@@ -416,6 +458,15 @@ const FinancialAccountsSettings = () => {
               <Label htmlFor="edit-account-current-balance">Current Balance</Label>
               <Input id="edit-account-current-balance" value={`${currency.symbol}${editingAccount?.current_balance.toFixed(2) || "0.00"}`} disabled />
               <p className="text-sm text-muted-foreground">Current balance is updated by transactions, not directly editable here.</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-account-can-receive-payments" className="text-sm font-medium">Can Receive Payments</Label>
+              <Switch
+                id="edit-account-can-receive-payments"
+                checked={editAccountCanReceivePayments}
+                onCheckedChange={setEditAccountCanReceivePayments}
+                disabled={!canManageFinancialAccounts}
+              />
             </div>
           </div>
           <AlertDialogFooter>

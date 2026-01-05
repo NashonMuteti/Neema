@@ -72,15 +72,19 @@ const RecordDebtPaymentDialog: React.FC<RecordDebtPaymentDialogProps> = ({
   const [receivedIntoAccountId, setReceivedIntoAccountId] = React.useState<string | undefined>(financialAccounts[0]?.id);
   const [notes, setNotes] = React.useState("");
 
+  const receivableAccounts = React.useMemo(() => {
+    return financialAccounts.filter(account => account.can_receive_payments);
+  }, [financialAccounts]);
+
   React.useEffect(() => {
     if (isOpen) {
       setPaymentAmount(debt.amount_due.toFixed(2));
       setPaymentDate(new Date());
       setSelectedPaymentMethod(paymentMethods[0]?.value);
-      setReceivedIntoAccountId(financialAccounts[0]?.id);
+      setReceivedIntoAccountId(receivableAccounts.length > 0 ? receivableAccounts[0].id : undefined); // Set default to a receivable account
       setNotes("");
     }
-  }, [isOpen, debt, financialAccounts]);
+  }, [isOpen, debt, receivableAccounts]);
 
   const handleSubmit = async () => {
     if (!paymentAmount || !paymentDate || !selectedPaymentMethod || !receivedIntoAccountId) {
@@ -178,14 +182,14 @@ const RecordDebtPaymentDialog: React.FC<RecordDebtPaymentDialogProps> = ({
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="received-into-account">Received Into Account</Label>
-            <Select value={receivedIntoAccountId} onValueChange={setReceivedIntoAccountId} disabled={!canManageDebts || financialAccounts.length === 0 || isProcessing}>
+            <Select value={receivedIntoAccountId} onValueChange={setReceivedIntoAccountId} disabled={!canManageDebts || receivableAccounts.length === 0 || isProcessing}>
               <SelectTrigger id="received-into-account">
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Financial Accounts</SelectLabel>
-                  {financialAccounts.map((account) => (
+                  {receivableAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.name} (Balance: {currency.symbol}{account.current_balance.toFixed(2)})
                     </SelectItem>
@@ -193,7 +197,7 @@ const RecordDebtPaymentDialog: React.FC<RecordDebtPaymentDialogProps> = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {financialAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found. Please add one in Admin Settings.</p>}
+            {receivableAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found that can receive payments. Please enable one in Admin Settings.</p>}
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="payment-notes">Notes (Optional)</Label>
@@ -207,7 +211,7 @@ const RecordDebtPaymentDialog: React.FC<RecordDebtPaymentDialogProps> = ({
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={!canManageDebts || isProcessing || financialAccounts.length === 0}>
+          <Button onClick={handleSubmit} disabled={!canManageDebts || isProcessing || receivableAccounts.length === 0}>
             <DollarSign className="mr-2 h-4 w-4" /> {isProcessing ? "Recording..." : "Record Payment"}
           </Button>
         </div>
