@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Edit, Trash2, Search, DollarSign } from "lucide-react";
-import { showSuccess, showError } from "@/utils/toast";
+import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,11 +31,11 @@ import { useSystemSettings } from "@/context/SystemSettingsContext";
 import AddEditDebtDialog, { Debt } from "@/components/sales-management/AddEditDebtDialog";
 import RecordDebtPaymentDialog from "@/components/sales-management/RecordDebtPaymentDialog";
 import { useDebounce } from "@/hooks/use-debounce";
-import { format, parseISO } from "date-fns"; // Added parseISO import
-import { Member, FinancialAccount } from "@/types/common"; // Added import for Member and FinancialAccount
+import { format, parseISO } from "date-fns";
+import { Member, FinancialAccount, Product } from "@/types/common"; // Added import for Product
 
 const Debts = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, session } = useAuth(); // Added session for Edge Function auth
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
 
@@ -50,20 +50,21 @@ const Debts = () => {
   }, [currentUser, definedRoles]);
 
   const [debts, setDebts] = useState<Debt[]>([]);
-  const [members, setMembers] = useState<Member[]>([]); // State for members
-  const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]); // State for financial accounts
+  const [members, setMembers] = useState<Member[]>([]);
+  const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
+  const [products, setProducts] = useState<Product[]>([]); // New state for products
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [localSearchQuery, setLocalSearchQuery] = useState(""); // Local state for input
-  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500);
 
   const [isAddEditDebtDialogOpen, setIsAddEditDebtDialogOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | undefined>(undefined);
   const [deletingDebtId, setDeletingDebtId] = useState<string | undefined>(undefined);
   const [isRecordPaymentDialogOpen, setIsRecordPaymentDialogOpen] = useState(false);
   const [selectedDebtForPayment, setSelectedDebtForPayment] = useState<Debt | undefined>(undefined);
-  const [isProcessing, setIsProcessing] = useState(false); // New state for processing
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -85,7 +86,7 @@ const Debts = () => {
     // Fetch Financial Accounts
     const { data: accountsData, error: accountsError } = await supabase
       .from('financial_accounts')
-      .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments') // Added initial_balance and profile_id
+      .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments')
       .order('name', { ascending: true });
 
     if (accountsError) {
@@ -95,6 +96,20 @@ const Debts = () => {
       setFinancialAccounts(accountsData || []);
     }
 
+    // Fetch Products (only active ones for sale)
+    const { data: productsData, error: productsError } = await supabase
+      .from('products')
+      .select('id, name, price, current_stock')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+
+    if (productsError) {
+      console.error("Error fetching products:", productsError);
+      showError("Failed to load products for debt sales.");
+    } else {
+      setProducts(productsData || []);
+    }
+
     let query = supabase.from('debts').select(`
       *,
       created_by_profile:profiles!debts_created_by_profile_id_fkey(name, email),
@@ -102,7 +117,7 @@ const Debts = () => {
       sales_transactions(notes)
     `);
 
-    if (debouncedSearchQuery) { // Use debounced query
+    if (debouncedSearchQuery) {
       query = query.or(`customer_name.ilike.%${debouncedSearchQuery}%,description.ilike.%${debouncedSearchQuery}%`);
     }
 
@@ -133,68 +148,111 @@ const Debts = () => {
       })) || []);
     }
     setLoading(false);
-  }, [debouncedSearchQuery, currentUser]); // Depend on debounced query and currentUser
+  }, [debouncedSearchQuery, currentUser]);
 
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  const handleSaveDebt = async (debtData: Omit<Debt, 'id' | 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string }) => {
-    if (!currentUser) {
+  const handleSaveDebt = async (debtData: Omit<Debt, 'id' | 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string; sale_items?: { product_id: string; quantity: number; unit_price: number; subtotal: number; }[] }) => {
+    if (!currentUser || !session) {
       showError("You must be logged in to manage debts.");
       return;
     }
 
     setIsProcessing(true);
 
-    if (debtData.id) {
-      // Update existing debt
-      const { error } = await supabase
-        .from('debts')
-        .update({
-          customer_name: debtData.customer_name,
-          description: debtData.description,
-          original_amount: debtData.original_amount,
-          amount_due: debtData.amount_due, // This should be managed by payments, but for initial edit, it might be set
-          due_date: debtData.due_date?.toISOString() || null,
-          debtor_profile_id: debtData.debtor_profile_id || null,
-          notes: debtData.notes || null,
-          status: debtData.status,
-        })
-        .eq('id', debtData.id);
-      
-      if (error) {
-        console.error("Error updating debt:", error);
-        showError("Failed to update debt.");
+    try {
+      if (debtData.id) {
+        // Update existing debt (no stock sale logic for updates)
+        const { error } = await supabase
+          .from('debts')
+          .update({
+            customer_name: debtData.customer_name,
+            description: debtData.description,
+            original_amount: debtData.original_amount,
+            amount_due: debtData.amount_due,
+            due_date: debtData.due_date?.toISOString() || null,
+            debtor_profile_id: debtData.debtor_profile_id || null,
+            notes: debtData.notes || null,
+            status: debtData.status,
+          })
+          .eq('id', debtData.id);
+        
+        if (error) {
+          console.error("Error updating debt:", error);
+          showError("Failed to update debt.");
+        } else {
+          showSuccess("Debt updated successfully!");
+          fetchInitialData();
+        }
       } else {
-        showSuccess("Debt updated successfully!");
-        fetchInitialData();
+        // Add new debt
+        if (debtData.sale_items && debtData.sale_items.length > 0) {
+          // Use Edge Function for debt sale
+          const toastId = showLoading("Recording debt sale...");
+          const { data, error: edgeFunctionError } = await supabase.functions.invoke('record-debt-sale', {
+            body: JSON.stringify({
+              debt_data: {
+                customer_name: debtData.customer_name,
+                description: debtData.description,
+                original_amount: debtData.original_amount,
+                due_date: debtData.due_date,
+                debtor_profile_id: debtData.debtor_profile_id,
+                notes: debtData.notes,
+              },
+              sale_items: debtData.sale_items,
+            }),
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (edgeFunctionError) {
+            console.error("Error from Edge Function:", edgeFunctionError);
+            showError(`Failed to record debt sale: ${edgeFunctionError.message}`);
+            return;
+          }
+          if (data.error) {
+            console.error("Error from Edge Function response:", data.error);
+            showError(`Failed to record debt sale: ${data.error}`);
+            return;
+          }
+          showSuccess("Debt sale recorded successfully!");
+          dismissToast(toastId);
+          fetchInitialData(); // Re-fetch data to update tables and stock
+        } else {
+          // Add new regular debt
+          const { error } = await supabase
+            .from('debts')
+            .insert({
+              created_by_profile_id: currentUser.id,
+              customer_name: debtData.customer_name || null,
+              description: debtData.description,
+              original_amount: debtData.original_amount,
+              amount_due: debtData.original_amount,
+              due_date: debtData.due_date?.toISOString() || null,
+              debtor_profile_id: debtData.debtor_profile_id || null,
+              notes: debtData.notes || null,
+              status: "Outstanding",
+            });
+          
+          if (error) {
+            console.error("Error adding debt:", error);
+            showError("Failed to add debt.");
+          } else {
+            showSuccess("Debt added successfully!");
+            fetchInitialData();
+          }
+        }
       }
-    } else {
-      // Add new debt
-      const { error } = await supabase
-        .from('debts')
-        .insert({
-          created_by_profile_id: currentUser.id,
-          customer_name: debtData.customer_name || null,
-          description: debtData.description,
-          original_amount: debtData.original_amount,
-          amount_due: debtData.original_amount, // New debts start with amount_due equal to original_amount
-          due_date: debtData.due_date?.toISOString() || null,
-          debtor_profile_id: debtData.debtor_profile_id || null,
-          notes: debtData.notes || null,
-          status: "Outstanding", // New debts are outstanding by default
-        });
-      
-      if (error) {
-        console.error("Error adding debt:", error);
-        showError("Failed to add debt.");
-      } else {
-        showSuccess("Debt added successfully!");
-        fetchInitialData();
-      }
+    } catch (err: any) {
+      console.error("Unexpected error in handleSaveDebt:", err);
+      showError(`An unexpected error occurred: ${err.message || 'Please try again.'}`);
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
   const handleDeleteDebt = async () => {
@@ -301,8 +359,8 @@ const Debts = () => {
               <Input
                 type="text"
                 placeholder="Search customer or description..."
-                value={localSearchQuery} // Use local state for input
-                onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
+                value={localSearchQuery}
+                onChange={(e) => setLocalSearchQuery(e.target.value)}
                 className="pl-8"
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
@@ -384,7 +442,8 @@ const Debts = () => {
         initialData={editingDebt}
         onSave={handleSaveDebt}
         canManageDebts={canManageDebts}
-        members={members} // Pass members here
+        members={members}
+        products={products} // Pass products here
       />
 
       {/* Record Payment Dialog */}
@@ -395,7 +454,7 @@ const Debts = () => {
           debt={selectedDebtForPayment}
           onRecordPayment={handleRecordPayment}
           canManageDebts={canManageDebts}
-          financialAccounts={financialAccounts} // Pass financialAccounts here
+          financialAccounts={financialAccounts}
           isProcessing={isProcessing}
         />
       )}
