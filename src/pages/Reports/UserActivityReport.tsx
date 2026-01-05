@@ -24,7 +24,7 @@ import { Search } from "lucide-react";
 import { format, getMonth, getYear, parseISO } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } => "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { showError } from "@/utils/toast";
 import { logUserActivity } from "@/utils/activityLogger"; // Import the new logger
 import { JoinedProfile } from "@/types/common"; // Import JoinedProfile
