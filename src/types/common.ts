@@ -53,6 +53,7 @@ export interface JoinedFinancialAccount { // For joined 'financial_accounts'
 export interface JoinedProject { // For joined 'projects'
   id: string;
   name: string;
+  member_contribution_amount?: number | null; // Added for expected amount calculation
 }
 
 export interface JoinedProfile { // For joined 'profiles'
@@ -122,6 +123,7 @@ export interface MyContribution {
   original_amount?: number; // For pledges, the total pledged amount
   paid_amount?: number;     // For pledges, the amount already paid
   due_date?: Date;          // For pledges
+  expected_amount?: number; // New: Expected contribution amount for the project
 }
 
 export interface MyFinancialAccount {

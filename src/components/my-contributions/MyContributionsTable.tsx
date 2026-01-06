@@ -15,13 +15,13 @@ import { format } from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { MyContribution } from "@/types/common"; // Import MyContribution type from common.ts
 
-interface MyContributionsOverviewTabProps {
+interface MyContributionsTableProps {
   contributions: MyContribution[];
   loading: boolean;
   error: string | null;
 }
 
-const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
+const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
   contributions,
   loading,
   error,
@@ -57,10 +57,22 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
 
   const sortedContributions = [...contributions].sort((a, b) => b.date.getTime() - a.date.getTime());
 
+  // Calculate subtotals
+  const totalExpected = sortedContributions.reduce((sum, c) => sum + (c.expected_amount || 0), 0);
+  const totalPledged = sortedContributions
+    .filter(c => c.type === "Pledge")
+    .reduce((sum, c) => sum + (c.original_amount || 0), 0);
+  const totalPaid = sortedContributions
+    .filter(c => c.type === "Pledge")
+    .reduce((sum, c) => sum + (c.paid_amount || 0), 0);
+  const totalRemaining = sortedContributions
+    .filter(c => c.type === "Pledge" && (c.paid_amount || 0) < (c.original_amount || 0))
+    .reduce((sum, c) => sum + ((c.original_amount || 0) - (c.paid_amount || 0)), 0);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Contributions</CardTitle>
+        <CardTitle>All Contributions</CardTitle>
       </CardHeader>
       <CardContent>
         {sortedContributions.length > 0 ? (
@@ -70,9 +82,11 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
                 <TableHead>Date</TableHead>
                 <TableHead>Project</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="text-right">Expected Amount</TableHead> {/* New column */}
+                <TableHead className="text-right">Paid Amount</TableHead>
+                <TableHead className="text-right">Pledged Amount</TableHead> {/* Moved column */}
                 <TableHead className="text-right">Remaining</TableHead>
+                <TableHead>Due Date</TableHead>
                 <TableHead className="text-center">Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -90,16 +104,28 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
                     <TableCell>{contribution.project_name}</TableCell>
                     <TableCell>{contribution.type}</TableCell>
                     <TableCell className="text-right">
-                      {currency.symbol}{contribution.amount.toFixed(2)}
+                      {contribution.expected_amount !== undefined
+                        ? `${currency.symbol}${contribution.expected_amount.toFixed(2)}`
+                        : "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       {isPledge && contribution.paid_amount !== undefined
                         ? `${currency.symbol}${contribution.paid_amount.toFixed(2)}`
+                        : isPledge ? `${currency.symbol}0.00` : `${currency.symbol}${contribution.amount.toFixed(2)}`}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {isPledge && contribution.original_amount !== undefined
+                        ? `${currency.symbol}${contribution.original_amount.toFixed(2)}`
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       {isPledge && remaining > 0
                         ? `${currency.symbol}${remaining.toFixed(2)}`
+                        : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {isPledge && contribution.due_date
+                        ? format(contribution.due_date, "MMM dd, yyyy")
                         : "-"}
                     </TableCell>
                     <TableCell className="text-center">
@@ -114,6 +140,15 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
                   </TableRow>
                 );
               })}
+              {/* Subtotals Row */}
+              <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                <TableCell colSpan={3}>Totals</TableCell>
+                <TableCell className="text-right">{currency.symbol}{totalExpected.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currency.symbol}{totalPaid.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currency.symbol}{totalPledged.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currency.symbol}{totalRemaining.toFixed(2)}</TableCell>
+                <TableCell colSpan={2}></TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         ) : (
@@ -124,4 +159,4 @@ const MyContributionsOverviewTab: React.FC<MyContributionsOverviewTabProps> = ({
   );
 };
 
-export default MyContributionsOverviewTab;
+export default MyContributionsTable;

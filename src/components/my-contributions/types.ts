@@ -1,1 +1,0 @@
-// This file is now empty as its types have been consolidated into src/types/common.ts

@@ -8,10 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
 import { parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
-import MyContributionsOverviewTab from "@/components/my-contributions/MyContributionsOverviewTab";
-import MyContributionsDetailedTab from "@/components/my-contributions/MyContributionsDetailedTab";
-import MemberContributionsOverview from "@/components/my-contributions/MemberContributionsOverview";
-import MemberContributionsDetailed from "@/components/my-contributions/MemberContributionsDetailed";
+import MyContributionsTable from "@/components/my-contributions/MyContributionsTable"; // Renamed import
 import { MyContribution, MyFinancialAccount, JoinedProject } from "@/types/common"; // Import types from common.ts
 
 // Define the expected structure of a collection row with joined project data
@@ -60,7 +57,7 @@ const MyContributions = () => {
           project_id,
           amount,
           date,
-          projects ( name )
+          projects ( name, member_contribution_amount )
         `)
         .eq('member_id', currentUser.id)
         .order('date', { ascending: false })) as { data: CollectionRowWithProject[] | null, error: PostgrestError | null };
@@ -74,6 +71,7 @@ const MyContributions = () => {
         amount: c.amount,
         date: parseISO(c.date),
         type: "Collection",
+        expected_amount: c.projects?.member_contribution_amount || 0, // Include expected amount
       }));
 
       // Fetch pledges
@@ -87,7 +85,7 @@ const MyContributions = () => {
           due_date,
           status,
           comments,
-          projects ( name )
+          projects ( name, member_contribution_amount )
         `)
         .eq('member_id', currentUser.id)
         .order('due_date', { ascending: false })) as { data: PledgeRowWithProject[] | null, error: PostgrestError | null };
@@ -105,18 +103,11 @@ const MyContributions = () => {
         due_date: parseISO(p.due_date),
         type: "Pledge",
         status: p.paid_amount >= p.amount ? "Paid" : "Active", // Derive status based on paid_amount
+        expected_amount: p.projects?.member_contribution_amount || 0, // Include expected amount
       }));
 
-      // Fetch financial accounts
-      const { data: accountsData, error: accountsError } = await supabase
-        .from('financial_accounts')
-        .select('id, name, current_balance')
-        .eq('profile_id', currentUser.id)
-        .order('name', { ascending: true });
-
-      if (accountsError) throw accountsError;
-
-      setFinancialAccounts(accountsData || []);
+      // Financial accounts are no longer needed for this page's display
+      // setFinancialAccounts(accountsData || []);
 
       setContributions([...fetchedCollections, ...fetchedPledges]);
     } catch (err: any) {
@@ -150,26 +141,8 @@ const MyContributions = () => {
         View your personal financial contributions and pledges to various projects.
       </p>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="detailed">Detailed</TabsTrigger>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-        </TabsList>
-        <TabsContent value="overview">
-          <MyContributionsOverviewTab contributions={contributions} loading={loading} error={error} />
-        </TabsContent>
-        <TabsContent value="detailed">
-          <MyContributionsDetailedTab contributions={contributions} loading={loading} error={error} />
-        </TabsContent>
-        <TabsContent value="accounts">
-          <MemberContributionsOverview financialAccounts={financialAccounts} loading={loading} error={error} />
-        </TabsContent>
-        <TabsContent value="summary">
-          <MemberContributionsDetailed contributions={contributions} financialAccounts={financialAccounts} loading={loading} error={error} />
-        </TabsContent>
-      </Tabs>
+      {/* Directly render MyContributionsTable */}
+      <MyContributionsTable contributions={contributions} loading={loading} error={error} />
     </div>
   );
 };
