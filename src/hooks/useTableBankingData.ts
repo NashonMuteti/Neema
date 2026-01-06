@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
 import {
   format,
   getMonth,
@@ -130,9 +129,13 @@ export const useTableBankingData = ({
           amount_due,
           due_date,
           status,
+          created_by_profile_id,
           debtor_profile_id,
           customer_name,
-          profiles!debts_debtor_profile_id_fkey(name, email)
+          notes,
+          created_at,
+          created_by_profile:profiles!debts_created_by_profile_id_fkey(name, email),
+          debtor_profile:profiles!debts_debtor_profile_id_fkey(name, email)
         `);
 
       if (!isAdmin) {
@@ -155,9 +158,9 @@ export const useTableBankingData = ({
         status: d.status,
         notes: d.notes || undefined,
         created_at: parseISO(d.created_at || new Date().toISOString()),
-        created_by_name: d.profiles!debts_created_by_profile_id_fkey?.name || d.profiles!debts_created_by_profile_id_fkey?.email || 'N/A',
-        debtor_name: d.profiles!debts_debtor_profile_id_fkey?.name || d.profiles!debts_debtor_profile_id_fkey?.email || d.customer_name || 'N/A',
-        sale_description: d.sales_transactions?.notes || undefined,
+        created_by_name: d.created_by_profile?.name || d.created_by_profile?.email || 'N/A',
+        debtor_name: d.debtor_profile?.name || d.debtor_profile?.email || d.customer_name || 'N/A',
+        sale_description: d.sales_transactions?.notes || undefined, // Assuming sales_transactions is joined elsewhere if needed
       })));
 
     } catch (err: any) {
