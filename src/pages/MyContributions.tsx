@@ -144,13 +144,16 @@ const MyContributions = () => {
       const totalPaidPledges = (totalPledgesData || []).reduce((sum, p) => sum + p.paid_amount, 0);
 
       // Total Outstanding Debt
-      const { data: outstandingDebtsData, error: outstandingDebtsError } = await supabase
+      let outstandingDebtsQuery = supabase
         .from('debts')
-        .select('amount, paid_amount')
-        .eq('profile_id', currentUser.id)
+        .select('amount_due') // Corrected: Select amount_due
         .neq('status', 'Paid'); // Only unpaid/partially paid debts
+      // If not admin, only show debts created by or owed by the current user
+      outstandingDebtsQuery = outstandingDebtsQuery.or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`);
+      
+      const { data: outstandingDebtsData, error: outstandingDebtsError } = await outstandingDebtsQuery;
       if (outstandingDebtsError) throw outstandingDebtsError;
-      const totalOutstandingDebt = (outstandingDebtsData || []).reduce((sum, d) => sum + (d.amount - d.paid_amount), 0);
+      const totalOutstandingDebt = (outstandingDebtsData || []).reduce((sum, debt) => sum + debt.amount_due, 0); // Corrected: Sum amount_due
 
       setSummaryData({
         totalCollections,
