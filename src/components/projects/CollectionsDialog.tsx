@@ -58,7 +58,17 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
   const queryClient = useQueryClient(); // Initialize queryClient
 
   const { canManageCollections } = React.useMemo(() => {
-    if (!currentUser || !definedRoles) {
+    if (!currentUser) {
+      return { canManageCollections: false };
+    }
+
+    // Super Admin can manage collections directly
+    if (currentUser.role === "Super Admin") {
+      return { canManageCollections: true };
+    }
+
+    // For other roles, check privileges
+    if (!definedRoles) {
       return { canManageCollections: false };
     }
     const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
