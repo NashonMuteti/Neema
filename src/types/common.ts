@@ -123,7 +123,8 @@ export interface MyContribution {
   original_amount?: number; // For pledges, the total pledged amount
   paid_amount?: number;     // For pledges, the amount already paid
   due_date?: Date;          // For pledges
-  expected_amount?: number; // New: Expected contribution amount for the project
+  expected_amount?: number; // Expected contribution amount for the project
+  balance_amount?: number;  // New: Expected - Actual for collections, Original - Paid for pledges
 }
 
 export interface MyFinancialAccount {

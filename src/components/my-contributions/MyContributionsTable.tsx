@@ -65,9 +65,9 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
   const totalPaid = sortedContributions
     .filter(c => c.type === "Pledge")
     .reduce((sum, c) => sum + (c.paid_amount || 0), 0);
-  const totalRemaining = sortedContributions
-    .filter(c => c.type === "Pledge" && (c.paid_amount || 0) < (c.original_amount || 0))
-    .reduce((sum, c) => sum + ((c.original_amount || 0) - (c.paid_amount || 0)), 0);
+  // Sum of balance_amount for all contributions
+  const totalBalance = sortedContributions.reduce((sum, c) => sum + (c.balance_amount || 0), 0);
+
 
   return (
     <Card>
@@ -82,10 +82,10 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
                 <TableHead>Date</TableHead>
                 <TableHead>Project</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">Expected Amount</TableHead> {/* New column */}
+                <TableHead className="text-right">Expected Amount</TableHead>
                 <TableHead className="text-right">Paid Amount</TableHead>
-                <TableHead className="text-right">Pledged Amount</TableHead> {/* Moved column */}
-                <TableHead className="text-right">Remaining</TableHead>
+                <TableHead className="text-right">Pledged Amount</TableHead>
+                <TableHead className="text-right">Balance</TableHead> {/* Renamed from Remaining */}
                 <TableHead>Due Date</TableHead>
                 <TableHead className="text-center">Status</TableHead>
               </TableRow>
@@ -94,9 +94,6 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
               {sortedContributions.map((contribution) => {
                 const displayStatus = getDisplayPledgeStatus(contribution);
                 const isPledge = contribution.type === "Pledge";
-                const remaining = isPledge && contribution.original_amount !== undefined && contribution.paid_amount !== undefined
-                  ? contribution.original_amount - contribution.paid_amount
-                  : 0;
 
                 return (
                   <TableRow key={contribution.id}>
@@ -119,8 +116,8 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right">
-                      {isPledge && remaining > 0
-                        ? `${currency.symbol}${remaining.toFixed(2)}`
+                      {contribution.balance_amount !== undefined
+                        ? `${currency.symbol}${contribution.balance_amount.toFixed(2)}`
                         : "-"}
                     </TableCell>
                     <TableCell>
@@ -146,7 +143,7 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
                 <TableCell className="text-right">{currency.symbol}{totalExpected.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{currency.symbol}{totalPaid.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{currency.symbol}{totalPledged.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{currency.symbol}{totalRemaining.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currency.symbol}{totalBalance.toFixed(2)}</TableCell> {/* Updated total */}
                 <TableCell colSpan={2}></TableCell>
               </TableRow>
             </TableBody>
