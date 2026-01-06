@@ -8,9 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
 import { parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
-import MyContributionsTable from "@/components/my-contributions/MyContributionsTable"; // Renamed import
-import MyContributionsGrandSummary from "@/components/my-contributions/MyContributionsGrandSummary"; // New import
-import { MyContribution, MyFinancialAccount, JoinedProject } from "@/types/common"; // Import types from common.ts
+import MyContributionsTable from "@/components/my-contributions/MyContributionsTable";
+import MyContributionsAnalysisSummary from "@/components/my-contributions/MyContributionsAnalysisSummary"; // New import
+import { MyContribution, JoinedProject, DebtRow } from "@/types/common"; // Import types from common.ts
 
 // Define the expected structure of a collection row with joined project data
 interface CollectionRowWithProject {
@@ -25,7 +25,7 @@ interface CollectionRowWithProject {
 interface PledgeRowWithProject {
   id: string;
   project_id: string;
-  amount: number;
+  amount: number; // This is original_amount
   paid_amount: number;
   due_date: string;
   status: "Active" | "Paid" | "Overdue";
@@ -33,17 +33,11 @@ interface PledgeRowWithProject {
   projects: JoinedProject | null;
 }
 
-interface MyContributionsSummary {
-  totalCollections: number;
-  totalPledged: number;
-  totalPaidPledges: number;
-  totalOutstandingDebt: number;
-}
-
 const MyContributions = () => {
   const { currentUser } = useAuth();
   const [contributions, setContributions] = useState<MyContribution[]>([]);
-  const [summaryData, setSummaryData] = useState<MyContributionsSummary | null>(null);
+  const [totalContributed, setTotalContributed] = useState(0);
+  const [balanceToPay, setBalanceToPay] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +51,10 @@ const MyContributions = () => {
     }
 
     try {
+      let allMyContributions: MyContribution[] = [];
+      let currentTotalContributed = 0;
+      let currentBalanceToPay = 0;
+
       // --- Fetch Collections ---
       const { data: collectionsData, error: collectionsError } = (await supabase
         .from('project_collections')
@@ -65,7 +63,7 @@ const MyContributions = () => {
           project_id,
           amount,
           date,
-          projects ( name, member_contribution_amount )
+          projects ( name )
         `)
         .eq('member_id', currentUser.id)
         .order('date', { ascending: false })) as { data: CollectionRowWithProject[] | null, error: PostgrestError | null };
@@ -73,18 +71,19 @@ const MyContributions = () => {
       if (collectionsError) throw collectionsError;
 
       const fetchedCollections: MyContribution[] = (collectionsData || []).map(c => {
-        const expectedAmount = c.projects?.member_contribution_amount || 0;
+        currentTotalContributed += c.amount; // Collections directly contribute to total
         return {
           id: c.id,
           project_id: c.project_id,
           project_name: c.projects?.name || 'Unknown Project',
-          amount: c.amount,
+          amount: c.amount, // Actual collected amount
           date: parseISO(c.date),
           type: "Collection",
-          expected_amount: expectedAmount,
-          balance_amount: expectedAmount - c.amount, // Expected - Actual collected
+          expected_amount: c.amount, // For collections, expected is actual collected
+          balance_amount: 0, // Collections are fully paid, so balance is 0
         };
       });
+      allMyContributions = [...allMyContributions, ...fetchedCollections];
 
       // --- Fetch Pledges ---
       const { data: pledgesData, error: pledgesError } = (await supabase
@@ -97,7 +96,7 @@ const MyContributions = () => {
           due_date,
           status,
           comments,
-          projects ( name, member_contribution_amount )
+          projects ( name )
         `)
         .eq('member_id', currentUser.id)
         .order('due_date', { ascending: false })) as { data: PledgeRowWithProject[] | null, error: PostgrestError | null };
@@ -107,6 +106,11 @@ const MyContributions = () => {
       const fetchedPledges: MyContribution[] = (pledgesData || []).map(p => {
         const originalAmount = p.amount;
         const paidAmount = p.paid_amount;
+        const balance = originalAmount - paidAmount;
+
+        currentTotalContributed += paidAmount; // Paid portion of pledges contributes
+        currentBalanceToPay += balance; // Unpaid portion of pledges contributes to balance to pay
+
         return {
           id: p.id,
           project_id: p.project_id,
@@ -118,49 +122,60 @@ const MyContributions = () => {
           due_date: parseISO(p.due_date),
           type: "Pledge",
           status: paidAmount >= originalAmount ? "Paid" : "Active", // Derive status based on paid_amount
-          expected_amount: p.projects?.member_contribution_amount || 0, // Include expected amount
-          balance_amount: originalAmount - paidAmount, // Original - Paid
+          expected_amount: originalAmount, // Expected for pledges is the original amount
+          balance_amount: balance, // Original - Paid
         };
       });
+      allMyContributions = [...allMyContributions, ...fetchedPledges];
 
-      setContributions([...fetchedCollections, ...fetchedPledges]);
-
-      // --- Fetch Summary Data ---
-      // Total Collections
-      const { data: totalCollectionsData, error: totalCollectionsError } = await supabase
-        .from('project_collections')
-        .select('amount')
-        .eq('member_id', currentUser.id);
-      if (totalCollectionsError) throw totalCollectionsError;
-      const totalCollections = (totalCollectionsData || []).reduce((sum, c) => sum + c.amount, 0);
-
-      // Total Pledged and Total Paid Towards Pledges
-      const { data: totalPledgesData, error: totalPledgesError } = await supabase
-        .from('project_pledges')
-        .select('amount, paid_amount')
-        .eq('member_id', currentUser.id);
-      if (totalPledgesError) throw totalPledgesError;
-      const totalPledged = (totalPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
-      const totalPaidPledges = (totalPledgesData || []).reduce((sum, p) => sum + p.paid_amount, 0);
-
-      // Total Outstanding Debt
-      let outstandingDebtsQuery = supabase
+      // --- Fetch Debts ---
+      let debtsQuery = supabase
         .from('debts')
-        .select('amount_due') // Corrected: Select amount_due
-        .neq('status', 'Paid'); // Only unpaid/partially paid debts
-      // If not admin, only show debts created by or owed by the current user
-      outstandingDebtsQuery = outstandingDebtsQuery.or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`);
-      
-      const { data: outstandingDebtsData, error: outstandingDebtsError } = await outstandingDebtsQuery;
-      if (outstandingDebtsError) throw outstandingDebtsError;
-      const totalOutstandingDebt = (outstandingDebtsData || []).reduce((sum, debt) => sum + debt.amount_due, 0); // Corrected: Sum amount_due
+        .select(`
+          id,
+          original_amount,
+          amount_due,
+          due_date,
+          status,
+          description,
+          created_at
+        `)
+        .or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`)
+        .order('due_date', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false }); // Fallback sort
 
-      setSummaryData({
-        totalCollections,
-        totalPledged,
-        totalPaidPledges,
-        totalOutstandingDebt,
+      const { data: debtsData, error: debtsError } = (await debtsQuery) as { data: DebtRow[] | null, error: PostgrestError | null };
+
+      if (debtsError) throw debtsError;
+
+      const fetchedDebts: MyContribution[] = (debtsData || []).map(d => {
+        const originalAmount = d.original_amount;
+        const amountDue = d.amount_due;
+        const paidAmount = originalAmount - amountDue;
+
+        currentTotalContributed += paidAmount; // Paid portion of debts contributes
+        currentBalanceToPay += amountDue; // Amount due for debts contributes to balance to pay
+
+        return {
+          id: d.id,
+          project_name: d.description || 'Personal Debt', // Use description as project_name for debts
+          description: d.description,
+          amount: originalAmount, // Original debt amount
+          original_amount: originalAmount,
+          paid_amount: paidAmount,
+          date: d.due_date ? parseISO(d.due_date) : parseISO(d.created_at), // Use due_date or created_at
+          due_date: d.due_date ? parseISO(d.due_date) : undefined,
+          type: "Debt",
+          status: d.status,
+          expected_amount: originalAmount, // Expected for debts is the original amount
+          balance_amount: amountDue, // Remaining amount due
+        };
       });
+      allMyContributions = [...allMyContributions, ...fetchedDebts];
+
+      setContributions(allMyContributions);
+      setTotalContributed(currentTotalContributed);
+      setBalanceToPay(currentBalanceToPay);
 
     } catch (err: any) {
       console.error("Error fetching contributions or summary:", err);
@@ -190,22 +205,18 @@ const MyContributions = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">My Contributions</h1>
       <p className="text-lg text-muted-foreground">
-        View your personal financial contributions and pledges to various projects.
+        View your personal financial contributions, pledges, and outstanding debts.
       </p>
-
-      {/* Grand Summary */}
-      {summaryData && (
-        <MyContributionsGrandSummary
-          totalCollections={summaryData.totalCollections}
-          totalPledged={summaryData.totalPledged}
-          totalPaidPledges={summaryData.totalPaidPledges}
-          totalOutstandingDebt={summaryData.totalOutstandingDebt}
-          loading={loading}
-        />
-      )}
 
       {/* Contributions Table */}
       <MyContributionsTable contributions={contributions} loading={loading} error={error} />
+
+      {/* Grand Summary Analysis */}
+      <MyContributionsAnalysisSummary
+        totalContributed={totalContributed}
+        balanceToPay={balanceToPay}
+        loading={loading}
+      />
     </div>
   );
 };
