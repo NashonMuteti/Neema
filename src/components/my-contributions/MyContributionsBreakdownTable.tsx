@@ -51,6 +51,21 @@ const MyContributionsBreakdownTable: React.FC<MyContributionsBreakdownTableProps
     }
   };
 
+  // Group items by type
+  const groupedItems: {
+    [key in ContributionBreakdownItem['type']]?: ContributionBreakdownItem[];
+  } = {
+    Project: [],
+    Pledge: [],
+    Debt: [],
+  };
+
+  breakdownItems.forEach(item => {
+    if (groupedItems[item.type]) {
+      groupedItems[item.type]?.push(item);
+    }
+  });
+
   const totalExpected = breakdownItems.reduce((sum, item) => sum + item.expectedAmount, 0);
   const totalPaid = breakdownItems.reduce((sum, item) => sum + item.paidAmount, 0);
   const totalBalanceDue = breakdownItems.reduce((sum, item) => sum + item.balanceDue, 0);
@@ -75,24 +90,49 @@ const MyContributionsBreakdownTable: React.FC<MyContributionsBreakdownTableProps
               </TableRow>
             </TableHeader>
             <TableBody>
-              {breakdownItems.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>{item.type}</TableCell>
-                  <TableCell className="text-right">{currency.symbol}{item.expectedAmount.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">{currency.symbol}{item.paidAmount.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-semibold">{currency.symbol}{item.balanceDue.toFixed(2)}</TableCell>
-                  <TableCell>{item.dueDate ? format(item.dueDate, "MMM dd, yyyy") : "N/A"}</TableCell>
-                  <TableCell className="text-center">
-                    {item.status && (
-                      <Badge className={getStatusBadgeClasses(item.status)}>
-                        {item.status}
-                      </Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+              {Object.keys(groupedItems).map((typeKey) => {
+                const type = typeKey as ContributionBreakdownItem['type'];
+                const itemsOfType = groupedItems[type] || [];
+
+                if (itemsOfType.length === 0) return null;
+
+                const subtotalExpected = itemsOfType.reduce((sum, item) => sum + item.expectedAmount, 0);
+                const subtotalPaid = itemsOfType.reduce((sum, item) => sum + item.paidAmount, 0);
+                const subtotalBalanceDue = itemsOfType.reduce((sum, item) => sum + item.balanceDue, 0);
+
+                return (
+                  <React.Fragment key={type}>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30 font-semibold">
+                      <TableCell colSpan={7} className="text-left text-lg py-3">{type}s</TableCell>
+                    </TableRow>
+                    {itemsOfType.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>{item.type}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{item.expectedAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{currency.symbol}{item.paidAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-semibold">{currency.symbol}{item.balanceDue.toFixed(2)}</TableCell>
+                        <TableCell>{item.dueDate ? format(item.dueDate, "MMM dd, yyyy") : "N/A"}</TableCell>
+                        <TableCell className="text-center">
+                          {item.status && (
+                            <Badge className={getStatusBadgeClasses(item.status)}>
+                              {item.status}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                      <TableCell colSpan={2} className="text-right">Subtotal {type}s</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{subtotalExpected.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{subtotalPaid.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{subtotalBalanceDue.toFixed(2)}</TableCell>
+                      <TableCell colSpan={2}></TableCell>
+                    </TableRow>
+                  </React.Fragment>
+                );
+              })}
+              <TableRow className="font-bold bg-primary/10 hover:bg-primary/10 text-primary-foreground">
                 <TableCell colSpan={2}>Grand Totals</TableCell>
                 <TableCell className="text-right">{currency.symbol}{totalExpected.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{currency.symbol}{totalPaid.toFixed(2)}</TableCell>
