@@ -9,8 +9,9 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
 import MyContributionsTable from "@/components/my-contributions/MyContributionsTable";
-import MyContributionsAnalysisSummary from "@/components/my-contributions/MyContributionsAnalysisSummary"; // New import
-import { MyContribution, JoinedProject, DebtRow } from "@/types/common"; // Import types from common.ts
+import MyContributionsAnalysisSummary from "@/components/my-contributions/MyContributionsAnalysisSummary";
+import MyContributionsBreakdownTable from "@/components/my-contributions/MyContributionsBreakdownTable"; // New import
+import { MyContribution, JoinedProject, DebtRow, ContributionBreakdownItem } from "@/types/common"; // Import types from common.ts
 
 // Define the expected structure of a collection row with joined project data
 interface CollectionRowWithProject {
@@ -38,6 +39,7 @@ const MyContributions = () => {
   const [contributions, setContributions] = useState<MyContribution[]>([]);
   const [totalContributed, setTotalContributed] = useState(0);
   const [balanceToPay, setBalanceToPay] = useState(0);
+  const [breakdownItems, setBreakdownItems] = useState<ContributionBreakdownItem[]>([]); // New state for breakdown
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +56,7 @@ const MyContributions = () => {
       let allMyContributions: MyContribution[] = [];
       let currentTotalContributed = 0;
       let currentBalanceToPay = 0;
+      let currentBreakdownItems: ContributionBreakdownItem[] = [];
 
       // --- Fetch Collections ---
       const { data: collectionsData, error: collectionsError } = (await supabase
@@ -111,6 +114,18 @@ const MyContributions = () => {
         currentTotalContributed += paidAmount; // Paid portion of pledges contributes
         currentBalanceToPay += balance; // Unpaid portion of pledges contributes to balance to pay
 
+        // Add to breakdown
+        currentBreakdownItems.push({
+          id: p.id,
+          name: p.projects?.name || 'Unknown Project Pledge',
+          type: "Pledge",
+          expectedAmount: originalAmount,
+          paidAmount: paidAmount,
+          balanceDue: balance,
+          status: paidAmount >= originalAmount ? "Paid" : "Active",
+          dueDate: parseISO(p.due_date),
+        });
+
         return {
           id: p.id,
           project_id: p.project_id,
@@ -156,6 +171,18 @@ const MyContributions = () => {
         currentTotalContributed += paidAmount; // Paid portion of debts contributes
         currentBalanceToPay += amountDue; // Amount due for debts contributes to balance to pay
 
+        // Add to breakdown
+        currentBreakdownItems.push({
+          id: d.id,
+          name: d.description || 'Personal Debt',
+          type: "Debt",
+          expectedAmount: originalAmount,
+          paidAmount: paidAmount,
+          balanceDue: amountDue,
+          status: d.status,
+          dueDate: d.due_date ? parseISO(d.due_date) : undefined,
+        });
+
         return {
           id: d.id,
           project_name: d.description || 'Personal Debt', // Use description as project_name for debts
@@ -173,9 +200,47 @@ const MyContributions = () => {
       });
       allMyContributions = [...allMyContributions, ...fetchedDebts];
 
+      // --- Fetch Active Projects for Expected Contributions ---
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, member_contribution_amount')
+        .eq('status', 'Open');
+
+      if (projectsError) throw projectsError;
+
+      // For each active project, calculate the user's expected contribution and how much they've paid
+      for (const project of (projectsData || [])) {
+        const expected = project.member_contribution_amount || 0;
+
+        // Sum of collections for this project by the current user
+        const projectCollections = fetchedCollections.filter(c => c.project_id === project.id);
+        const totalCollectedForProject = projectCollections.reduce((sum, c) => sum + c.amount, 0);
+
+        // Sum of paid pledges for this project by the current user
+        const projectPledges = fetchedPledges.filter(p => p.project_id === project.id);
+        const totalPaidPledgesForProject = projectPledges.reduce((sum, p) => sum + (p.paid_amount || 0), 0);
+
+        const totalPaidForProject = totalCollectedForProject + totalPaidPledgesForProject;
+        const balanceDueForProject = expected - totalPaidForProject;
+
+        // Only add to breakdown if there's an expected amount or some activity
+        if (expected > 0 || totalPaidForProject > 0) {
+          currentBreakdownItems.push({
+            id: project.id,
+            name: project.name,
+            type: "Project",
+            expectedAmount: expected,
+            paidAmount: totalPaidForProject,
+            balanceDue: balanceDueForProject > 0 ? balanceDueForProject : 0, // Ensure non-negative
+            status: balanceDueForProject <= 0 ? "Paid" : "Outstanding",
+          });
+        }
+      }
+
       setContributions(allMyContributions);
       setTotalContributed(currentTotalContributed);
       setBalanceToPay(currentBalanceToPay);
+      setBreakdownItems(currentBreakdownItems); // Set the new breakdown items
 
     } catch (err: any) {
       console.error("Error fetching contributions or summary:", err);
@@ -216,6 +281,13 @@ const MyContributions = () => {
         totalContributed={totalContributed}
         balanceToPay={balanceToPay}
         loading={loading}
+      />
+
+      {/* New: Breakdown Summary Table */}
+      <MyContributionsBreakdownTable
+        breakdownItems={breakdownItems}
+        loading={loading}
+        error={error}
       />
     </div>
   );

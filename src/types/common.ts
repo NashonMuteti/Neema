@@ -181,3 +181,15 @@ export interface Product {
   profile_id: string;
   is_active: boolean; // New: Whether the product is active or inactive
 }
+
+// New: Interface for the breakdown summary table
+export interface ContributionBreakdownItem {
+  id: string;
+  name: string; // Name of the project, pledge, or debt description
+  type: "Project" | "Pledge" | "Debt";
+  expectedAmount: number;
+  paidAmount: number;
+  balanceDue: number;
+  status?: "Active" | "Paid" | "Outstanding" | "Partially Paid" | "Overdue";
+  dueDate?: Date;
+}
