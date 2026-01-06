@@ -5,15 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { getYear, format, parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
-import { FinancialAccount, Member, MonthYearOption, Project, Transaction } from "@/types/common";
-
-interface MonthlyFinancialData {
-  year: number;
-  month: string;
-  income: number;
-  expenditure: number;
-  outstandingPledges: number;
-}
+import { FinancialAccount, Member, MonthYearOption, Project, Transaction, MonthlyFinancialData, DebtRow } from "@/types/common";
 
 export const useFinancialData = () => {
   const { currentUser } = useAuth();
@@ -54,29 +46,47 @@ export const useFinancialData = () => {
       const { data: projectPledges, error: pledgesError } = await projectPledgesQuery;
       if (pledgesError) throw pledgesError;
 
-      const aggregatedData: Record<string, { income: number; expenditure: number; outstandingPledges: number }> = {};
+      // New: Fetch debts
+      let debtsQuery = supabase.from('debts').select('due_date, amount_due, status, created_at');
+      if (!isAdmin) {
+        debtsQuery = debtsQuery.or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`);
+      }
+      const { data: debtsData, error: debtsError } = await debtsQuery as { data: DebtRow[] | null, error: any };
+      if (debtsError) throw debtsError;
+
+      const aggregatedData: Record<string, { income: number; expenditure: number; outstandingPledges: number; outstandingDebts: number }> = {};
       const yearsSet = new Set<number>();
 
-      const aggregateByMonth = (dateStr: string, type: 'income' | 'expenditure' | 'outstandingPledges', amount: number) => {
+      const aggregateByMonth = (dateStr: string | null, type: 'income' | 'expenditure' | 'outstandingPledges' | 'outstandingDebts', amount: number) => {
+        if (!dateStr) return; // Skip if date is null
         const date = parseISO(dateStr);
         const year = getYear(date);
         const month = format(date, 'MMM');
         const key = `${year}-${month}`;
         
         if (!aggregatedData[key]) {
-          aggregatedData[key] = { income: 0, expenditure: 0, outstandingPledges: 0 };
+          aggregatedData[key] = { income: 0, expenditure: 0, outstandingPledges: 0, outstandingDebts: 0 };
         }
         aggregatedData[key][type] += amount;
         yearsSet.add(year);
       };
 
       incomeTransactions?.forEach(tx => aggregateByMonth(tx.date, 'income', tx.amount));
-      expenditureTransactions?.forEach(tx => aggregateByMonth(tx.date, 'expenditure', tx.amount)); // Now includes former petty cash
+      expenditureTransactions?.forEach(tx => aggregateByMonth(tx.date, 'expenditure', tx.amount));
       
       projectPledges?.forEach(pledge => {
         const outstanding = pledge.amount - pledge.paid_amount;
         if (outstanding > 0) {
           aggregateByMonth(pledge.due_date, 'outstandingPledges', outstanding);
+        }
+      });
+
+      // New: Aggregate outstanding debts
+      debtsData?.forEach(debt => {
+        if (debt.status !== 'Paid' && debt.amount_due > 0) {
+          // Use due_date if available, otherwise created_at
+          const dateToAggregate = debt.due_date || debt.created_at;
+          aggregateByMonth(dateToAggregate, 'outstandingDebts', debt.amount_due);
         }
       });
 
@@ -89,6 +99,7 @@ export const useFinancialData = () => {
             income: aggregatedData[key].income,
             expenditure: aggregatedData[key].expenditure,
             outstandingPledges: aggregatedData[key].outstandingPledges,
+            outstandingDebts: aggregatedData[key].outstandingDebts, // Include new field
           };
         })
         .sort((a, b) => {

@@ -13,15 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-import { Project } from "@/types/common"; // Import Project from common.ts
-
-interface MonthlyFinancialData {
-  year: number;
-  month: string;
-  income: number;
-  expenditure: number;
-  outstandingPledges: number; // New field
-}
+import { MonthlyFinancialData } from "@/types/common"; // Import MonthlyFinancialData from common.ts
 
 interface IncomeExpenditureGraphProps {
   financialData: MonthlyFinancialData[];
@@ -43,6 +35,7 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
     income: 0,
     expenditure: 0,
     outstandingPledges: 0,
+    outstandingDebts: 0, // Initialize new field
   }));
 
   // Merge actual financial data into the full year structure
@@ -77,7 +70,7 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
       <CardHeader>
-        <CardTitle>Income, Expenditure & Outstanding Pledges ({selectedYear})</CardTitle>
+        <CardTitle>Income, Expenditure, Outstanding Pledges & Debts ({selectedYear})</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -121,10 +114,17 @@ const IncomeExpenditureGraph: React.FC<IncomeExpenditureGraphProps> = ({
               name="Outstanding Pledges"
               activeDot={{ r: 8 }}
             />
+            <Line // New Line for Outstanding Debts
+              type="monotone"
+              dataKey="outstandingDebts"
+              stroke="hsl(var(--yellow-600))" // Use a distinct color, e.g., yellow-600
+              name="Outstanding Debts"
+              activeDot={{ r: 8 }}
+            />
           </LineChart>
         </ResponsiveContainer>
         <p className="text-sm text-muted-foreground mt-4 text-center">
-          Monthly breakdown of financial activity and outstanding commitments.
+          Monthly breakdown of financial activity, outstanding commitments, and debts.
         </p>
       </CardContent>
     </Card>

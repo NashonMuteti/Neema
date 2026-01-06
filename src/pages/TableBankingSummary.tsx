@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -44,7 +44,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
-import { FinancialAccount, MonthYearOption } from "@/types/common"; // Updated import
+import { FinancialAccount, MonthYearOption, DebtRow } from "@/types/common"; // Updated import
+import { Debt } from "@/components/sales-management/AddEditDebtDialog"; // Import Debt interface
 
 interface ProjectCollection {
   id: string;
@@ -58,6 +59,8 @@ interface ProjectCollection {
 const TableBankingSummary: React.FC = () => {
   const { currency } = useSystemSettings(); // Use currency from context
   const { currentUser } = useAuth(); // Use currentUser to filter accounts
+  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
+
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date());
 
@@ -69,6 +72,7 @@ const TableBankingSummary: React.FC = () => {
 
   const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
   const [allCollections, setAllCollections] = React.useState<ProjectCollection[]>([]);
+  const [debts, setDebts] = React.useState<Debt[]>([]); // New state for debts
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -116,8 +120,55 @@ const TableBankingSummary: React.FC = () => {
     } else {
       setAllCollections(collectionsData || []);
     }
+
+    // New: Fetch Debts
+    let debtsQuery = supabase
+      .from('debts')
+      .select(`
+        id,
+        description,
+        original_amount,
+        amount_due,
+        due_date,
+        status,
+        debtor_profile_id,
+        customer_name,
+        profiles!debts_debtor_profile_id_fkey(name, email)
+      `);
+    
+    // Filter debts by current user if not admin
+    if (!isAdmin) {
+      debtsQuery = debtsQuery.or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`);
+    }
+
+    const { data: debtsData, error: debtsError } = await debtsQuery.order('due_date', { ascending: false, nullsFirst: false });
+
+    if (debtsError) {
+      console.error("Error fetching debts:", debtsError);
+      setError("Failed to load debts.");
+      setDebts([]);
+    } else {
+      setDebts((debtsData || []).map((d: any) => ({
+        id: d.id,
+        created_by_profile_id: d.created_by_profile_id,
+        sale_id: d.sale_id || undefined,
+        debtor_profile_id: d.debtor_profile_id || undefined,
+        customer_name: d.customer_name || undefined,
+        description: d.description,
+        original_amount: d.original_amount,
+        amount_due: d.amount_due,
+        due_date: d.due_date ? parseISO(d.due_date) : undefined,
+        status: d.status,
+        notes: d.notes || undefined,
+        created_at: parseISO(d.created_at || new Date().toISOString()),
+        created_by_name: d.profiles!debts_created_by_profile_id_fkey?.name || d.profiles!debts_created_by_profile_id_fkey?.email || 'N/A',
+        debtor_name: d.profiles!debts_debtor_profile_id_fkey?.name || d.profiles!debts_debtor_profile_id_fkey?.email || d.customer_name || 'N/A',
+        sale_description: d.sales_transactions?.notes || undefined,
+      })));
+    }
+
     setLoading(false);
-  }, [currentUser]); // Added currentUser to dependencies
+  }, [currentUser, isAdmin, filterPeriod, selectedDate, selectedMonth, selectedYear]);
 
   useEffect(() => {
     fetchTableBankingData();
@@ -171,6 +222,16 @@ const TableBankingSummary: React.FC = () => {
   }, [filteredCollections]);
 
   const grandTotal = Object.values(groupedContributions).reduce((sum, amount) => sum + amount, 0);
+
+  const filteredDebts = React.useMemo(() => {
+    return debts.filter(debt => {
+      const debtDate = debt.due_date || debt.created_at; // Use due_date or created_at for filtering
+      if (!debtDate) return false;
+      return isWithinInterval(debtDate, { start, end });
+    });
+  }, [debts, start, end]);
+
+  const totalOutstandingDebts = filteredDebts.reduce((sum, debt) => sum + debt.amount_due, 0);
 
   const getPeriodLabel = () => {
     switch (filterPeriod) {
@@ -388,7 +449,7 @@ const TableBankingSummary: React.FC = () => {
                   );
                 })}
                 <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                  <TableCell>Grand Total</TableCell>
+                  <TableCell>Grand Total Collections</TableCell> {/* Updated label */}
                   <TableCell className="text-right">{currency.symbol}{grandTotal.toFixed(2)}</TableCell>
                   <TableCell></TableCell>
                 </TableRow>
@@ -396,6 +457,44 @@ const TableBankingSummary: React.FC = () => {
             </Table>
           ) : (
             <p className="text-muted-foreground text-center mt-4">No contributions found for the selected period.</p>
+          )}
+
+          {/* New: Debts Summary Section */}
+          <h3 className="text-xl font-semibold mb-2 mt-6">Debts Overview for {getPeriodLabel()}</h3>
+          {filteredDebts.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Debtor</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead className="text-right">Amount Due</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredDebts.map((debt) => (
+                  <TableRow key={debt.id}>
+                    <TableCell className="font-medium">{debt.debtor_name}</TableCell>
+                    <TableCell>{debt.description}</TableCell>
+                    <TableCell>{debt.due_date ? format(debt.due_date, "MMM dd, yyyy") : "N/A"}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{debt.amount_due.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <span className={`font-medium ${debt.status === "Paid" ? "text-green-600" : debt.status === "Overdue" ? "text-destructive" : "text-yellow-600"}`}>
+                        {debt.status}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                  <TableCell colSpan={3}>Total Outstanding Debts</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{totalOutstandingDebts.toFixed(2)}</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-muted-foreground text-center mt-4">No debts found for the selected period.</p>
           )}
         </CardContent>
       </Card>

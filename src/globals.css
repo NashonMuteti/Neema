@@ -44,6 +44,7 @@
     --sidebar-ring: 40 70% 40%; /* Dark gold */
 
     --sky-blue-header: 200 80% 80%; /* Light sky blue for header */
+    --yellow-600: 40 80% 45%; /* A distinct yellow for light mode */
   }
 
   html[data-theme="dark"] {
@@ -84,6 +85,7 @@
     --sidebar-ring: 40 70% 40%; /* Dark gold */
 
     --sky-blue-header: 200 80% 20%; /* Darker sky blue for header in dark mode */
+    --yellow-600: 40 80% 65%; /* A distinct yellow for dark mode */
   }
 
   html[data-theme="blue"] {
@@ -127,6 +129,7 @@
     --sidebar-ring: 40 70% 40%; /* Dark gold */
 
     --sky-blue-header: 200 80% 80%; /* Light sky blue for header */
+    --yellow-600: 40 80% 45%; /* A distinct yellow for light mode */
   }
 
   html[data-theme="green"] {
@@ -170,6 +173,7 @@
     --sidebar-ring: 40 70% 40%; /* Dark gold */
 
     --sky-blue-header: 200 80% 80%; /* Light sky blue for header */
+    --yellow-600: 40 80% 45%; /* A distinct yellow for light mode */
   }
 
   html[data-theme="purple"] {
@@ -213,6 +217,7 @@
     --sidebar-ring: 40 70% 40%; /* Dark gold */
 
     --sky-blue-header: 200 80% 80%; /* Light sky blue for header */
+    --yellow-600: 40 80% 45%; /* A distinct yellow for light mode */
   }
 
   html[data-theme="orange"] {
@@ -256,6 +261,7 @@
     --sidebar-ring: 40 70% 40%; /* Dark gold */
 
     --sky-blue-header: 200 80% 80%; /* Light sky blue for header */
+    --yellow-600: 40 80% 45%; /* A distinct yellow for light mode */
   }
 }
 

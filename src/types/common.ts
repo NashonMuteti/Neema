@@ -43,6 +43,16 @@ export interface Transaction {
   pledgeId?: string; // To link income transactions to pledges
 }
 
+// New: Monthly Financial Data for Dashboard Graph
+export interface MonthlyFinancialData {
+  year: number;
+  month: string;
+  income: number;
+  expenditure: number;
+  outstandingPledges: number;
+  outstandingDebts: number; // New: Add outstandingDebts
+}
+
 // Raw data structures from Supabase joins (for internal use in fetchers)
 // These represent the shape of data directly returned from Supabase queries with joins.
 export interface JoinedFinancialAccount { // For joined 'financial_accounts'
@@ -98,12 +108,13 @@ export interface DebtRow {
   id: string;
   original_amount: number;
   amount_due: number;
-  due_date: string;
-  status: "Active" | "Paid" | "Overdue"; // Assuming similar statuses
+  due_date: string | null; // Can be null
+  status: "Outstanding" | "Partially Paid" | "Paid" | "Overdue";
   description?: string;
   created_at: string; // For sorting if due_date is null
   created_by_profile_id: string;
-  debtor_profile_id: string;
+  debtor_profile_id: string | null;
+  customer_name: string | null;
 }
 
 // Processed data for MemberContributionsDetail page
