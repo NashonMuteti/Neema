@@ -19,6 +19,7 @@ import {
 } from "date-fns";
 import { FinancialAccount, DebtRow } from "@/types/common";
 import { Debt } from "@/components/sales-management/AddEditDebtDialog"; // Import Debt interface
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 interface ProjectCollection {
   id: string;

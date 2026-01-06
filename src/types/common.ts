@@ -125,7 +125,7 @@ export interface MemberContribution {
   date: Date;
   amount: number; // Actual amount for income/expenditure, original_amount for pledge
   accountName: string; // Financial account name for transactions, project name for pledges
-  status?: "Active" | "Paid" | "Overdue"; // Only for pledges
+  status?: "Active" | "Paid" | "Overdue" | "Outstanding" | "Partially Paid"; // Only for pledges/debts
   dueDate?: Date; // Only for pledges
   pledgeId?: string; // To link income transactions to pledges
   original_amount?: number; // For pledges, the total pledged amount
@@ -141,7 +141,7 @@ export interface MyContribution {
   amount: number; // Actual amount for collection, original_amount for pledge/debt
   date: Date;
   type: "Collection" | "Pledge" | "Debt"; // Updated: Added "Debt"
-  status?: "Active" | "Paid" | "Overdue"; // Only for pledges/debts
+  status?: "Active" | "Paid" | "Overdue" | "Outstanding" | "Partially Paid"; // Only for pledges/debts
   original_amount?: number; // For pledges/debts, the total original amount
   paid_amount?: number;     // For pledges/debts, the amount already paid
   due_date?: Date;          // For pledges/debts

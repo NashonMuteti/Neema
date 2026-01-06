@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { MonthYearOption } from "@/types/common";
+import { Button } from "@/components/ui/button"; // Added Button import
 
 interface TableBankingSummaryFiltersProps {
   filterPeriod: "daily" | "weekly" | "monthly" | "yearly";
