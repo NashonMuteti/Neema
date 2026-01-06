@@ -9,7 +9,6 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
 import MyContributionsTable from "@/components/my-contributions/MyContributionsTable";
-import MyContributionsAnalysisSummary from "@/components/my-contributions/MyContributionsAnalysisSummary";
 import MyContributionsBreakdownTable from "@/components/my-contributions/MyContributionsBreakdownTable"; // New import
 import { MyContribution, JoinedProject, DebtRow, ContributionBreakdownItem } from "@/types/common"; // Import types from common.ts
 
@@ -275,13 +274,6 @@ const MyContributions = () => {
 
       {/* Contributions Table */}
       <MyContributionsTable contributions={contributions} loading={loading} error={error} />
-
-      {/* Grand Summary Analysis */}
-      <MyContributionsAnalysisSummary
-        totalContributed={totalContributed}
-        balanceToPay={balanceToPay}
-        loading={loading}
-      />
 
       {/* New: Breakdown Summary Table */}
       <MyContributionsBreakdownTable
