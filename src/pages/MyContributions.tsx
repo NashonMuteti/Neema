@@ -288,6 +288,8 @@ const MyContributions = () => {
         breakdownItems={breakdownItems}
         loading={loading}
         error={error}
+        overallTotalContributed={totalContributed}
+        overallBalanceToPay={balanceToPay}
       />
     </div>
   );

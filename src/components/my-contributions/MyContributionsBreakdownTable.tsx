@@ -19,12 +19,16 @@ interface MyContributionsBreakdownTableProps {
   breakdownItems: ContributionBreakdownItem[];
   loading: boolean;
   error: string | null;
+  overallTotalContributed: number; // New prop
+  overallBalanceToPay: number;     // New prop
 }
 
 const MyContributionsBreakdownTable: React.FC<MyContributionsBreakdownTableProps> = ({
   breakdownItems,
   loading,
   error,
+  overallTotalContributed, // Destructure new prop
+  overallBalanceToPay,     // Destructure new prop
 }) => {
   const { currency } = useSystemSettings();
 
@@ -66,9 +70,8 @@ const MyContributionsBreakdownTable: React.FC<MyContributionsBreakdownTableProps
     }
   });
 
+  // Calculate total expected from breakdown items (this remains as is)
   const totalExpected = breakdownItems.reduce((sum, item) => sum + item.expectedAmount, 0);
-  const totalPaid = breakdownItems.reduce((sum, item) => sum + item.paidAmount, 0);
-  const totalBalanceDue = breakdownItems.reduce((sum, item) => sum + item.balanceDue, 0);
 
   return (
     <Card className="mt-6">
@@ -135,8 +138,8 @@ const MyContributionsBreakdownTable: React.FC<MyContributionsBreakdownTableProps
               <TableRow className="font-bold bg-primary/10 hover:bg-primary/10 text-primary-foreground">
                 <TableCell colSpan={2}>Grand Totals</TableCell>
                 <TableCell className="text-right">{currency.symbol}{totalExpected.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{currency.symbol}{totalPaid.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{currency.symbol}{totalBalanceDue.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currency.symbol}{overallTotalContributed.toFixed(2)}</TableCell> {/* Use overallTotalContributed */}
+                <TableCell className="text-right">{currency.symbol}{overallBalanceToPay.toFixed(2)}</TableCell> {/* Use overallBalanceToPay */}
                 <TableCell colSpan={2}></TableCell>
               </TableRow>
             </TableBody>
