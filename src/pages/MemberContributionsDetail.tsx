@@ -16,7 +16,6 @@ import {
   MemberContribution,
   IncomeTxRow,
   ExpenditureTxRow,
-  // Removed PettyCashTxRow
   PledgeTxRow,
   Project, // Generic Project interface for all active projects
   FinancialAccount // Use FinancialAccount for the main type
@@ -36,6 +35,7 @@ const MemberContributionsDetail: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [memberContributions, setMemberContributions] = useState<MemberContribution[]>([]);
   const [memberName, setMemberName] = useState("Unknown Member");
+  const [memberImageUrl, setMemberImageUrl] = useState<string | undefined>(undefined); // New state for member image
   const [allActiveProjects, setAllActiveProjects] = useState<Project[]>([]); // ALL active projects in the system
   const [totalYearlyPledgedAmount, setTotalYearlyPledgedAmount] = useState(0);
   const [totalYearlyPaidAmount, setTotalYearlyPaidAmount] = useState(0);
@@ -76,10 +76,10 @@ const MemberContributionsDetail: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Fetch member name
+    // Fetch member name and image URL
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('name, email')
+      .select('name, email, image_url') // Select image_url
       .eq('id', memberId)
       .single();
 
@@ -93,6 +93,7 @@ const MemberContributionsDetail: React.FC = () => {
     if (profileData) {
       const name = profileData.name || profileData.email || "Unknown Member";
       setMemberName(name);
+      setMemberImageUrl(profileData.image_url || undefined); // Set member image URL
       setViewingMemberName(name);
     } else {
       setError("Member not found.");
@@ -274,7 +275,7 @@ const MemberContributionsDetail: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <MemberContributionsHeader memberName={memberName} />
+      <MemberContributionsHeader memberName={memberName} memberImageUrl={memberImageUrl} />
       <p className="text-lg text-muted-foreground">
         Detailed view of {memberName}'s financial activities.
       </p>

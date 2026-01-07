@@ -11,6 +11,8 @@ import { showError } from "@/utils/toast";
 import MyContributionsTable from "@/components/my-contributions/MyContributionsTable";
 import MyContributionsBreakdownTable from "@/components/my-contributions/MyContributionsBreakdownTable"; // New import
 import { MyContribution, JoinedProject, DebtRow, ContributionBreakdownItem } from "@/types/common"; // Import types from common.ts
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // New import
+import { User as UserIcon } from "lucide-react"; // New import
 
 // Define the expected structure of a collection row with joined project data
 interface CollectionRowWithProject {
@@ -267,7 +269,18 @@ const MyContributions = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">My Contributions</h1>
+      <div className="flex items-center gap-4"> {/* Added flex container for avatar and title */}
+        <Avatar className="h-9 w-9">
+          {currentUser.imageUrl ? (
+            <AvatarImage src={currentUser.imageUrl} alt={currentUser.name} />
+          ) : (
+            <AvatarFallback>
+              <UserIcon className="h-5 w-5 text-muted-foreground" />
+            </AvatarFallback>
+          )}
+        </Avatar>
+        <h1 className="text-3xl font-bold text-foreground">My Contributions</h1>
+      </div>
       <p className="text-lg text-muted-foreground">
         View your personal financial contributions, pledges, and outstanding debts.
       </p>
