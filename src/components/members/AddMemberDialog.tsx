@@ -227,11 +227,11 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
               <img
                 src={displayImageUrl}
                 alt="Member Avatar Preview"
-                className="w-24 h-24 object-cover rounded-full border"
+                className="w-48 h-48 object-cover rounded-full border" // Increased size
               />
             ) : (
-              <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center text-muted-foreground border">
-                <ImageIcon className="h-12 w-12" />
+              <div className="w-48 h-48 bg-muted rounded-full flex items-center justify-center text-muted-foreground border"> {/* Increased size */}
+                <ImageIcon className="h-24 w-24" /> {/* Scaled icon */}
               </div>
             )}
             <div className="grid w-full items-center gap-1.5">

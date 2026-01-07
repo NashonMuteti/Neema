@@ -206,10 +206,10 @@ const BoardMembers = () => {
                   <TableRow key={member.id}>
                     <TableCell>
                       {member.image_url ? (
-                        <img src={member.image_url} alt={member.name} className="h-8 w-8 rounded-full object-cover" />
+                        <img src={member.image_url} alt={member.name} className="h-32 w-32 rounded-full object-cover" /> {/* Increased size */}
                       ) : (
-                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                          <UserIcon className="h-4 w-4 text-muted-foreground" />
+                        <div className="h-32 w-32 rounded-full bg-muted flex items-center justify-center"> {/* Increased size */}
+                          <UserIcon className="h-16 w-16 text-muted-foreground" /> {/* Scaled icon */}
                         </div>
                       )}
                     </TableCell>

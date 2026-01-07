@@ -392,17 +392,18 @@ const Projects = () => {
             
             return (
               <Card key={project.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"> {/* Added flex classes */}
                   <CardTitle>{project.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="w-full h-32 bg-muted rounded-md flex items-center justify-center overflow-hidden">
+                  <div className="w-48 h-48 bg-muted rounded-md flex items-center justify-center overflow-hidden"> {/* Moved and resized */}
                     {project.thumbnailUrl ? (
                       <img src={project.thumbnailUrl} alt="Project Thumbnail" className="h-full w-full object-cover" />
                     ) : (
-                      <ImageIcon className="h-20 w-20 text-muted-foreground" />
+                      <ImageIcon className="h-32 w-32 text-muted-foreground" /> {/* Scaled icon */}
                     )}
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Removed the old thumbnail div from here */}
                   <p className="text-muted-foreground text-sm">{project.description}</p>
                   <p className="text-sm">
                     Status: <span className="font-medium">{project.status}</span>
