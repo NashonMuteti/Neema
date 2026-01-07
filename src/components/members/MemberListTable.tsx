@@ -65,10 +65,10 @@ const MemberListTable: React.FC<MemberListTableProps> = ({
               <TableRow key={member.id}>
                 <TableCell>
                   {member.imageUrl ? (
-                    <img src={member.imageUrl} alt={member.name} className="h-32 w-32 rounded-full object-cover" /> {/* Increased size */}
+                    <img src={member.imageUrl} alt={member.name} className="h-8 w-8 rounded-full object-cover" />
                   ) : (
-                    <div className="h-32 w-32 rounded-full bg-muted flex items-center justify-center"> {/* Increased size */}
-                      <UserIcon className="h-16 w-16 text-muted-foreground" /> {/* Scaled icon */}
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                      <UserIcon className="h-4 w-4 text-muted-foreground" />
                     </div>
                   )}
                 </TableCell>

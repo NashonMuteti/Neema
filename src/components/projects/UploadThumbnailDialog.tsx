@@ -173,7 +173,7 @@ const UploadThumbnailDialog: React.FC<UploadThumbnailDialogProps> = ({
               />
             ) : (
               <div className="w-48 h-48 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
-                <ImageIcon className="h-24 w-24" /> {/* Scaled icon */}
+                <ImageIcon className="h-12 w-12" />
               </div>
             )}
             <div className="grid w-full items-center gap-1.5">

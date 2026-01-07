@@ -291,10 +291,10 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({ project, onEditPr
           </div>
           <div className="flex flex-col items-center gap-4 col-span-full">
             {displayImageUrl ? (
-              <img src={displayImageUrl} alt="Project Thumbnail Preview" className="w-48 h-48 object-cover rounded-md border" /> {/* Increased size */}
+              <img src={displayImageUrl} alt="Project Thumbnail Preview" className="w-32 h-32 object-cover rounded-md border" />
             ) : (
-              <div className="w-48 h-48 bg-muted rounded-md flex items-center justify-center text-muted-foreground border"> {/* Increased size */}
-                <ImageIcon className="h-24 w-24" /> {/* Scaled icon */}
+              <div className="w-32 h-32 bg-muted rounded-md flex items-center justify-center text-muted-foreground border">
+                <ImageIcon className="h-12 w-12" />
               </div>
             )}
             <div className="grid w-full items-center gap-1.5">
