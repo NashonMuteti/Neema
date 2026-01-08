@@ -1,45 +1,49 @@
+import React, { Suspense } from "react"; // Import Suspense
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Layout from "./components/Layout";
+import "./globals.css";
+import { ThemeProvider } from "next-themes";
+
 import { AuthProvider } from "./context/AuthContext";
 import { BrandingProvider } from "./context/BrandingContext";
 import { UserRolesProvider } from "./context/UserRolesContext";
 import { ViewingMemberProvider } from "./context/ViewingMemberContext";
 import { SystemSettingsProvider } from "./context/SystemSettingsContext";
-import Login from "./pages/Login";
+
+// Layout and ProtectedRoute
+import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-// Placeholder pages
-import Projects from "./pages/Projects";
-// import PettyCash from "./pages/PettyCash"; // Removed
-import UserSettings from "./pages/UserSettings";
-import Members from "./pages/Members";
-import Pledges from "./pages/Pledges";
-import MemberContributions from "./pages/Reports/MemberContributions";
-// import PettyCashReport from "./pages/Reports/PettyCashReport"; // Removed
-import PledgeReport from "./pages/Reports/PledgeReport";
-import AdminSettings from "./pages/AdminSettings";
-import UserActivityReport from "./pages/Reports/UserActivityReport";
-import InitializeBalances from "./pages/InitializeBalances";
-import DeletedProjectsReport from "./pages/Reports/DeletedProjectsReport";
-import Income from "./pages/Income";
-import Expenditure from "./pages/Expenditure";
-import BoardMembers from "./pages/BoardMembers";
-import MyContributions from "./pages/MyContributions";
-import MemberContributionsDetail from "./pages/MemberContributionsDetail";
-import ProjectFinancialsDetail from "./pages/ProjectFinancialsDetail";
-import TableBankingSummary from "./pages/TableBankingSummary";
-import TransferFunds from "./pages/TransferFunds"; // New import
+// Dynamically import pages using React.lazy
+const Index = React.lazy(() => import("./pages/Index"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const Login = React.lazy(() => import("./pages/Login"));
+const Projects = React.lazy(() => import("./pages/Projects"));
+const UserSettings = React.lazy(() => import("./pages/UserSettings"));
+const Members = React.lazy(() => import("./pages/Members"));
+const Pledges = React.lazy(() => import("./pages/Pledges"));
+const MemberContributions = React.lazy(() => import("./pages/Reports/MemberContributions"));
+const PledgeReport = React.lazy(() => import("./pages/Reports/PledgeReport"));
+const AdminSettings = React.lazy(() => import("./pages/AdminSettings"));
+const UserActivityReport = React.lazy(() => import("./pages/Reports/UserActivityReport"));
+const InitializeBalances = React.lazy(() => import("./pages/InitializeBalances"));
+const DeletedProjectsReport = React.lazy(() => import("./pages/Reports/DeletedProjectsReport"));
+const Income = React.lazy(() => import("./pages/Income"));
+const Expenditure = React.lazy(() => import("./pages/Expenditure"));
+const BoardMembers = React.lazy(() => import("./pages/BoardMembers"));
+const MyContributions = React.lazy(() => import("./pages/MyContributions"));
+const MemberContributionsDetail = React.lazy(() => import("./pages/MemberContributionsDetail"));
+const ProjectFinancialsDetail = React.lazy(() => import("./pages/ProjectFinancialsDetail"));
+const TableBankingSummary = React.lazy(() => import("./pages/TableBankingSummary"));
+const TransferFunds = React.lazy(() => import("./pages/TransferFunds"));
 
 // Sales Management Pages
-import Stocks from "./pages/SalesManagement/Stocks";
-import DailySales from "./pages/SalesManagement/DailySales";
-import Debts from "./pages/SalesManagement/Debts";
+const Stocks = React.lazy(() => import("./pages/SalesManagement/Stocks"));
+const DailySales = React.lazy(() => import("./pages/SalesManagement/DailySales"));
+const Debts = React.lazy(() => import("./pages/SalesManagement/Debts"));
 
 const queryClient = new QueryClient();
 
@@ -54,45 +58,49 @@ const App = () => (
             <UserRolesProvider>
               <ViewingMemberProvider>
                 <SystemSettingsProvider>
-                  <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route element={<ProtectedRoute />}>
-                      <Route element={<Layout />}>
-                        <Route path="/" element={<Index />} />
-                        <Route path="/projects" element={<Projects />} />
-                        <Route path="/projects/:projectId/financials" element={<ProjectFinancialsDetail />} />
-                        {/* <Route path="/petty-cash" element={<PettyCash />} /> */}
-                        <Route path="/pledges" element={<Pledges />} />
-                        <Route path="/income" element={<Income />} />
-                        <Route path="/expenditure" element={<Expenditure />} />
-                        
-                        {/* Sales Management Routes */}
-                        <Route path="/sales/stocks" element={<Stocks />} />
-                        <Route path="/sales/daily" element={<DailySales />} />
-                        <Route path="/sales/debts" element={<Debts />} />
-                        
-                        <Route path="/members" element={<Members />} />
-                        <Route path="/board-members" element={<BoardMembers />} />
-                        <Route path="/profile" element={<UserSettings />} />
-                        <Route path="/settings" element={<UserSettings />} />
-                        <Route path="/my-contributions" element={<MyContributions />} />
-                        <Route path="/members/:memberId/contributions" element={<MemberContributionsDetail />} />
-                        
-                        <Route path="/reports/member-contributions" element={<MemberContributions />} />
-                        {/* <Route path="/reports/petty-cash" element={<PettyCashReport />} /> */}
-                        <Route path="/reports/pledges" element={<PledgeReport />} />
-                        <Route path="/reports/table-banking-summary" element={<TableBankingSummary />} />
-                        <Route path="/reports/user-activity" element={<UserActivityReport />} />
-                        <Route path="/reports/deleted-projects" element={<DeletedProjectsReport />} />
-                        
-                        <Route path="/initialize-balances" element={<InitializeBalances />} />
-                        <Route path="/transfer-funds" element={<TransferFunds />} /> {/* New route */}
-                        <Route path="/admin/settings" element={<AdminSettings />} />
+                  <Suspense fallback={
+                    <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+                      Loading application...
+                    </div>
+                  }>
+                    <Routes>
+                      <Route path="/login" element={<Login />} />
+                      <Route element={<ProtectedRoute />}>
+                        <Route element={<Layout />}>
+                          <Route path="/" element={<Index />} />
+                          <Route path="/projects" element={<Projects />} />
+                          <Route path="/projects/:projectId/financials" element={<ProjectFinancialsDetail />} />
+                          <Route path="/pledges" element={<Pledges />} />
+                          <Route path="/income" element={<Income />} />
+                          <Route path="/expenditure" element={<Expenditure />} />
+                          
+                          {/* Sales Management Routes */}
+                          <Route path="/sales/stocks" element={<Stocks />} />
+                          <Route path="/sales/daily" element={<DailySales />} />
+                          <Route path="/sales/debts" element={<Debts />} />
+                          
+                          <Route path="/members" element={<Members />} />
+                          <Route path="/board-members" element={<BoardMembers />} />
+                          <Route path="/profile" element={<UserSettings />} />
+                          <Route path="/settings" element={<UserSettings />} />
+                          <Route path="/my-contributions" element={<MyContributions />} />
+                          <Route path="/members/:memberId/contributions" element={<MemberContributionsDetail />} />
+                          
+                          <Route path="/reports/member-contributions" element={<MemberContributions />} />
+                          <Route path="/reports/pledges" element={<PledgeReport />} />
+                          <Route path="/reports/table-banking-summary" element={<TableBankingSummary />} />
+                          <Route path="/reports/user-activity" element={<UserActivityReport />} />
+                          <Route path="/reports/deleted-projects" element={<DeletedProjectsReport />} />
+                          
+                          <Route path="/initialize-balances" element={<InitializeBalances />} />
+                          <Route path="/transfer-funds" element={<TransferFunds />} />
+                          <Route path="/admin/settings" element={<AdminSettings />} />
+                        </Route>
                       </Route>
-                    </Route>
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
                 </SystemSettingsProvider>
               </ViewingMemberProvider>
             </UserRolesProvider>
