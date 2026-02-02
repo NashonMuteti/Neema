@@ -15,6 +15,7 @@ import { SystemSettingsProvider } from "./context/SystemSettingsContext";
 import { perfMark } from "@/utils/perf";
 import PerfLogger from "@/components/PerfLogger";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
+import BrandingMeta from "@/components/BrandingMeta";
 
 // Layout and ProtectedRoute
 import Layout from "./components/Layout";
@@ -65,6 +66,7 @@ const App = () => {
             <PerfLogger />
             <AuthProvider>
               <BrandingProvider>
+                <BrandingMeta />
                 <UserRolesProvider>
                   <ViewingMemberProvider>
                     <SystemSettingsProvider>
