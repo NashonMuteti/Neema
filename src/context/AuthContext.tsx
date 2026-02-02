@@ -38,16 +38,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
       if (error) throw error;
-      
-      if (refreshedSession) {
-        setSession(refreshedSession);
-        setSupabaseUser(refreshedSession.user);
-        await fetchUserProfile(refreshedSession.user);
-      }
+
+      setSession(refreshedSession);
+      setSupabaseUser(refreshedSession?.user || null);
+      // NOTE: do NOT run Supabase queries from inside auth callbacks/refresh flows.
+      // Profile fetching is handled by a separate effect below.
     } catch (error) {
       console.error("Error refreshing session:", error);
     } finally {
-      end({ hasSession: !!session, hasRefreshedSession: !!supabaseUser });
+      end({ hasSession: !!session, hasSupabaseUser: !!supabaseUser });
     }
   };
 
@@ -128,22 +127,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        // Workaround for Supabase JS issue (#762): avoid doing Supabase queries inside
+        // onAuthStateChange, as it can cause subsequent queries to hang.
         const end = perfStart(`AuthContext:onAuthStateChange:${event}`);
         setSession(currentSession);
         setSupabaseUser(currentSession?.user || null);
-        await fetchUserProfile(currentSession?.user || null);
-        setIsLoading(false);
         end({ hasSession: !!currentSession, hasUser: !!currentSession?.user });
       }
     );
 
     // Initial session check
     const initialEnd = perfStart('AuthContext:getSession');
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       setSession(initialSession);
       setSupabaseUser(initialSession?.user || null);
-      await fetchUserProfile(initialSession?.user || null);
-      setIsLoading(false);
       initialEnd({ hasSession: !!initialSession, hasUser: !!initialSession?.user });
     });
 
@@ -151,6 +148,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  // Fetch profile OUTSIDE auth callbacks (see Supabase JS issue #762)
+  useEffect(() => {
+    const run = async () => {
+      if (!supabaseUser) {
+        setCurrentUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      const end = perfStart('AuthContext:profileFetchEffect');
+      await fetchUserProfile(supabaseUser);
+      setIsLoading(false);
+      end({ userId: supabaseUser.id });
+    };
+
+    run();
+  }, [supabaseUser?.id]);
 
   return (
     <AuthContext.Provider value={{ 
