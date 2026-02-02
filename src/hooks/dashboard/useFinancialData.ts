@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getYear, format, parseISO } from "date-fns";
 import { showError } from "@/utils/toast";
 import { FinancialAccount, Member, MonthYearOption, Project, Transaction, MonthlyFinancialData, DebtRow } from "@/types/common";
+import { perfStart } from "@/utils/perf";
 
 export const useFinancialData = () => {
   const { currentUser } = useAuth();
@@ -14,7 +15,10 @@ export const useFinancialData = () => {
   const queryKey = ['financialData', currentUser?.id, isAdmin];
 
   const fetcher = async (): Promise<{ monthlyFinancialData: MonthlyFinancialData[]; availableYears: number[] }> => {
+    const endAll = perfStart("useFinancialData:fetcher");
+
     if (!currentUser) {
+      endAll({ skipped: true, reason: "no-currentUser" });
       return { monthlyFinancialData: [], availableYears: [] };
     }
 
@@ -26,7 +30,9 @@ export const useFinancialData = () => {
       }
       incomeQuery = incomeQuery.not('source', 'ilike', `Funds Transfer from %`);
 
+      const endIncome = perfStart("useFinancialData:income_transactions");
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
+      endIncome({ rows: incomeTransactions?.length ?? 0, errorCode: incomeError?.code });
       if (incomeError) throw incomeError;
 
       // Fetch expenditure transactions (now includes former petty cash)
@@ -36,14 +42,18 @@ export const useFinancialData = () => {
       }
       expenditureQuery = expenditureQuery.not('purpose', 'ilike', `Funds Transfer to %`);
 
+      const endExp = perfStart("useFinancialData:expenditure_transactions");
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
+      endExp({ rows: expenditureTransactions?.length ?? 0, errorCode: expenditureError?.code });
       if (expenditureError) throw expenditureError;
 
       let projectPledgesQuery = supabase.from('project_pledges').select('due_date, amount, paid_amount');
       if (!isAdmin) {
         projectPledgesQuery = projectPledgesQuery.eq('member_id', currentUser.id);
       }
+      const endPledges = perfStart("useFinancialData:project_pledges");
       const { data: projectPledges, error: pledgesError } = await projectPledgesQuery;
+      endPledges({ rows: projectPledges?.length ?? 0, errorCode: pledgesError?.code });
       if (pledgesError) throw pledgesError;
 
       // New: Fetch debts
@@ -51,7 +61,9 @@ export const useFinancialData = () => {
       if (!isAdmin) {
         debtsQuery = debtsQuery.or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`);
       }
+      const endDebts = perfStart("useFinancialData:debts");
       const { data: debtsData, error: debtsError } = await debtsQuery as { data: DebtRow[] | null, error: any };
+      endDebts({ rows: debtsData?.length ?? 0, errorCode: debtsError?.code });
       if (debtsError) throw debtsError;
 
       const aggregatedData: Record<string, { income: number; expenditure: number; outstandingPledges: number; outstandingDebts: number }> = {};
@@ -111,11 +123,13 @@ export const useFinancialData = () => {
       const currentYear = getYear(new Date());
       const yearsArray = Array.from({ length: 10 }, (_, i) => currentYear - i).sort((a, b) => b - a);
 
+      endAll({ ok: true, months: sortedData.length });
       return { monthlyFinancialData: sortedData, availableYears: yearsArray };
 
     } catch (err: any) {
       console.error("Error fetching financial data:", err);
       showError("Failed to load financial data.");
+      endAll({ ok: false });
       throw err; // Re-throw to be caught by useQuery
     }
   };

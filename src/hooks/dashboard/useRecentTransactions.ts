@@ -11,6 +11,7 @@ import {
   ExpenditureTxRow,
   JoinedFinancialAccount // Use JoinedFinancialAccount for the nested object
 } from "@/types/common"; // Updated import path
+import { perfStart } from "@/utils/perf";
 
 export const useRecentTransactions = (limit: number = 5) => {
   const { currentUser } = useAuth();
@@ -19,7 +20,10 @@ export const useRecentTransactions = (limit: number = 5) => {
   const queryKey = ['recentTransactions', currentUser?.id, isAdmin, limit];
 
   const fetcher = async (): Promise<Transaction[]> => {
+    const endAll = perfStart("useRecentTransactions:fetcher");
+
     if (!currentUser) {
+      endAll({ skipped: true, reason: "no-currentUser" });
       return [];
     }
 
@@ -35,7 +39,10 @@ export const useRecentTransactions = (limit: number = 5) => {
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
+
+      const endIncome = perfStart("useRecentTransactions:income_transactions");
       const { data: incomeData, error: incomeError } = await incomeQuery as { data: IncomeTxRow[] | null, error: any };
+      endIncome({ rows: incomeData?.length ?? 0, errorCode: incomeError?.code });
       if (incomeError) console.error("Error fetching recent income:", incomeError);
       incomeData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
@@ -56,7 +63,10 @@ export const useRecentTransactions = (limit: number = 5) => {
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
+
+      const endExp = perfStart("useRecentTransactions:expenditure_transactions");
       const { data: expenditureData, error: expenditureError } = await expenditureQuery as { data: ExpenditureTxRow[] | null, error: any };
+      endExp({ rows: expenditureData?.length ?? 0, errorCode: expenditureError?.code });
       if (expenditureError) console.error("Error fetching recent expenditure:", expenditureError);
       expenditureData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
@@ -72,11 +82,13 @@ export const useRecentTransactions = (limit: number = 5) => {
         .sort((a, b) => b.date.getTime() - a.date.getTime())
         .slice(0, limit);
 
+      endAll({ ok: true, rows: sortedAndLimited.length });
       return sortedAndLimited;
 
     } catch (err: any) {
       console.error("Error fetching recent transactions:", err);
       showError("Failed to load recent transactions.");
+      endAll({ ok: false });
       throw err;
     }
   };

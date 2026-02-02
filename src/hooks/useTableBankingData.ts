@@ -20,6 +20,7 @@ import {
 import { FinancialAccount, DebtRow } from "@/types/common";
 import { Debt } from "@/components/sales-management/AddEditDebtDialog"; // Import Debt interface
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { perfStart } from "@/utils/perf";
 
 interface ProjectCollection {
   id: string;
@@ -95,28 +96,34 @@ export const useTableBankingData = ({
   const { start, end } = useMemo(() => getPeriodInterval(), [getPeriodInterval]);
 
   const fetchTableBankingData = useCallback(async () => {
+    const endAll = perfStart("useTableBankingData:fetchTableBankingData");
     setLoading(true);
     setError(null);
 
     if (!currentUser) {
       setLoading(false);
+      endAll({ skipped: true, reason: "no-currentUser" });
       return;
     }
 
     try {
+      const endAccounts = perfStart("useTableBankingData:financial_accounts");
       const { data: accountsData, error: accountsError } = await supabase
         .from('financial_accounts')
         .select('id, name, current_balance, initial_balance, profile_id')
         .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
+      endAccounts({ rows: accountsData?.length ?? 0, errorCode: accountsError?.code });
 
       if (accountsError) throw accountsError;
       setFinancialAccounts((accountsData || []) as FinancialAccount[]);
 
+      const endCollections = perfStart("useTableBankingData:project_collections");
       const { data: collectionsData, error: collectionsError } = await supabase
         .from('project_collections')
         .select('id, date, amount, project_id, member_id, account_id')
         .order('date', { ascending: false });
+      endCollections({ rows: collectionsData?.length ?? 0, errorCode: collectionsError?.code });
 
       if (collectionsError) throw collectionsError;
       setAllCollections(collectionsData || []);
@@ -143,7 +150,9 @@ export const useTableBankingData = ({
         debtsQuery = debtsQuery.or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`);
       }
 
+      const endDebts = perfStart("useTableBankingData:debts");
       const { data: debtsData, error: debtsError } = await debtsQuery.order('due_date', { ascending: false, nullsFirst: false });
+      endDebts({ rows: debtsData?.length ?? 0, errorCode: debtsError?.code });
 
       if (debtsError) throw debtsError;
       setDebts((debtsData || []).map((d: any) => ({
@@ -164,9 +173,11 @@ export const useTableBankingData = ({
         sale_description: d.sales_transactions?.notes || undefined, // Assuming sales_transactions is joined elsewhere if needed
       })));
 
+      endAll({ ok: true });
     } catch (err: any) {
       console.error("Error fetching table banking data:", err);
       setError(`Failed to load data: ${err.message || err.toString()}`);
+      endAll({ ok: false });
     } finally {
       setLoading(false);
     }

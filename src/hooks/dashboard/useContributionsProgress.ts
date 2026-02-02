@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { showError } from "@/utils/toast";
 import { Project } from "@/types/common"; // Import Project from common.ts
+import { perfStart } from "@/utils/perf";
 
 interface ProjectContributionData {
   name: string;
@@ -20,16 +21,21 @@ export const useContributionsProgress = () => {
   const queryKey = ['contributionsProgress', currentUser?.id, isAdmin];
 
   const fetcher = async (): Promise<ProjectContributionData[]> => {
+    const endAll = perfStart("useContributionsProgress:fetcher");
+
     if (!currentUser) {
+      endAll({ skipped: true, reason: "no-currentUser" });
       return [];
     }
 
     try {
       let activeMembersCount = 0;
+      const endCount = perfStart("useContributionsProgress:profiles.countActive");
       const { count, error: membersCountError } = await supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'Active');
+      endCount({ count: count ?? 0, errorCode: membersCountError?.code });
 
       if (membersCountError) {
         console.error("Error fetching active members count:", membersCountError);
@@ -46,28 +52,33 @@ export const useContributionsProgress = () => {
         projectsQuery = projectsQuery.eq('profile_id', currentUser.id);
       }
 
+      const endProjects = perfStart("useContributionsProgress:projects.select");
       const { data: projectsData, error: projectsError } = await projectsQuery;
+      endProjects({ rows: projectsData?.length ?? 0, errorCode: projectsError?.code });
       if (projectsError) throw projectsError;
 
       const projectContributions: ProjectContributionData[] = [];
-      for (const project of projectsData || []) {
-        const expected = (project.member_contribution_amount || 0) * activeMembersCount; 
+      const projects = projectsData || [];
 
-        let collectionsQuery = supabase
+      const endLoop = perfStart("useContributionsProgress:perProject.loop");
+      for (const project of projects) {
+        const expected = (project.member_contribution_amount || 0) * activeMembersCount;
+
+        const endCollections = perfStart(`useContributionsProgress:collections:${project.id}`);
+        const { data: collectionsData, error: collectionsError } = await supabase
           .from('project_collections')
           .select('amount')
           .eq('project_id', project.id);
-
-        const { data: collectionsData, error: collectionsError } = await collectionsQuery;
+        endCollections({ rows: collectionsData?.length ?? 0, errorCode: collectionsError?.code });
         if (collectionsError) console.error(`Error fetching collections for project ${project.name}:`, collectionsError);
         const actualCollections = (collectionsData || []).reduce((sum, c) => sum + c.amount, 0);
 
-        let allPledgesQuery = supabase
+        const endPledges = perfStart(`useContributionsProgress:pledges:${project.id}`);
+        const { data: allPledgesData, error: allPledgesError } = await supabase
           .from('project_pledges')
           .select('amount, paid_amount')
           .eq('project_id', project.id);
-
-        const { data: allPledgesData, error: allPledgesError } = await allPledgesQuery;
+        endPledges({ rows: allPledgesData?.length ?? 0, errorCode: allPledgesError?.code });
         if (allPledgesError) console.error(`Error fetching all pledges for project ${project.name}:`, allPledgesError);
         const totalPledged = (allPledgesData || []).reduce((sum, p) => sum + p.amount, 0);
         const totalPaidPledges = (allPledgesData || []).reduce((sum, p) => sum + p.paid_amount, 0);
@@ -79,10 +90,14 @@ export const useContributionsProgress = () => {
           pledged: totalPledged,
         });
       }
+      endLoop({ projects: projects.length });
+
+      endAll({ ok: true, projects: projects.length });
       return projectContributions;
     } catch (err: any) {
       console.error("Error fetching contributions progress:", err);
       showError("An unexpected error occurred while loading contributions progress.");
+      endAll({ ok: false });
       throw err;
     }
   };

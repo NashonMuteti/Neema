@@ -28,6 +28,7 @@ TableHeader,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, Handshake, Loader2 } from "lucide-react";
+import { perfStart } from "@/utils/perf";
 
 
 const DashboardTableBankingCalendar: React.FC = () => {
@@ -43,10 +44,12 @@ const DashboardTableBankingCalendar: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchAllData = useCallback(async () => {
+    const endAll = perfStart("DashboardTableBankingCalendar:fetchAllData");
     setLoading(true);
     setError(null);
     if (!currentUser) {
       setLoading(false);
+      endAll({ skipped: true, reason: "no-currentUser" });
       return;
     }
 
@@ -66,7 +69,9 @@ const DashboardTableBankingCalendar: React.FC = () => {
       if (!isAdmin) {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
+      const endIncome = perfStart("DashboardTableBankingCalendar:income_transactions");
       const { data: incomeData, error: incomeError } = await incomeQuery as { data: IncomeTxRow[] | null, error: any };
+      endIncome({ rows: incomeData?.length ?? 0, errorCode: incomeError?.code });
       if (incomeError) console.error("Error fetching income:", incomeError);
       incomeData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
@@ -88,7 +93,9 @@ const DashboardTableBankingCalendar: React.FC = () => {
       if (!isAdmin) {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
+      const endExp = perfStart("DashboardTableBankingCalendar:expenditure_transactions");
       const { data: expenditureData, error: expenditureError } = await expenditureQuery as { data: ExpenditureTxRow[] | null, error: any };
+      endExp({ rows: expenditureData?.length ?? 0, errorCode: expenditureError?.code });
       if (expenditureError) console.error("Error fetching expenditure:", expenditureError);
       expenditureData?.forEach(tx => allFetchedTransactions.push({
         id: tx.id,
@@ -111,7 +118,9 @@ const DashboardTableBankingCalendar: React.FC = () => {
       if (!isAdmin) {
         pledgesQuery = pledgesQuery.eq('member_id', currentUser.id);
       }
+      const endPledges = perfStart("DashboardTableBankingCalendar:project_pledges");
       const { data: pledgesData, error: pledgesError } = await pledgesQuery as { data: PledgeTxRow[] | null, error: any };
+      endPledges({ rows: pledgesData?.length ?? 0, errorCode: pledgesError?.code });
       if (pledgesError) console.error("Error fetching pledges:", pledgesError);
       pledgesData?.forEach(pledge => allFetchedTransactions.push({
         id: pledge.id,
@@ -133,14 +142,18 @@ const DashboardTableBankingCalendar: React.FC = () => {
       if (!isAdmin) {
         accountsQuery = accountsQuery.eq('profile_id', currentUser.id);
       }
+      const endAccounts = perfStart("DashboardTableBankingCalendar:financial_accounts");
       const { data: accountsData, error: accountsError } = await accountsQuery;
+      endAccounts({ rows: accountsData?.length ?? 0, errorCode: accountsError?.code });
       if (accountsError) console.error("Error fetching financial accounts:", accountsError);
       setFinancialAccounts(accountsData || []);
 
+      endAll({ ok: true, txs: allFetchedTransactions.length, accounts: accountsData?.length ?? 0 });
     } catch (err) {
       console.error("Unexpected error in fetchAllData:", err);
       setError("An unexpected error occurred while loading financial data.");
       showError("Failed to load financial data for the calendar.");
+      endAll({ ok: false });
     } finally {
       setLoading(false);
     }

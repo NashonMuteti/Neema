@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { showError } from "@/utils/toast";
 import { FinancialAccount } from "@/types/common";
+import { perfStart } from "@/utils/perf";
 
 interface FinancialAccountSummary {
   id: string;
@@ -27,7 +28,10 @@ export const useFinancialSummary = () => {
   const queryKey = ['financialSummary', currentUser?.id, isAdmin];
 
   const fetcher = async (): Promise<FinancialSummaryResult> => {
+    const endAll = perfStart("useFinancialSummary:fetcher");
+
     if (!currentUser) {
+      endAll({ skipped: true, reason: "no-currentUser" });
       return {
         totalUnpaidPledges: 0,
         totalOutstandingDebts: 0, // Default for new field
@@ -44,7 +48,10 @@ export const useFinancialSummary = () => {
       if (!isAdmin) {
         unpaidPledgesQuery = unpaidPledgesQuery.eq('member_id', currentUser.id);
       }
+
+      const endPledges = perfStart("useFinancialSummary:project_pledges");
       const { data: unpaidPledgesData, error: unpaidPledgesError } = await unpaidPledgesQuery;
+      endPledges({ rows: unpaidPledgesData?.length ?? 0, errorCode: unpaidPledgesError?.code });
       if (unpaidPledgesError) throw unpaidPledgesError;
       const totalUnpaidPledges = (unpaidPledgesData || []).reduce((sum, pledge) => sum + (pledge.amount - pledge.paid_amount), 0);
 
@@ -57,10 +64,12 @@ export const useFinancialSummary = () => {
         // If not admin, only show debts created by or owed by the current user
         outstandingDebtsQuery = outstandingDebtsQuery.or(`created_by_profile_id.eq.${currentUser.id},debtor_profile_id.eq.${currentUser.id}`);
       }
+
+      const endDebts = perfStart("useFinancialSummary:debts");
       const { data: outstandingDebtsData, error: outstandingDebtsError } = await outstandingDebtsQuery;
+      endDebts({ rows: outstandingDebtsData?.length ?? 0, errorCode: outstandingDebtsError?.code });
       if (outstandingDebtsError) throw outstandingDebtsError;
       const totalOutstandingDebts = (outstandingDebtsData || []).reduce((sum, debt) => sum + debt.amount_due, 0);
-
 
       let accountsQuery = supabase
         .from('financial_accounts')
@@ -68,7 +77,10 @@ export const useFinancialSummary = () => {
       if (!isAdmin) {
         accountsQuery = accountsQuery.eq('profile_id', currentUser.id);
       }
+
+      const endAccounts = perfStart("useFinancialSummary:financial_accounts");
       const { data: accountsData, error: accountsError } = await accountsQuery;
+      endAccounts({ rows: accountsData?.length ?? 0, errorCode: accountsError?.code });
       if (accountsError) throw accountsError;
       const activeFinancialAccounts = accountsData || [];
       const grandTotalAccountsBalance = (accountsData || []).reduce((sum, account) => sum + account.current_balance, 0);
@@ -81,7 +93,10 @@ export const useFinancialSummary = () => {
         incomeQuery = incomeQuery.eq('profile_id', currentUser.id);
       }
       incomeQuery = incomeQuery.not('source', 'ilike', `Funds Transfer from %`);
+
+      const endIncome = perfStart("useFinancialSummary:income_transactions");
       const { data: incomeTransactions, error: incomeError } = await incomeQuery;
+      endIncome({ rows: incomeTransactions?.length ?? 0, errorCode: incomeError?.code });
       if (incomeError) throw incomeError;
       totalIncomeAllTime += (incomeTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
 
@@ -90,14 +105,16 @@ export const useFinancialSummary = () => {
         expenditureQuery = expenditureQuery.eq('profile_id', currentUser.id);
       }
       expenditureQuery = expenditureQuery.not('purpose', 'ilike', `Funds Transfer to %`);
+
+      const endExpenditure = perfStart("useFinancialSummary:expenditure_transactions");
       const { data: expenditureTransactions, error: expenditureError } = await expenditureQuery;
+      endExpenditure({ rows: expenditureTransactions?.length ?? 0, errorCode: expenditureError?.code });
       if (expenditureError) throw expenditureError;
       totalExpenditureAllTime += (expenditureTransactions || []).reduce((sum, tx) => sum + tx.amount, 0);
 
-      // Removed petty cash transactions from here as they are now merged into expenditure_transactions
-
       const cumulativeNetOperatingBalance = totalIncomeAllTime - totalExpenditureAllTime;
 
+      endAll({ ok: true });
       return {
         totalUnpaidPledges,
         totalOutstandingDebts, // Return new field
@@ -108,6 +125,7 @@ export const useFinancialSummary = () => {
     } catch (err: any) {
       console.error("Error fetching financial summary:", err);
       showError("Failed to load financial summary.");
+      endAll({ ok: false });
       throw err;
     }
   };
