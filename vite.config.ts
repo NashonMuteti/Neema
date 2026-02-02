@@ -8,6 +8,10 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
   },
+  build: {
+    // Helps debug production-only errors by mapping stack traces back to source.
+    sourcemap: true,
+  },
   plugins: [dyadComponentTagger(), react()],
   resolve: {
     alias: {
