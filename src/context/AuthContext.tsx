@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { perfMark, perfStart } from '@/utils/perf';
 
 // Centralized User interface
 export interface User {
@@ -33,6 +34,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Function to refresh the session
   const refreshSession = async () => {
+    const end = perfStart('AuthContext:refreshSession');
     try {
       const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
       if (error) throw error;
@@ -44,18 +46,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     } catch (error) {
       console.error("Error refreshing session:", error);
+    } finally {
+      end({ hasSession: !!session, hasRefreshedSession: !!supabaseUser });
     }
   };
 
   // Function to fetch and set the application's currentUser profile
   const fetchUserProfile = async (user: SupabaseUser | null) => {
+    const end = perfStart('AuthContext:fetchUserProfile');
     if (user) {
       try {
+        const fetchProfileEnd = perfStart('AuthContext:fetchUserProfile:profiles.select');
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
+        fetchProfileEnd({ hasProfileRow: !!profileData, errorCode: profileError?.code });
 
         let userRole = "Contributor"; // Default role
         let userStatus: "Active" | "Inactive" | "Suspended" = "Active";
@@ -107,28 +114,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch (error) {
         console.error("AuthContext: Error in fetchUserProfile:", error);
         setCurrentUser(null);
+      } finally {
+        end({ hasUser: true });
       }
     } else {
       setCurrentUser(null);
+      end({ hasUser: false });
     }
   };
 
   useEffect(() => {
+    perfMark('AuthContext:mount');
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        const end = perfStart(`AuthContext:onAuthStateChange:${event}`);
         setSession(currentSession);
         setSupabaseUser(currentSession?.user || null);
         await fetchUserProfile(currentSession?.user || null);
         setIsLoading(false);
+        end({ hasSession: !!currentSession, hasUser: !!currentSession?.user });
       }
     );
 
     // Initial session check
+    const initialEnd = perfStart('AuthContext:getSession');
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       setSession(initialSession);
       setSupabaseUser(initialSession?.user || null);
       await fetchUserProfile(initialSession?.user || null);
       setIsLoading(false);
+      initialEnd({ hasSession: !!initialSession, hasUser: !!initialSession?.user });
     });
 
     return () => {

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
+import { perfMark, perfStart } from '@/utils/perf';
 
 interface BrandingContextType {
   brandLogoUrl: string;
@@ -23,6 +24,7 @@ export const BrandingProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchBrandingSettings = useCallback(async () => {
+    const end = perfStart('BrandingContext:fetchBrandingSettings');
     setIsLoading(true);
     const { data, error } = await supabase
       .from('settings')
@@ -39,13 +41,16 @@ export const BrandingProvider: React.FC<{ children: ReactNode }> = ({ children }
       setHeaderTitleState(settingsMap.get('header_title') || "Group Finance");
     }
     setIsLoading(false);
+    end({ rows: data?.length ?? 0, errorCode: error?.code });
   }, []);
 
   useEffect(() => {
+    perfMark('BrandingContext:mount');
     fetchBrandingSettings();
   }, [fetchBrandingSettings]);
 
   const updateSetting = async (key: string, value: string | null) => {
+    const end = perfStart(`BrandingContext:updateSetting:${key}`);
     setIsLoading(true);
     const { error } = await supabase
       .from('settings')
@@ -55,9 +60,11 @@ export const BrandingProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error(`Error updating ${key} setting:`, error);
       showError(`Failed to update ${key}.`);
       setIsLoading(false);
+      end({ ok: false, errorCode: error.code });
       return false;
     }
     setIsLoading(false);
+    end({ ok: true });
     return true;
   };
 

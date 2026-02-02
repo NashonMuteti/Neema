@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
+import { perfMark, perfStart } from '@/utils/perf';
 
 interface CurrencyInfo {
   code: string;
@@ -36,6 +37,7 @@ export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ chil
   };
 
   const fetchSettings = useCallback(async () => {
+    const end = perfStart('SystemSettingsContext:fetchSettings');
     setIsLoading(true);
     const { data, error } = await supabase
       .from('settings')
@@ -52,12 +54,14 @@ export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ chil
       setDefaultThemeState(settingsMap.get('default_theme') || 'system'); // Set fetched default theme
     } else {
       // If no setting found, insert defaults
+      const insertEnd = perfStart('SystemSettingsContext:insertDefaults');
       const { error: insertError } = await supabase
         .from('settings')
         .insert([
           { key: 'default_currency_code', value: 'USD' },
           { key: 'default_theme', value: 'system' }
         ]);
+      insertEnd({ ok: !insertError, errorCode: insertError?.code });
       
       if (insertError) {
         console.error("Error inserting default settings:", insertError);
@@ -68,13 +72,16 @@ export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ chil
       }
     }
     setIsLoading(false);
+    end({ rows: data?.length ?? 0, errorCode: error?.code });
   }, []);
 
   useEffect(() => {
+    perfMark('SystemSettingsContext:mount');
     fetchSettings();
   }, [fetchSettings]);
 
   const updateSetting = async (key: string, value: string) => {
+    const end = perfStart(`SystemSettingsContext:updateSetting:${key}`);
     setIsLoading(true);
     const { error } = await supabase
       .from('settings')
@@ -84,9 +91,11 @@ export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ chil
       console.error(`Error updating ${key} setting:`, error);
       showError(`Failed to update ${key}.`);
       setIsLoading(false);
+      end({ ok: false, errorCode: error.code });
       return false;
     }
     setIsLoading(false);
+    end({ ok: true });
     return true;
   };
 

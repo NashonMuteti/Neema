@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { canManageRoles, logSecurityEvent } from '@/utils/security';
+import { perfMark, perfStart } from '@/utils/perf';
 
 interface UserRolesContextType {
   userRoles: UserRoleType[];
@@ -22,6 +23,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [userRoles, setUserRoles] = useState<UserRoleType[]>([]);
   
   const fetchRoles = useCallback(async () => {
+    const end = perfStart('UserRolesContext:fetchRoles');
     const { data, error } = await supabase
       .from('roles')
       .select('*')
@@ -31,6 +33,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.error("Error fetching roles:", error);
       showError("Failed to load user roles.");
       setUserRoles([]);
+      end({ ok: false, errorCode: error.code });
     } else {
       let fetchedRoles: UserRoleType[] = data.map(role => ({
         id: role.id,
@@ -66,11 +69,15 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       }
 
       setUserRoles(fetchedRoles);
-      console.log("UserRolesContext: fetchedRoles", fetchedRoles); // Log fetched roles
+      // Keep this as debug-level info to avoid noisy logs, but still useful for performance investigation.
+      // eslint-disable-next-line no-console
+      console.debug("[perf] UserRolesContext: roles loaded", { count: fetchedRoles.length });
+      end({ ok: true, rows: data.length });
     }
   }, [currentUser]); // Now fetchRoles depends on currentUser
 
   useEffect(() => {
+    perfMark('UserRolesContext:mount');
     // Fetch roles only when auth is not loading and currentUser is available
     if (!authLoading && currentUser) {
       fetchRoles();
