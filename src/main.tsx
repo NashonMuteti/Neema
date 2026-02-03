@@ -12,18 +12,32 @@ function isBrowserExtensionUrl(url?: string | null) {
   );
 }
 
+function stackLooksLikeExtension(stack?: string | null) {
+  if (!stack) return false;
+  return (
+    stack.includes("chrome-extension://") ||
+    stack.includes("moz-extension://") ||
+    stack.includes("safari-extension://")
+  );
+}
+
 function setupGlobalErrorLogging() {
   window.addEventListener("error", (event) => {
+    const e = event as ErrorEvent;
+
     // Ignore errors coming from browser extensions (common during development)
-    if (isBrowserExtensionUrl((event as ErrorEvent).filename)) return;
+    if (isBrowserExtensionUrl(e.filename) || stackLooksLikeExtension(e.error?.stack)) {
+      event.preventDefault();
+      return;
+    }
 
     // eslint-disable-next-line no-console
     console.error("[global-error]", {
-      message: event.message,
-      filename: (event as ErrorEvent).filename,
-      lineno: (event as ErrorEvent).lineno,
-      colno: (event as ErrorEvent).colno,
-      error: (event as ErrorEvent).error,
+      message: e.message,
+      filename: e.filename,
+      lineno: e.lineno,
+      colno: e.colno,
+      error: e.error,
     });
   });
 
@@ -32,7 +46,10 @@ function setupGlobalErrorLogging() {
     const stack = typeof reason?.stack === "string" ? reason.stack : "";
 
     // Ignore unhandled rejections coming from browser extensions
-    if (stack.includes("chrome-extension://") || stack.includes("moz-extension://")) return;
+    if (stackLooksLikeExtension(stack)) {
+      event.preventDefault();
+      return;
+    }
 
     // eslint-disable-next-line no-console
     console.error("[global-unhandledrejection]", { reason });
