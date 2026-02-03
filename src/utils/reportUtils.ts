@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 interface Member {
@@ -94,7 +94,7 @@ export async function exportTableToPdf(options: TablePdfOptions) {
   await addLogo(doc, options.brandLogoUrl);
 
   // Table
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: options.subtitle ? 64 : 54,
     head: [options.columns],
     body: options.rows,
@@ -157,8 +157,7 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
       member.status,
     ]);
 
-    // Add table
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 30, // Start table below the header
       head: [tableColumn],
       body: tableRows,
