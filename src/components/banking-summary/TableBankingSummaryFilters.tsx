@@ -18,16 +18,19 @@ import { CalendarIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { MonthYearOption } from "@/types/common";
 import { Button } from "@/components/ui/button"; // Added Button import
+import { DateRange } from "react-day-picker";
 
 interface TableBankingSummaryFiltersProps {
-  filterPeriod: "daily" | "weekly" | "monthly" | "yearly";
-  setFilterPeriod: (period: "daily" | "weekly" | "monthly" | "yearly") => void;
+  filterPeriod: "daily" | "weekly" | "monthly" | "yearly" | "range";
+  setFilterPeriod: (period: "daily" | "weekly" | "monthly" | "yearly" | "range") => void;
   selectedDate?: Date;
   setSelectedDate: (date?: Date) => void;
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
   selectedYear: string;
   setSelectedYear: (year: string) => void;
+  selectedRange?: DateRange;
+  setSelectedRange: (range?: DateRange) => void;
   months: MonthYearOption[];
   years: MonthYearOption[];
 }
@@ -41,6 +44,8 @@ const TableBankingSummaryFilters: React.FC<TableBankingSummaryFiltersProps> = ({
   setSelectedMonth,
   selectedYear,
   setSelectedYear,
+  selectedRange,
+  setSelectedRange,
   months,
   years,
 }) => {
@@ -49,7 +54,7 @@ const TableBankingSummaryFilters: React.FC<TableBankingSummaryFiltersProps> = ({
       <div className="grid gap-1.5">
         <Label htmlFor="table-banking-filter-period">View By</Label>
         <Select value={filterPeriod} onValueChange={setFilterPeriod}>
-          <SelectTrigger id="table-banking-filter-period" className="w-[150px]">
+          <SelectTrigger id="table-banking-filter-period" className="w-[170px]">
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent>
@@ -58,6 +63,7 @@ const TableBankingSummaryFilters: React.FC<TableBankingSummaryFiltersProps> = ({
               <SelectItem value="weekly">Weekly</SelectItem>
               <SelectItem value="monthly">Monthly</SelectItem>
               <SelectItem value="yearly">Yearly</SelectItem>
+              <SelectItem value="range">Custom Range</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -87,6 +93,37 @@ const TableBankingSummaryFilters: React.FC<TableBankingSummaryFiltersProps> = ({
                 onSelect={setSelectedDate}
                 initialFocus
               />
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
+
+      {filterPeriod === "range" && (
+        <div className="grid gap-1.5">
+          <Label>Date Range</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[280px] justify-start text-left font-normal",
+                  !selectedRange?.from && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedRange?.from ? (
+                  selectedRange.to ? (
+                    `${format(selectedRange.from, "PPP")} - ${format(selectedRange.to, "PPP")}`
+                  ) : (
+                    format(selectedRange.from, "PPP")
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="range" selected={selectedRange} onSelect={setSelectedRange} numberOfMonths={2} />
             </PopoverContent>
           </Popover>
         </div>

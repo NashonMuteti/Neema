@@ -21,6 +21,7 @@ import { FinancialAccount, DebtRow } from "@/types/common";
 import { Debt } from "@/components/sales-management/AddEditDebtDialog"; // Import Debt interface
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
 import { perfStart } from "@/utils/perf";
+import { DateRange } from "react-day-picker";
 
 interface ProjectCollection {
   id: string;
@@ -31,11 +32,19 @@ interface ProjectCollection {
   account_id: string; // This is the key for grouping
 }
 
+type AccountTxRow = {
+  id: string;
+  account_id: string;
+  date: string;
+  amount: number;
+};
+
 interface UseTableBankingDataProps {
-  filterPeriod: "daily" | "weekly" | "monthly" | "yearly";
+  filterPeriod: "daily" | "weekly" | "monthly" | "yearly" | "range";
   selectedDate?: Date;
   selectedMonth: string;
   selectedYear: string;
+  selectedRange?: DateRange;
 }
 
 export const useTableBankingData = ({
@@ -43,6 +52,7 @@ export const useTableBankingData = ({
   selectedDate,
   selectedMonth,
   selectedYear,
+  selectedRange,
 }: UseTableBankingDataProps) => {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
@@ -53,18 +63,24 @@ export const useTableBankingData = ({
   const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
   const [allCollections, setAllCollections] = useState<ProjectCollection[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [incomeTx, setIncomeTx] = useState<AccountTxRow[]>([]);
+  const [expenditureTx, setExpenditureTx] = useState<AccountTxRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
-    value: i.toString(),
-    label: format(new Date(0, i), "MMMM"),
-  })), []);
+  const months = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => ({
+      value: i.toString(),
+      label: format(new Date(0, i), "MMMM"),
+    })),
+  []);
 
-  const years = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
-    value: (currentYear - 2 + i).toString(),
-    label: (currentYear - 2 + i).toString(),
-  })), [currentYear]);
+  const years = useMemo(() =>
+    Array.from({ length: 5 }, (_, i) => ({
+      value: (currentYear - 2 + i).toString(),
+      label: (currentYear - 2 + i).toString(),
+    })),
+  [currentYear]);
 
   const getPeriodInterval = useCallback(() => {
     let start: Date;
@@ -76,22 +92,38 @@ export const useTableBankingData = ({
         end = endOfDay(selectedDate || new Date());
         break;
       case "weekly":
-        start = startOfWeek(selectedDate || new Date(), { weekStartsOn: 1 }); // Week starts on Monday
+        start = startOfWeek(selectedDate || new Date(), { weekStartsOn: 1 });
         end = endOfWeek(selectedDate || new Date(), { weekStartsOn: 1 });
         break;
-      case "monthly":
-        const monthDate = new Date(parseInt(selectedYear || currentYear.toString()), parseInt(selectedMonth || currentMonth.toString()));
+      case "monthly": {
+        const monthDate = new Date(
+          parseInt(selectedYear || currentYear.toString()),
+          parseInt(selectedMonth || currentMonth.toString()),
+        );
         start = startOfMonth(monthDate);
         end = endOfMonth(monthDate);
         break;
-      case "yearly":
+      }
+      case "yearly": {
         const yearDate = new Date(parseInt(selectedYear || currentYear.toString()), 0);
         start = startOfYear(yearDate);
         end = endOfYear(yearDate);
         break;
+      }
+      case "range": {
+        const from = selectedRange?.from ? startOfDay(selectedRange.from) : startOfDay(new Date());
+        const to = selectedRange?.to ? endOfDay(selectedRange.to) : endOfDay(new Date());
+        start = from;
+        end = to;
+        break;
+      }
+      default:
+        start = startOfDay(new Date());
+        end = endOfDay(new Date());
     }
+
     return { start, end };
-  }, [filterPeriod, selectedDate, selectedMonth, selectedYear, currentYear, currentMonth]);
+  }, [filterPeriod, selectedDate, selectedMonth, selectedYear, selectedRange, currentYear, currentMonth]);
 
   const { start, end } = useMemo(() => getPeriodInterval(), [getPeriodInterval]);
 
@@ -107,27 +139,33 @@ export const useTableBankingData = ({
     }
 
     try {
-      const endAccounts = perfStart("useTableBankingData:financial_accounts");
-      const { data: accountsData, error: accountsError } = await supabase
+      // Financial accounts
+      let accountsQuery = supabase
         .from('financial_accounts')
         .select('id, name, current_balance, initial_balance, profile_id')
-        .eq('profile_id', currentUser.id)
         .order('name', { ascending: true });
-      endAccounts({ rows: accountsData?.length ?? 0, errorCode: accountsError?.code });
 
+      if (!isAdmin) {
+        accountsQuery = accountsQuery.eq('profile_id', currentUser.id);
+      }
+
+      const endAccounts = perfStart("useTableBankingData:financial_accounts");
+      const { data: accountsData, error: accountsError } = await accountsQuery;
+      endAccounts({ rows: accountsData?.length ?? 0, errorCode: accountsError?.code });
       if (accountsError) throw accountsError;
       setFinancialAccounts((accountsData || []) as FinancialAccount[]);
 
+      // Collections (kept as-is, filtered in-memory by selected period)
       const endCollections = perfStart("useTableBankingData:project_collections");
       const { data: collectionsData, error: collectionsError } = await supabase
         .from('project_collections')
         .select('id, date, amount, project_id, member_id, account_id')
         .order('date', { ascending: false });
       endCollections({ rows: collectionsData?.length ?? 0, errorCode: collectionsError?.code });
-
       if (collectionsError) throw collectionsError;
       setAllCollections(collectionsData || []);
 
+      // Debts (kept as-is, filtered in-memory by selected period)
       let debtsQuery = supabase
         .from('debts')
         .select(`
@@ -153,25 +191,59 @@ export const useTableBankingData = ({
       const endDebts = perfStart("useTableBankingData:debts");
       const { data: debtsData, error: debtsError } = await debtsQuery.order('due_date', { ascending: false, nullsFirst: false });
       endDebts({ rows: debtsData?.length ?? 0, errorCode: debtsError?.code });
-
       if (debtsError) throw debtsError;
-      setDebts((debtsData || []).map((d: any) => ({
-        id: d.id,
-        created_by_profile_id: d.created_by_profile_id,
-        sale_id: d.sale_id || undefined,
-        debtor_profile_id: d.debtor_profile_id || undefined,
-        customer_name: d.customer_name || undefined,
-        description: d.description,
-        original_amount: d.original_amount,
-        amount_due: d.amount_due,
-        due_date: d.due_date ? parseISO(d.due_date) : undefined,
-        status: d.status,
-        notes: d.notes || undefined,
-        created_at: parseISO(d.created_at || new Date().toISOString()),
-        created_by_name: d.created_by_profile?.name || d.created_by_profile?.email || 'N/A',
-        debtor_name: d.debtor_profile?.name || d.debtor_profile?.email || d.customer_name || 'N/A',
-        sale_description: d.sales_transactions?.notes || undefined, // Assuming sales_transactions is joined elsewhere if needed
-      })));
+      setDebts(
+        (debtsData || []).map((d: any) => ({
+          id: d.id,
+          created_by_profile_id: d.created_by_profile_id,
+          sale_id: d.sale_id || undefined,
+          debtor_profile_id: d.debtor_profile_id || undefined,
+          customer_name: d.customer_name || undefined,
+          description: d.description,
+          original_amount: d.original_amount,
+          amount_due: d.amount_due,
+          due_date: d.due_date ? parseISO(d.due_date) : undefined,
+          status: d.status,
+          notes: d.notes || undefined,
+          created_at: parseISO(d.created_at || new Date().toISOString()),
+          created_by_name: d.created_by_profile?.name || d.created_by_profile?.email || 'N/A',
+          debtor_name: d.debtor_profile?.name || d.debtor_profile?.email || d.customer_name || 'N/A',
+          sale_description: d.sales_transactions?.notes || undefined,
+        })),
+      );
+
+      // Income/Expenditure for selectable date range summary
+      let incomeQuery = supabase
+        .from("income_transactions")
+        .select("id, account_id, date, amount")
+        .gte("date", start.toISOString())
+        .lte("date", end.toISOString());
+
+      if (!isAdmin) {
+        incomeQuery = incomeQuery.eq("profile_id", currentUser.id);
+      }
+
+      const endIncome = perfStart("useTableBankingData:income_transactions");
+      const { data: incomeData, error: incomeError } = await incomeQuery;
+      endIncome({ rows: incomeData?.length ?? 0, errorCode: incomeError?.code });
+      if (incomeError) throw incomeError;
+      setIncomeTx((incomeData || []) as AccountTxRow[]);
+
+      let expQuery = supabase
+        .from("expenditure_transactions")
+        .select("id, account_id, date, amount")
+        .gte("date", start.toISOString())
+        .lte("date", end.toISOString());
+
+      if (!isAdmin) {
+        expQuery = expQuery.eq("profile_id", currentUser.id);
+      }
+
+      const endExp = perfStart("useTableBankingData:expenditure_transactions");
+      const { data: expData, error: expError } = await expQuery;
+      endExp({ rows: expData?.length ?? 0, errorCode: expError?.code });
+      if (expError) throw expError;
+      setExpenditureTx((expData || []) as AccountTxRow[]);
 
       endAll({ ok: true });
     } catch (err: any) {
@@ -181,14 +253,14 @@ export const useTableBankingData = ({
     } finally {
       setLoading(false);
     }
-  }, [currentUser, isAdmin, getPeriodInterval]);
+  }, [currentUser, isAdmin, start, end]);
 
   useEffect(() => {
     fetchTableBankingData();
   }, [fetchTableBankingData]);
 
   const filteredCollections = useMemo(() => {
-    return allCollections.filter(collection => {
+    return allCollections.filter((collection) => {
       const collectionDate = parseISO(collection.date);
       return isWithinInterval(collectionDate, { start, end });
     });
@@ -196,34 +268,70 @@ export const useTableBankingData = ({
 
   const groupedContributions = useMemo(() => {
     const groups: Record<string, number> = {};
-    filteredCollections.forEach(collection => {
+    filteredCollections.forEach((collection) => {
       groups[collection.account_id] = (groups[collection.account_id] || 0) + collection.amount;
     });
     return groups;
   }, [filteredCollections]);
 
-  const grandTotal = useMemo(() => Object.values(groupedContributions).reduce((sum, amount) => sum + amount, 0), [groupedContributions]);
+  const grandTotal = useMemo(
+    () => Object.values(groupedContributions).reduce((sum, amount) => sum + amount, 0),
+    [groupedContributions],
+  );
 
   const filteredDebts = useMemo(() => {
-    return debts.filter(debt => {
+    return debts.filter((debt) => {
       const debtDate = debt.due_date || debt.created_at;
       if (!debtDate) return false;
       return isWithinInterval(debtDate, { start, end });
     });
   }, [debts, start, end]);
 
-  const totalOutstandingDebts = useMemo(() => filteredDebts.reduce((sum, debt) => sum + debt.amount_due, 0), [filteredDebts]);
+  const totalOutstandingDebts = useMemo(
+    () => filteredDebts.reduce((sum, debt) => sum + debt.amount_due, 0),
+    [filteredDebts],
+  );
+
+  const accountCashflow = useMemo(() => {
+    const byAccount: Record<string, { income: number; expenditure: number; net: number }> = {};
+
+    for (const tx of incomeTx) {
+      byAccount[tx.account_id] = byAccount[tx.account_id] || { income: 0, expenditure: 0, net: 0 };
+      byAccount[tx.account_id].income += Number(tx.amount || 0);
+    }
+
+    for (const tx of expenditureTx) {
+      byAccount[tx.account_id] = byAccount[tx.account_id] || { income: 0, expenditure: 0, net: 0 };
+      byAccount[tx.account_id].expenditure += Number(tx.amount || 0);
+    }
+
+    Object.keys(byAccount).forEach((id) => {
+      byAccount[id].net = byAccount[id].income - byAccount[id].expenditure;
+    });
+
+    return byAccount;
+  }, [incomeTx, expenditureTx]);
+
+  const cashflowTotals = useMemo(() => {
+    const income = Object.values(accountCashflow).reduce((sum, a) => sum + a.income, 0);
+    const expenditure = Object.values(accountCashflow).reduce((sum, a) => sum + a.expenditure, 0);
+    return { income, expenditure, net: income - expenditure };
+  }, [accountCashflow]);
 
   const getPeriodLabel = useCallback(() => {
     switch (filterPeriod) {
       case "daily":
         return selectedDate ? format(selectedDate, "PPP") : "Select a date";
       case "weekly":
-        return selectedDate ? `${format(start, "MMM dd")} - ${format(end, "MMM dd, yyyy")}` : "Select a date";
+        return selectedDate
+          ? `${format(start, "MMM dd")} - ${format(end, "MMM dd, yyyy")}`
+          : "Select a date";
       case "monthly":
         return `${months[parseInt(selectedMonth)].label} ${selectedYear}`;
       case "yearly":
         return selectedYear;
+      case "range":
+        return `${format(start, "MMM dd, yyyy")} - ${format(end, "MMM dd, yyyy")}`;
       default:
         return "";
     }
@@ -231,8 +339,6 @@ export const useTableBankingData = ({
 
   return {
     financialAccounts,
-    allCollections,
-    debts,
     loading,
     error,
     filteredCollections,
@@ -243,5 +349,7 @@ export const useTableBankingData = ({
     getPeriodLabel,
     months,
     years,
+    accountCashflow,
+    cashflowTotals,
   };
 };

@@ -62,6 +62,13 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // Board member linkage (optional)
+  const [createBoardMemberProfile, setCreateBoardMemberProfile] = React.useState(false);
+  const [boardMemberPhone, setBoardMemberPhone] = React.useState("");
+  const [boardMemberTitle, setBoardMemberTitle] = React.useState("Board Member");
+
+  const isBoardMemberRole = role === "Board Member";
+
   React.useEffect(() => {
     if (isOpen) {
       setName(initialData?.name || "");
@@ -71,8 +78,62 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       setEnableLogin(initialData?.enableLogin || false);
       setSelectedFile(null); // Clear selected file on open
       setBase64Image(null); // Clear Base64 image on open
+
+      // Reset board member fields
+      setCreateBoardMemberProfile(false);
+      setBoardMemberPhone("");
+      setBoardMemberTitle("Board Member");
     }
   }, [isOpen, initialData, availableRoles]);
+
+  const upsertBoardMemberByEmail = async (args: {
+    name: string;
+    email: string;
+    phone: string;
+    title: string;
+    imageUrl?: string;
+  }) => {
+    const { data: existing, error: existingError } = await supabase
+      .from("board_members")
+      .select("id")
+      .eq("email", args.email)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error("Error checking board member by email:", existingError);
+      return;
+    }
+
+    if (existing?.id) {
+      const { error: updateError } = await supabase
+        .from("board_members")
+        .update({
+          name: args.name,
+          role: args.title,
+          email: args.email,
+          phone: args.phone,
+          image_url: args.imageUrl,
+        })
+        .eq("id", existing.id);
+
+      if (updateError) {
+        console.error("Error updating board member:", updateError);
+      }
+      return;
+    }
+
+    const { error: insertError } = await supabase.from("board_members").insert({
+      name: args.name,
+      role: args.title,
+      email: args.email,
+      phone: args.phone,
+      image_url: args.imageUrl,
+    });
+
+    if (insertError) {
+      console.error("Error inserting board member:", insertError);
+    }
+  };
 
   // Effect to convert selected file to Base64 for preview
   React.useEffect(() => {
@@ -117,9 +178,14 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
       showError("Name and Email are required.");
       return;
     }
-    
+
     if (!role) {
       showError("User Role is required.");
+      return;
+    }
+
+    if (isBoardMemberRole && createBoardMemberProfile && !boardMemberPhone) {
+      showError("Board Member phone is required when creating a board member profile.");
       return;
     }
 
@@ -159,7 +225,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
         // If the user had login enabled (or still has it enabled)
         if (oldEnableLogin || newEnableLogin) {
           // Update Supabase auth user metadata via Edge Function
-          const { data: authUpdateResponse, error: authUpdateError } = await supabase.functions.invoke('manage-user-auth', {
+          const { error: authUpdateError } = await supabase.functions.invoke('manage-user-auth', {
             body: JSON.stringify({
               action: 'updateUserById',
               payload: {
@@ -203,6 +269,17 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           setIsSaving(false);
           return;
         }
+
+        if (isBoardMemberRole && createBoardMemberProfile) {
+          await upsertBoardMemberByEmail({
+            name,
+            email,
+            phone: boardMemberPhone,
+            title: boardMemberTitle || "Board Member",
+            imageUrl: userImageUrl,
+          });
+        }
+
         showSuccess("User updated successfully!");
 
       } else {
@@ -214,9 +291,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               action: 'createUser',
               payload: {
                 email: email,
-                // A temporary password is required by createUser, but inviteUserByEmail will override it.
-                // For security, we'll use a placeholder and immediately send an invite.
-                password: Math.random().toString(36).substring(2, 15), 
+                password: Math.random().toString(36).substring(2, 15),
                 user_metadata: {
                   full_name: name,
                   avatar_url: userImageUrl,
@@ -263,6 +338,16 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             } else {
               showSuccess("User added and invitation email sent successfully!");
             }
+
+            if (isBoardMemberRole && createBoardMemberProfile) {
+              await upsertBoardMemberByEmail({
+                name,
+                email,
+                phone: boardMemberPhone,
+                title: boardMemberTitle || "Board Member",
+                imageUrl: userImageUrl,
+              });
+            }
           }
         } else {
           // Add member directly to public.profiles without creating an auth.users entry
@@ -273,7 +358,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               email: email,
               role: role,
               status: status,
-              enable_login: false, // Explicitly false for non-login members
+              enable_login: false,
               image_url: userImageUrl,
             });
 
@@ -283,6 +368,17 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
             setIsSaving(false);
             return;
           }
+
+          if (isBoardMemberRole && createBoardMemberProfile) {
+            await upsertBoardMemberByEmail({
+              name,
+              email,
+              phone: boardMemberPhone,
+              title: boardMemberTitle || "Board Member",
+              imageUrl: userImageUrl,
+            });
+          }
+
           showSuccess("Non-login user added successfully!");
         }
       }
@@ -298,7 +394,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>{initialData ? "Edit User Profile" : "Add New User"}</DialogTitle>
           <DialogDescription>
@@ -406,9 +502,61 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
               checked={enableLogin} 
               onCheckedChange={(checked) => setEnableLogin(checked as boolean)} 
               className="col-span-3" 
-              disabled={!canManageUserProfiles || isSaving || (initialData && !initialData.enableLogin)} // Disable if editing a non-login user
+              disabled={!canManageUserProfiles || isSaving || (initialData && !initialData.enableLogin)}
             />
           </div>
+
+          {isBoardMemberRole ? (
+            <>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="createBoardMemberProfile" className="text-right">
+                  Board Profile
+                </Label>
+                <div className="col-span-3 flex items-center gap-3">
+                  <Checkbox
+                    id="createBoardMemberProfile"
+                    checked={createBoardMemberProfile}
+                    onCheckedChange={(checked) => setCreateBoardMemberProfile(checked as boolean)}
+                    disabled={!canManageUserProfiles || isSaving}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Create / update a record in the Board Members list
+                  </span>
+                </div>
+              </div>
+
+              {createBoardMemberProfile ? (
+                <>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="boardMemberTitle" className="text-right">
+                      Board Title
+                    </Label>
+                    <Input
+                      id="boardMemberTitle"
+                      value={boardMemberTitle}
+                      onChange={(e) => setBoardMemberTitle(e.target.value)}
+                      className="col-span-3"
+                      disabled={!canManageUserProfiles || isSaving}
+                      placeholder="e.g., Chairperson"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="boardMemberPhone" className="text-right">
+                      Phone
+                    </Label>
+                    <Input
+                      id="boardMemberPhone"
+                      value={boardMemberPhone}
+                      onChange={(e) => setBoardMemberPhone(e.target.value)}
+                      className="col-span-3"
+                      disabled={!canManageUserProfiles || isSaving}
+                      placeholder="Phone number"
+                    />
+                  </div>
+                </>
+              ) : null}
+            </>
+          ) : null}
         </div>
         <div className="flex justify-end">
           <Button 
@@ -419,7 +567,7 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Note: If "Enable Login" is checked, an invitation email will be sent to the user to set their password. For existing users, password resets must be initiated separately.
+          Note: If "Enable Login" is checked, an invitation email will be sent to the user to set their password.
         </p>
       </DialogContent>
     </Dialog>

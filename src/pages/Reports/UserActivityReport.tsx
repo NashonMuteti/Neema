@@ -26,9 +26,8 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { showError } from "@/utils/toast";
-import { logUserActivity } from "@/utils/activityLogger"; // Import the new logger
-import { JoinedProfile } from "@/types/common"; // Import JoinedProfile
-import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import { JoinedProfile } from "@/types/common";
+import { useDebounce } from "@/hooks/use-debounce";
 import ReportActions from "@/components/reports/ReportActions";
 
 interface UserActivityLog {
@@ -42,15 +41,19 @@ interface UserActivityLog {
 
 const UserActivityReport = () => {
   const { currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
+
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date()); // 0-indexed
 
   const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
   const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  
-  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
-  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+  const [filterUserId, setFilterUserId] = React.useState<string>("All");
 
+  const [localSearchQuery, setLocalSearchQuery] = React.useState("");
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500);
+
+  const [users, setUsers] = React.useState<{ id: string; name: string }[]>([]);
   const [activityLogs, setActivityLogs] = React.useState<UserActivityLog[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -63,6 +66,27 @@ const UserActivityReport = () => {
     value: (currentYear - 2 + i).toString(),
     label: (currentYear - 2 + i).toString(),
   }));
+
+  React.useEffect(() => {
+    const loadUsers = async () => {
+      if (!isAdmin) return;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name, email")
+        .order("name", { ascending: true });
+
+      if (!error) {
+        setUsers(
+          (data || []).map((p) => ({
+            id: p.id,
+            name: p.name || p.email || "Unknown",
+          })),
+        );
+      }
+    };
+
+    loadUsers();
+  }, [isAdmin]);
 
   const fetchActivityLogs = React.useCallback(async () => {
     setLoading(true);
@@ -85,11 +109,15 @@ const UserActivityReport = () => {
         details,
         timestamp,
         profiles ( id, name, email )
-      `) // Added 'id' to profiles select
+      `)
       .gte('timestamp', startOfMonth.toISOString())
       .lte('timestamp', endOfMonth.toISOString());
 
-    if (debouncedSearchQuery) { // Use debounced query
+    if (isAdmin && filterUserId !== "All") {
+      query = query.eq("user_id", filterUserId);
+    }
+
+    if (debouncedSearchQuery) {
       query = query.or(`action.ilike.%${debouncedSearchQuery}%,profiles.name.ilike.%${debouncedSearchQuery}%,profiles.email.ilike.%${debouncedSearchQuery}%`);
     }
 
@@ -107,19 +135,15 @@ const UserActivityReport = () => {
         action: activity.action,
         details: activity.details,
         timestamp: activity.timestamp,
-        profiles: activity.profiles ? { id: activity.profiles.id, name: activity.profiles.name, email: activity.profiles.email } : null, // Explicitly map to JoinedProfile
+        profiles: activity.profiles ? { id: activity.profiles.id, name: activity.profiles.name, email: activity.profiles.email } : null,
       })));
     }
     setLoading(false);
-  }, [currentUser, filterMonth, filterYear, debouncedSearchQuery]); // Depend on debounced query
+  }, [currentUser, filterMonth, filterYear, debouncedSearchQuery, isAdmin, filterUserId]);
 
   React.useEffect(() => {
     fetchActivityLogs();
-    // Log a dummy activity when the report is viewed (for demonstration)
-    if (currentUser) {
-      logUserActivity(currentUser, "Viewed User Activity Report", { month: format(new Date(parseInt(filterYear), parseInt(filterMonth)), "MMMM yyyy") });
-    }
-  }, [fetchActivityLogs, currentUser, filterMonth, filterYear]);
+  }, [fetchActivityLogs]);
 
   if (loading) {
     return (
@@ -139,18 +163,20 @@ const UserActivityReport = () => {
     );
   }
 
-  const subtitle = `Period: ${months.find((m) => m.value === filterMonth)?.label} ${filterYear}${debouncedSearchQuery ? ` • Search: ${debouncedSearchQuery}` : ""}`;
+  const subtitle = `Period: ${months.find((m) => m.value === filterMonth)?.label} ${filterYear}` +
+    (isAdmin && filterUserId !== "All" ? ` • User: ${users.find((u) => u.id === filterUserId)?.name || "Selected"}` : "") +
+    (debouncedSearchQuery ? ` • Search: ${debouncedSearchQuery}` : "");
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">User Activity Report</h1>
       <p className="text-lg text-muted-foreground">
-        Track and review all user actions within the application.
+        Track and review user actions within the application.
       </p>
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
-            <CardTitle>Recent User Actions</CardTitle>
+            <CardTitle>Activity Logs</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
           </div>
           <ReportActions
@@ -204,12 +230,35 @@ const UserActivityReport = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {isAdmin ? (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="filter-user">User</Label>
+                  <Select value={filterUserId} onValueChange={setFilterUserId}>
+                    <SelectTrigger id="filter-user" className="w-[220px]">
+                      <SelectValue placeholder="All users" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>User</SelectLabel>
+                        <SelectItem value="All">All Users</SelectItem>
+                        {users.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+
               <div className="relative flex items-center">
                 <Input
                   type="text"
                   placeholder="Search user or action..."
-                  value={localSearchQuery} // Use local state for input
-                  onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
                   className="pl-8"
                 />
                 <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
@@ -230,10 +279,12 @@ const UserActivityReport = () => {
               <TableBody>
                 {activityLogs.map((activity) => (
                   <TableRow key={activity.id}>
-                    <TableCell className="font-medium">{activity.profiles?.name || activity.profiles?.email || 'Unknown User'}</TableCell>
+                    <TableCell className="font-medium">
+                      {activity.profiles?.name || activity.profiles?.email || 'Unknown User'}
+                    </TableCell>
                     <TableCell>{activity.action}</TableCell>
                     <TableCell>{format(parseISO(activity.timestamp), "MMM dd, yyyy hh:mm a")}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                    <TableCell className="text-sm text-muted-foreground max-w-[260px] truncate">
                       {activity.details && Object.keys(activity.details).length > 0
                         ? JSON.stringify(activity.details)
                         : '-'}
@@ -243,7 +294,9 @@ const UserActivityReport = () => {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center mt-4">No user activity found for the selected period or matching your search.</p>
+            <p className="text-muted-foreground text-center mt-4">
+              No user activity found for the selected criteria.
+            </p>
           )}
         </CardContent>
       </Card>
