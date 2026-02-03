@@ -28,7 +28,9 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
 }) => {
   const { currency } = useSystemSettings();
 
-  const getDisplayStatus = (contribution: MyContribution): "Paid" | "Unpaid" | "Active" | "Overdue" | undefined => {
+  const getDisplayStatus = (
+    contribution: MyContribution,
+  ): "Paid" | "Unpaid" | "Active" | "Overdue" | undefined => {
     if (contribution.type === "Pledge" || contribution.type === "Debt") {
       if (contribution.status === "Paid") return "Paid";
       if (contribution.status === "Active") return "Active";
@@ -36,13 +38,15 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
       // Fallback for pledges/debts if status is not explicitly set but paid_amount covers original
       if (contribution.original_amount !== undefined && contribution.paid_amount !== undefined) {
         if (contribution.paid_amount >= contribution.original_amount) return "Paid";
-        return "Unpaid"; // If not paid and not active/overdue, consider unpaid
+        return "Unpaid";
       }
     }
     return undefined;
   };
 
-  const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid" | "Active" | "Overdue" | undefined) => {
+  const getStatusBadgeClasses = (
+    displayStatus: "Paid" | "Unpaid" | "Active" | "Overdue" | undefined,
+  ) => {
     switch (displayStatus) {
       case "Paid":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
@@ -50,7 +54,7 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
       case "Overdue":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      case "Unpaid": // For pledges/debts that are not 'Active' or 'Overdue' but have balance
+      case "Unpaid":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
@@ -65,20 +69,17 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
     return <p className="text-destructive">Error: {error}</p>;
   }
 
-  const sortedContributions = [...contributions].sort((a, b) => b.date.getTime() - a.date.getTime());
+  const sortedContributions = [...contributions].sort(
+    (a, b) => b.date.getTime() - a.date.getTime(),
+  );
 
-  // Calculate subtotals
   const totalExpected = sortedContributions.reduce((sum, c) => sum + (c.expected_amount || 0), 0);
   const totalActualPaid = sortedContributions.reduce((sum, c) => {
     if (c.type === "Collection") return sum + c.amount;
     if (c.type === "Pledge" || c.type === "Debt") return sum + (c.paid_amount || 0);
     return sum;
   }, 0);
-  const totalPledgedOrOriginal = sortedContributions
-    .filter(c => c.type === "Pledge" || c.type === "Debt")
-    .reduce((sum, c) => sum + (c.original_amount || 0), 0);
   const totalBalance = sortedContributions.reduce((sum, c) => sum + (c.balance_amount || 0), 0);
-
 
   return (
     <Card>
@@ -91,10 +92,10 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Item</TableHead> {/* Renamed from Project */}
+                <TableHead>Item</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">Expected/Original</TableHead> {/* Combined for clarity */}
-                <TableHead className="text-right">Actual Paid</TableHead> {/* New column */}
+                <TableHead className="text-right">Expected/Original</TableHead>
+                <TableHead className="text-right">Actual Paid</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
                 <TableHead>Due Date</TableHead>
                 <TableHead className="text-center">Status</TableHead>
@@ -103,12 +104,15 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
             <TableBody>
               {sortedContributions.map((contribution) => {
                 const displayStatus = getDisplayStatus(contribution);
-                const isPledgeOrDebt = contribution.type === "Pledge" || contribution.type === "Debt";
+                const isPledgeOrDebt =
+                  contribution.type === "Pledge" || contribution.type === "Debt";
 
                 return (
                   <TableRow key={contribution.id}>
                     <TableCell>{format(contribution.date, "MMM dd, yyyy")}</TableCell>
-                    <TableCell>{contribution.project_name || contribution.description || 'N/A'}</TableCell>
+                    <TableCell>
+                      {contribution.project_name || contribution.description || "N/A"}
+                    </TableCell>
                     <TableCell>{contribution.type}</TableCell>
                     <TableCell className="text-right">
                       {contribution.expected_amount !== undefined
@@ -144,12 +148,20 @@ const MyContributionsTable: React.FC<MyContributionsTableProps> = ({
                   </TableRow>
                 );
               })}
-              {/* Subtotals Row */}
               <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
                 <TableCell colSpan={3}>Totals</TableCell>
-                <TableCell className="text-right">{currency.symbol}{totalExpected.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{currency.symbol}{totalActualPaid.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{currency.symbol}{totalBalance.toFixed(2)}</TableCell>
+                <TableCell className="text-right">
+                  {currency.symbol}
+                  {totalExpected.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {currency.symbol}
+                  {totalActualPaid.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {currency.symbol}
+                  {totalBalance.toFixed(2)}
+                </TableCell>
                 <TableCell colSpan={2}></TableCell>
               </TableRow>
             </TableBody>
