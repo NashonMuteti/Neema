@@ -31,8 +31,8 @@ const TableBankingSummary: React.FC = () => {
     financialAccounts,
     loading,
     error,
-    filteredCollections,
     groupedContributions,
+    contributionIncomeTx,
     grandTotal,
     filteredDebts,
     totalOutstandingDebts,
@@ -205,7 +205,7 @@ const TableBankingSummary: React.FC = () => {
             <ContributionsSummaryTable
               financialAccounts={financialAccounts}
               groupedContributions={groupedContributions}
-              filteredCollections={filteredCollections}
+              contributionIncomeTx={contributionIncomeTx}
               grandTotal={grandTotal}
               getPeriodLabel={getPeriodLabel}
             />
