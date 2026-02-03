@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import {
   Home,
   DollarSign,
-  Wallet,
   Users,
   Settings,
   BarChart2,
@@ -24,13 +23,16 @@ import {
   ShoppingCart,
   Package,
   Scale,
-  ArrowRightLeft // New import
+  ArrowRightLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 
@@ -51,6 +53,18 @@ export interface NavHeading {
 
 type SidebarItem = NavItem | NavHeading;
 
+type SidebarProps =
+  | {
+      variant: "desktop";
+      collapsed: boolean;
+      onToggleCollapsed: () => void;
+      onNavigate?: () => void;
+    }
+  | {
+      variant: "mobile";
+      onNavigate?: () => void;
+    };
+
 export const navItems: SidebarItem[] = [
   {
     name: "Dashboard",
@@ -64,12 +78,6 @@ export const navItems: SidebarItem[] = [
     icon: DollarSign,
     requiredPrivileges: ["View Project Accounts"],
   },
-  // {
-  //   name: "Petty Cash",
-  //   href: "/petty-cash",
-  //   icon: Wallet,
-  //   requiredPrivileges: ["View Petty Cash"],
-  // },
   {
     name: "Pledges",
     href: "/pledges",
@@ -136,12 +144,6 @@ export const navItems: SidebarItem[] = [
         icon: BarChart2,
         requiredPrivileges: ["View Member Contributions Report"],
       },
-      // {
-      //   name: "Petty Cash Report",
-      //   href: "/reports/petty-cash",
-      //   icon: FileText,
-      //   requiredPrivileges: ["View Petty Cash Report"],
-      // },
       {
         name: "Pledge Report",
         href: "/reports/pledges",
@@ -174,13 +176,13 @@ export const navItems: SidebarItem[] = [
         requiredPrivileges: ["Initialize Balances"],
       },
       {
-        name: "Transfer Funds", // New menu item
+        name: "Transfer Funds",
         href: "/transfer-funds",
         icon: ArrowRightLeft,
-        requiredPrivileges: ["Manage Funds Transfer"], // New privilege
+        requiredPrivileges: ["Manage Funds Transfer"],
       },
       {
-        name: "Deleted Projects Report", // Moved here
+        name: "Deleted Projects Report",
         href: "/reports/deleted-projects",
         icon: FolderX,
         requiredPrivileges: ["View Deleted Projects Report"],
@@ -201,7 +203,7 @@ export const navItems: SidebarItem[] = [
   },
 ];
 
-const Sidebar = () => {
+function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const { currentUser, isLoading } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
@@ -210,21 +212,24 @@ const Sidebar = () => {
   const [isActionsOpen, setIsActionsOpen] = React.useState(false);
   const [isSalesManagementOpen, setIsSalesManagementOpen] = React.useState(false);
 
-  const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser?.role);
+  const currentUserRoleDefinition = definedRoles.find((role) => role.name === currentUser?.role);
   const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
 
-  const hasAccess = React.useCallback((requiredPrivileges?: string[]) => {
-    if (!requiredPrivileges || requiredPrivileges.length === 0) return true;
-    return requiredPrivileges.some(privilege => currentUserPrivileges.includes(privilege));
-  }, [currentUserPrivileges]);
+  const hasAccess = React.useCallback(
+    (requiredPrivileges?: string[]) => {
+      if (!requiredPrivileges || requiredPrivileges.length === 0) return true;
+      return requiredPrivileges.some((privilege) => currentUserPrivileges.includes(privilege));
+    },
+    [currentUserPrivileges],
+  );
 
   const accessibleNavItems = React.useMemo(() => {
-    return navItems.filter(item => {
+    return navItems.filter((item) => {
       if (!hasAccess(item.requiredPrivileges)) {
         return false;
       }
       if (item.type === "heading") {
-        const accessibleChildren = item.children.filter(child => hasAccess(child.requiredPrivileges));
+        const accessibleChildren = item.children.filter((child) => hasAccess(child.requiredPrivileges));
         return accessibleChildren.length > 0;
       }
       return true;
@@ -232,11 +237,16 @@ const Sidebar = () => {
   }, [hasAccess]);
 
   React.useEffect(() => {
-    const checkAndSetOpen = (headingName: string, setter: React.Dispatch<React.SetStateAction<boolean>>) => {
-      const headingItem = accessibleNavItems.find(item => item.type === "heading" && item.name === headingName) as NavHeading | undefined;
+    const checkAndSetOpen = (
+      headingName: string,
+      setter: React.Dispatch<React.SetStateAction<boolean>>,
+    ) => {
+      const headingItem = accessibleNavItems.find(
+        (item) => item.type === "heading" && item.name === headingName,
+      ) as NavHeading | undefined;
       if (headingItem) {
-        const isChildActive = headingItem.children.some(child => 
-          location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges)
+        const isChildActive = headingItem.children.some(
+          (child) => location.pathname.startsWith(child.href) && hasAccess(child.requiredPrivileges),
         );
         setter(isChildActive);
       } else {
@@ -249,98 +259,159 @@ const Sidebar = () => {
     checkAndSetOpen("Sales Management", setIsSalesManagementOpen);
   }, [location.pathname, accessibleNavItems, hasAccess]);
 
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        Loading navigation...
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        Please log in.
+      </div>
+    );
+  }
+
   return (
-    <aside className="w-64 bg-sidebar border-r shadow-lg p-4 flex flex-col transition-all duration-300 ease-in-out">
-      {isLoading ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          Loading navigation...
-        </div>
-      ) : !currentUser ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          Please log in.
-        </div>
-      ) : (
-        <nav className="flex-1 space-y-2">
-          {accessibleNavItems.map((item) => {
-            if (item.type === "heading") {
-              const headingItem = item as NavHeading;
-              let isOpen = false;
-              let setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    <nav className="flex-1 space-y-2">
+      {accessibleNavItems.map((item) => {
+        if (item.type === "heading") {
+          const headingItem = item as NavHeading;
+          let isOpen = false;
+          let setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 
-              if (headingItem.name === "Reports") {
-                isOpen = isReportsOpen;
-                setIsOpen = setIsReportsOpen;
-              } else if (headingItem.name === "Actions") {
-                isOpen = isActionsOpen;
-                setIsOpen = setIsActionsOpen;
-              } else if (headingItem.name === "Sales Management") {
-                isOpen = isSalesManagementOpen;
-                setIsOpen = setIsSalesManagementOpen;
-              } else {
-                isOpen = false;
-                setIsOpen = () => {};
-              }
+          if (headingItem.name === "Reports") {
+            isOpen = isReportsOpen;
+            setIsOpen = setIsReportsOpen;
+          } else if (headingItem.name === "Actions") {
+            isOpen = isActionsOpen;
+            setIsOpen = setIsActionsOpen;
+          } else if (headingItem.name === "Sales Management") {
+            isOpen = isSalesManagementOpen;
+            setIsOpen = setIsSalesManagementOpen;
+          } else {
+            isOpen = false;
+            setIsOpen = () => {};
+          }
 
-              return (
-                <Collapsible
-                  key={headingItem.name}
-                  open={isOpen}
-                  onOpenChange={setIsOpen}
-                  className="space-y-2"
-                >
-                  <CollapsibleTrigger
-                    className={cn(
-                      "flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors duration-200 ease-in-out"
-                    )}
-                  >
-                    {headingItem.name}
-                    <ChevronDown
-                      className={cn(
-                        "h-4 w-4 transition-transform duration-200",
-                        isOpen && "rotate-180"
-                      )}
-                    />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1 pl-4">
-                    {headingItem.children
-                      .filter(child => hasAccess(child.requiredPrivileges))
-                      .map((child) => (
-                        <Link
-                          key={child.name}
-                          to={child.href}
-                          className={cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                            location.pathname.startsWith(child.href) &&
-                              "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
-                          )}
-                        >
-                          <child.icon className="h-5 w-5" />
-                          {child.name}
-                        </Link>
-                      ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            } else {
-              const navItem = item as NavItem;
-              return (
-                <Link
-                  key={navItem.name}
-                  to={navItem.href}
+          return (
+            <Collapsible
+              key={headingItem.name}
+              open={isOpen}
+              onOpenChange={setIsOpen}
+              className="space-y-2"
+            >
+              <CollapsibleTrigger
+                className={cn(
+                  "flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors duration-200 ease-in-out",
+                )}
+              >
+                {headingItem.name}
+                <ChevronDown
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
-                    location.pathname === navItem.href &&
-                      "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                    "h-4 w-4 transition-transform duration-200",
+                    isOpen && "rotate-180",
                   )}
-                >
-                  <navItem.icon className="h-5 w-5" />
-                  {navItem.name}
-                </Link>
-              );
-            }
-          })}
-        </nav>
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-1 pl-4">
+                {headingItem.children
+                  .filter((child) => hasAccess(child.requiredPrivileges))
+                  .map((child) => (
+                    <Link
+                      key={child.name}
+                      to={child.href}
+                      onClick={onNavigate}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
+                        location.pathname.startsWith(child.href) &&
+                          "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
+                      )}
+                    >
+                      <child.icon className="h-5 w-5" />
+                      {child.name}
+                    </Link>
+                  ))}
+              </CollapsibleContent>
+            </Collapsible>
+          );
+        }
+
+        const navItem = item as NavItem;
+        return (
+          <Link
+            key={navItem.name}
+            to={navItem.href}
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200 ease-in-out",
+              location.pathname === navItem.href &&
+                "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
+            )}
+          >
+            <navItem.icon className="h-5 w-5" />
+            {navItem.name}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+const Sidebar = (props: SidebarProps) => {
+  if (props.variant === "mobile") {
+    return (
+      <div className="h-full bg-sidebar border-r shadow-lg p-4 flex flex-col">
+        <SidebarNav onNavigate={props.onNavigate} />
+      </div>
+    );
+  }
+
+  const { collapsed, onToggleCollapsed } = props;
+
+  return (
+    <aside
+      className={cn(
+        "bg-sidebar border-r shadow-lg flex flex-col transition-all duration-300 ease-in-out",
+        collapsed ? "w-0 p-0 overflow-hidden" : "w-64 p-4",
       )}
+    >
+      {!collapsed ? (
+        <div className="mb-3 flex items-center justify-end">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleCollapsed}
+            aria-label="Hide navigation"
+          >
+            <PanelLeftClose className="h-5 w-5" />
+          </Button>
+        </div>
+      ) : null}
+
+      {!collapsed ? <SidebarNav onNavigate={props.onNavigate} /> : null}
+
+      {collapsed ? (
+        <div className="w-0" />
+      ) : null}
+
+      {/* When collapsed, show a floating opener button */}
+      {collapsed ? (
+        <div className="fixed left-2 top-20 z-40">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="shadow"
+            onClick={onToggleCollapsed}
+            aria-label="Show navigation"
+          >
+            <PanelLeftOpen className="h-5 w-5" />
+          </Button>
+        </div>
+      ) : null}
     </aside>
   );
 };

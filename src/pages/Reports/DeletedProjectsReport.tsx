@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
+import ReportActions from "@/components/reports/ReportActions";
 
 interface Project {
   id: string;
@@ -148,8 +149,17 @@ const DeletedProjectsReport = () => {
         View and manage projects that have been marked as deleted.
       </p>
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
-          <CardTitle>Deleted Projects List</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Deleted Projects List</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Status: Deleted</p>
+          </div>
+          <ReportActions
+            title="Deleted Projects Report"
+            subtitle="Status: Deleted"
+            columns={["Project Name", "Description", "Status"]}
+            rows={deletedProjects.map((p) => [p.name, p.description || "", p.status])}
+          />
         </CardHeader>
         <CardContent>
           {deletedProjects.length > 0 ? (

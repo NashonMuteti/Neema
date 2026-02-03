@@ -6,9 +6,12 @@ import { useTableBankingData } from "@/hooks/useTableBankingData";
 import TableBankingSummaryFilters from "@/components/banking-summary/TableBankingSummaryFilters";
 import ContributionsSummaryTable from "@/components/banking-summary/ContributionsSummaryTable";
 import DebtsSummaryTable from "@/components/banking-summary/DebtsSummaryTable";
-import { getMonth, getYear } from "date-fns";
+import { format, getMonth, getYear } from "date-fns";
+import ReportActions from "@/components/reports/ReportActions";
+import { useSystemSettings } from "@/context/SystemSettingsContext";
 
 const TableBankingSummary: React.FC = () => {
+  const { currency } = useSystemSettings();
   const currentYear = getYear(new Date());
   const currentMonth = getMonth(new Date());
 
@@ -54,6 +57,21 @@ const TableBankingSummary: React.FC = () => {
     );
   }
 
+  const subtitle = `Period: ${getPeriodLabel()}`;
+
+  const contributionRows = financialAccounts.map((acc) => [
+    acc.name,
+    `${currency.symbol}${(groupedContributions[acc.id] || 0).toFixed(2)}`,
+  ]);
+
+  const debtRows = filteredDebts.map((d) => [
+    d.debtor_name,
+    d.description,
+    d.due_date ? format(d.due_date, "MMM dd, yyyy") : "N/A",
+    `${currency.symbol}${d.amount_due.toFixed(2)}`,
+    d.status,
+  ]);
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Table Banking Summary</h1>
@@ -79,6 +97,19 @@ const TableBankingSummary: React.FC = () => {
             years={years}
           />
 
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-semibold">Contributions Summary</h3>
+              <p className="text-sm text-muted-foreground">{subtitle}</p>
+            </div>
+            <ReportActions
+              title="Table Banking Summary (Contributions)"
+              subtitle={subtitle}
+              columns={["Financial Account", "Total Contributions"]}
+              rows={[...contributionRows, ["Grand Total", `${currency.symbol}${grandTotal.toFixed(2)}`]]}
+            />
+          </div>
+
           <ContributionsSummaryTable
             financialAccounts={financialAccounts}
             groupedContributions={groupedContributions}
@@ -86,6 +117,22 @@ const TableBankingSummary: React.FC = () => {
             grandTotal={grandTotal}
             getPeriodLabel={getPeriodLabel}
           />
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
+            <div>
+              <h3 className="text-xl font-semibold">Debts Summary</h3>
+              <p className="text-sm text-muted-foreground">{subtitle}</p>
+            </div>
+            <ReportActions
+              title="Table Banking Summary (Debts)"
+              subtitle={subtitle}
+              columns={["Debtor", "Description", "Due Date", "Amount Due", "Status"]}
+              rows={[
+                ...debtRows,
+                ["Total Outstanding", "", "", `${currency.symbol}${totalOutstandingDebts.toFixed(2)}`, ""],
+              ]}
+            />
+          </div>
 
           <DebtsSummaryTable
             filteredDebts={filteredDebts}

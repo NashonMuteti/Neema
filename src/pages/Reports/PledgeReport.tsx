@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import ReportActions from "@/components/reports/ReportActions";
 
 interface PledgeReportEntry {
   pledge_id: string;
@@ -111,6 +112,8 @@ const PledgeReport = () => {
     );
   }
 
+  const subtitle = `Period: ${months.find((m) => m.value === filterMonth)?.label} ${filterYear} • Status: ${filterStatus}`;
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Pledge Report</h1>
@@ -118,8 +121,33 @@ const PledgeReport = () => {
         Comprehensive overview of all pledges, their status, and financial details.
       </p>
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
-          <CardTitle>Pledge Details</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Pledge Details</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+          </div>
+          <ReportActions
+            title="Pledge Report"
+            subtitle={subtitle}
+            columns={[
+              "Member Name",
+              "Project Name",
+              "Original Amount",
+              "Paid Amount",
+              "Balance Due",
+              "Due Date",
+              "Status",
+            ]}
+            rows={pledgeReport.map((p) => [
+              p.member_name,
+              p.project_name,
+              p.original_amount.toFixed(2),
+              p.paid_amount.toFixed(2),
+              p.balance_due.toFixed(2),
+              format(parseISO(p.due_date), "MMM dd, yyyy"),
+              p.status,
+            ])}
+          />
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
@@ -181,8 +209,8 @@ const PledgeReport = () => {
                 <Input
                   type="text"
                   placeholder="Search member or project..."
-                  value={localSearchQuery} // Use local state for input
-                  onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
                   className="pl-8"
                 />
                 <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />

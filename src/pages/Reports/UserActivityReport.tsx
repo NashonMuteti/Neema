@@ -29,6 +29,7 @@ import { showError } from "@/utils/toast";
 import { logUserActivity } from "@/utils/activityLogger"; // Import the new logger
 import { JoinedProfile } from "@/types/common"; // Import JoinedProfile
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import ReportActions from "@/components/reports/ReportActions";
 
 interface UserActivityLog {
   id: string;
@@ -138,6 +139,8 @@ const UserActivityReport = () => {
     );
   }
 
+  const subtitle = `Period: ${months.find((m) => m.value === filterMonth)?.label} ${filterYear}${debouncedSearchQuery ? ` • Search: ${debouncedSearchQuery}` : ""}`;
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">User Activity Report</h1>
@@ -145,8 +148,22 @@ const UserActivityReport = () => {
         Track and review all user actions within the application.
       </p>
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
-          <CardTitle>Recent User Actions</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Recent User Actions</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+          </div>
+          <ReportActions
+            title="User Activity Report"
+            subtitle={subtitle}
+            columns={["User", "Action", "Timestamp", "Details"]}
+            rows={activityLogs.map((a) => [
+              a.profiles?.name || a.profiles?.email || "Unknown User",
+              a.action,
+              format(parseISO(a.timestamp), "MMM dd, yyyy hh:mm a"),
+              a.details && Object.keys(a.details).length > 0 ? JSON.stringify(a.details) : "-",
+            ])}
+          />
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">

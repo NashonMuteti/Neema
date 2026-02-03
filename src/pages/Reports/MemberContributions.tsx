@@ -27,6 +27,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import ReportActions from "@/components/reports/ReportActions";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 interface MemberContribution {
   member_id: string;
@@ -106,6 +109,8 @@ const MemberContributions = () => {
     );
   }
 
+  const subtitle = `Period: ${months.find((m) => m.value === filterMonth)?.label} ${filterYear}${debouncedSearchQuery ? ` • Search: ${debouncedSearchQuery}` : ""}`;
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Member Contributions Report</h1>
@@ -113,8 +118,22 @@ const MemberContributions = () => {
         View a summary of financial contributions made by each member.
       </p>
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
-          <CardTitle>Contributions Summary</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Contributions Summary</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+          </div>
+          <ReportActions
+            title="Member Contributions Report"
+            subtitle={subtitle}
+            columns={["Member Name", "Member Email", "Total Contributed", "Last Contribution Date"]}
+            rows={contributions.map((c) => [
+              c.member_name,
+              c.member_email,
+              `${currency.symbol}${c.total_contributed.toFixed(2)}`,
+              c.last_contribution_date ? format(parseISO(c.last_contribution_date), "MMM dd, yyyy") : "N/A",
+            ])}
+          />
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
@@ -176,6 +195,7 @@ const MemberContributions = () => {
                   <TableHead>Member Email</TableHead>
                   <TableHead className="text-right">Total Contributed</TableHead>
                   <TableHead>Last Contribution Date</TableHead>
+                  <TableHead className="text-right">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -188,6 +208,11 @@ const MemberContributions = () => {
                       {contribution.last_contribution_date
                         ? format(parseISO(contribution.last_contribution_date), "MMM dd, yyyy")
                         : "N/A"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/members/${contribution.member_id}/contributions`}>View</Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

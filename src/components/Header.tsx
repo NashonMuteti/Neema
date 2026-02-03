@@ -1,10 +1,17 @@
 "use client";
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User, Shield } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LogOut, Settings, User, Shield, Menu } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 
 import { useAuth } from "@/context/AuthContext";
@@ -12,21 +19,23 @@ import { useBranding } from "@/context/BrandingContext";
 import { useViewingMember } from "@/context/ViewingMemberContext";
 import { supabase } from '@/integrations/supabase/client';
 
-const Header = () => {
+type HeaderProps = {
+  onOpenMobileNav?: () => void;
+};
+
+const Header = ({ onOpenMobileNav }: HeaderProps) => {
   const { currentUser, isLoading } = useAuth();
-  const { brandLogoUrl, headerTitle } = useBranding(); // Use headerTitle from branding context
+  const { brandLogoUrl, headerTitle } = useBranding();
   const { viewingMemberName } = useViewingMember();
-  
-  // Determine if the current user is an admin based on their role
+
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
-  
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // The onAuthStateChange listener in AuthContext will handle state update and redirection
   };
 
   return (
-    <header className="flex items-center justify-between h-16 px-6 border-b-4 border-yellow-500 bg-sky-blue-header shadow-sm transition-all duration-300 ease-in-out">
+    <header className="flex items-center justify-between h-16 px-3 sm:px-6 border-b-4 border-yellow-500 bg-sky-blue-header shadow-sm transition-all duration-300 ease-in-out">
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           Loading header...
@@ -37,20 +46,31 @@ const Header = () => {
         </div>
       ) : (
         <>
-          <div className="flex items-center">
-            <Link to="/" className="text-xl font-bold text-foreground flex items-center">
-              <img src={brandLogoUrl} alt="Logo" className="h-8 w-auto mr-2" />
-              {headerTitle} {/* Use dynamic headerTitle */}
+          <div className="flex items-center gap-2 min-w-0">
+            {onOpenMobileNav ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={onOpenMobileNav}
+                aria-label="Open navigation"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            ) : null}
+
+            <Link to="/" className="text-xl font-bold text-foreground flex items-center min-w-0">
+              <img src={brandLogoUrl} alt="Logo" className="h-8 w-auto mr-2 shrink-0" />
+              <span className="truncate">{headerTitle}</span>
               {viewingMemberName && (
-                <span className="ml-2 text-base font-normal text-muted-foreground">
+                <span className="ml-2 text-base font-normal text-muted-foreground truncate">
                   {" - " + viewingMemberName}
                 </span>
               )}
             </Link>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <ThemeToggle />
-            {/* Admin Menu - only visible if the user's role is 'Admin' or 'Super Admin' */}
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
