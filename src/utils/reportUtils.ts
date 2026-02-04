@@ -96,6 +96,33 @@ function addFooter(doc: jsPDF, tagline?: string) {
   }
 }
 
+function applySubtotalRowStyles(hookData: any) {
+  if (hookData.section !== "body") return;
+  const raw = hookData.row?.raw as Array<string | number> | undefined;
+  if (!raw || !Array.isArray(raw)) return;
+
+  const label = String(raw[0] ?? "").trim();
+  const value = String(raw[1] ?? "").trim();
+
+  const isTotal = /^(total|subtotal)$/i.test(label);
+  const isNetCashflow = /net\s+cashflow/i.test(label);
+
+  if (!isTotal && !isNetCashflow) return;
+
+  hookData.cell.styles.fontStyle = "bold";
+
+  if (isTotal) {
+    hookData.cell.styles.fillColor = [232, 240, 253];
+    hookData.cell.styles.textColor = [22, 47, 79];
+    return;
+  }
+
+  // Net cashflow styling (green/red)
+  const isNegative = value.includes("-");
+  hookData.cell.styles.fillColor = isNegative ? [254, 242, 242] : [240, 253, 244];
+  hookData.cell.styles.textColor = isNegative ? [190, 18, 60] : [21, 128, 61];
+}
+
 export async function exportTableToPdf(options: TablePdfOptions) {
   const orientation =
     options.orientation === "auto" || !options.orientation
@@ -145,6 +172,7 @@ export async function exportTableToPdf(options: TablePdfOptions) {
     alternateRowStyles: {
       fillColor: [245, 245, 245],
     },
+    didParseCell: applySubtotalRowStyles,
     margin: { left: marginX, right: marginX },
   });
 
@@ -163,7 +191,10 @@ export async function exportTableToPdf(options: TablePdfOptions) {
 
 export async function exportMultiTableToPdf(options: MultiTablePdfOptions) {
   const allRows = options.tables.flatMap((t) => t.rows);
-  const allCols = options.tables.reduce((max, t) => (t.columns.length > max.length ? t.columns : max), options.tables[0]?.columns ?? []);
+  const allCols = options.tables.reduce(
+    (max, t) => (t.columns.length > max.length ? t.columns : max),
+    options.tables[0]?.columns ?? [],
+  );
 
   const orientation =
     options.orientation === "auto" || !options.orientation
@@ -223,6 +254,7 @@ export async function exportMultiTableToPdf(options: MultiTablePdfOptions) {
       alternateRowStyles: {
         fillColor: [245, 245, 245],
       },
+      didParseCell: applySubtotalRowStyles,
       margin: { left: marginX, right: marginX },
     });
 

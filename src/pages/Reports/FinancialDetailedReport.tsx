@@ -1,26 +1,21 @@
 "use client";
 
 import React from "react";
-import { format, getMonth, getYear } from "date-fns";
+import { endOfMonth, format, startOfDay, startOfMonth } from "date-fns";
 import * as XLSX from "xlsx";
-import { FileSpreadsheet, Printer } from "lucide-react";
+import { CalendarIcon, FileSpreadsheet, Printer } from "lucide-react";
+import { DateRange } from "react-day-picker";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
@@ -90,11 +85,12 @@ export default function FinancialDetailedReport() {
   const { currency } = useSystemSettings();
   const { brandLogoUrl, tagline } = useBranding();
 
-  const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date());
+  const defaultRange = React.useMemo<DateRange>(() => {
+    const now = new Date();
+    return { from: startOfMonth(now), to: endOfMonth(now) };
+  }, []);
 
-  const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
-  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(defaultRange);
   const [messageToMembers, setMessageToMembers] = React.useState<string>(
     "Thank you all for your continued support. Below is the detailed financial report for accountability.",
   );
@@ -108,28 +104,18 @@ export default function FinancialDetailedReport() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const months = React.useMemo(
-    () => Array.from({ length: 12 }, (_, i) => ({ value: i.toString(), label: format(new Date(0, i), "MMMM") })),
-    [],
-  );
-
-  const years = React.useMemo(
-    () => Array.from({ length: 6 }, (_, i) => {
-      const y = currentYear - 3 + i;
-      return { value: y.toString(), label: y.toString() };
-    }),
-    [currentYear],
-  );
-
   const period = React.useMemo(() => {
-    const y = parseInt(filterYear);
-    const m = parseInt(filterMonth);
-    const start = new Date(Date.UTC(y, m, 1, 0, 0, 0));
-    const endExclusive = new Date(Date.UTC(y, m + 1, 1, 0, 0, 0));
-    return { start, endExclusive };
-  }, [filterYear, filterMonth]);
+    const from = dateRange?.from ? startOfDay(dateRange.from) : null;
+    const to = dateRange?.to ? startOfDay(dateRange.to) : null;
+    const endExclusive = to ? new Date(to.getTime() + 24 * 60 * 60 * 1000) : null;
+    return { start: from, endExclusive };
+  }, [dateRange?.from, dateRange?.to]);
 
-  const periodLabel = `${months.find((m) => m.value === filterMonth)?.label} ${filterYear}`;
+  const periodLabel = React.useMemo(() => {
+    const fromStr = dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : "-";
+    const toStr = dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : "-";
+    return `${fromStr} - ${toStr}`;
+  }, [dateRange?.from, dateRange?.to]);
 
   const accountNameById = React.useMemo(() => {
     const m = new Map<string, string>();
@@ -160,6 +146,16 @@ export default function FinancialDetailedReport() {
     setError(null);
 
     if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    if (!period.start || !period.endExclusive) {
+      setAccounts([]);
+      setIncome([]);
+      setExpenditure([]);
+      setSales([]);
+      setDebts([]);
       setLoading(false);
       return;
     }
@@ -219,9 +215,9 @@ export default function FinancialDetailedReport() {
   }, [fetchAll]);
 
   const exportPdf = async () => {
+    const subtitle = `Period: ${periodLabel} • Prepared by: ${currentUser?.name || "-"}`;
+
     const summaryRows: Array<Array<string | number>> = [
-      ["Period", periodLabel],
-      ["Prepared by", currentUser?.name || ""],
       ["Cash on hand (current)", money(currency.symbol, cashOnHand)],
       ["Income (period)", money(currency.symbol, incomeTotal)],
       ["Expenditure (period)", money(currency.symbol, expenditureTotal)],
@@ -230,21 +226,27 @@ export default function FinancialDetailedReport() {
       ["Debts outstanding (current)", money(currency.symbol, debtsOutstandingTotal)],
     ];
 
-    const incomeRows = income.map((r) => [
+    const incomeRows: Array<Array<string | number>> = income.map((r) => [
       format(new Date(r.date), "yyyy-MM-dd"),
       r.source,
       accountNameById.get(r.account_id) || r.account_id,
       money(currency.symbol, r.amount || 0),
     ]);
+    if (incomeRows.length) {
+      incomeRows.push(["SUBTOTAL", "", "", money(currency.symbol, incomeTotal)]);
+    }
 
-    const expenditureRows = expenditure.map((r) => [
+    const expenditureRows: Array<Array<string | number>> = expenditure.map((r) => [
       format(new Date(r.date), "yyyy-MM-dd"),
       r.purpose,
       accountNameById.get(r.account_id) || r.account_id,
       money(currency.symbol, r.amount || 0),
     ]);
+    if (expenditureRows.length) {
+      expenditureRows.push(["SUBTOTAL", "", "", money(currency.symbol, expenditureTotal)]);
+    }
 
-    const salesRows = sales.map((r) => [
+    const salesRows: Array<Array<string | number>> = sales.map((r) => [
       format(new Date(r.sale_date), "yyyy-MM-dd"),
       r.customer_name || "—",
       r.payment_method,
@@ -252,18 +254,24 @@ export default function FinancialDetailedReport() {
       money(currency.symbol, r.total_amount || 0),
       r.notes || "",
     ]);
+    if (salesRows.length) {
+      salesRows.push(["SUBTOTAL", "", "", "", money(currency.symbol, salesTotal), ""]);
+    }
 
-    const debtsRows = debts.map((d) => [
+    const debtsRows: Array<Array<string | number>> = debts.map((d) => [
       d.customer_name || "—",
       d.description,
       d.due_date ? format(new Date(d.due_date), "yyyy-MM-dd") : "—",
       d.status,
       money(currency.symbol, d.amount_due || 0),
     ]);
+    if (debtsRows.length) {
+      debtsRows.push(["SUBTOTAL", "", "", "", money(currency.symbol, debtsOutstandingTotal)]);
+    }
 
     await exportMultiTableToPdf({
       title: "Financial Detailed Report",
-      subtitle: `Period: ${periodLabel}`,
+      subtitle,
       fileName: `Financial_Detailed_${periodLabel}`,
       brandLogoUrl,
       tagline,
@@ -411,41 +419,38 @@ export default function FinancialDetailedReport() {
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-end gap-4">
             <div className="grid gap-1.5">
-              <Label>Month</Label>
-              <Select value={filterMonth} onValueChange={setFilterMonth}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Month</SelectLabel>
-                    {months.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label>Year</Label>
-              <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Year</SelectLabel>
-                    {years.map((y) => (
-                      <SelectItem key={y.value} value={y.value}>
-                        {y.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Label>Period</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[300px] justify-start text-left font-normal",
+                      !dateRange?.from && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange?.from ? (
+                      dateRange.to ? (
+                        `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`
+                      ) : (
+                        format(dateRange.from, "MMM dd, yyyy")
+                      )
+                    ) : (
+                      <span>Pick a date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <Badge variant="secondary" className="font-semibold">
