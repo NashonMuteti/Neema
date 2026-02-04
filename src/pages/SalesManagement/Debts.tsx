@@ -32,10 +32,10 @@ import AddEditDebtDialog, { Debt } from "@/components/sales-management/AddEditDe
 import RecordDebtPaymentDialog from "@/components/sales-management/RecordDebtPaymentDialog";
 import { useDebounce } from "@/hooks/use-debounce";
 import { format, parseISO } from "date-fns";
-import { Member, FinancialAccount, Product } from "@/types/common"; // Added import for Product
+import { Member, FinancialAccount, Product } from "@/types/common";
 
 const Debts = () => {
-  const { currentUser, session } = useAuth(); // Added session for Edge Function auth
+  const { currentUser, session } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
 
@@ -43,7 +43,7 @@ const Debts = () => {
     if (!currentUser || !definedRoles) {
       return { canManageDebts: false };
     }
-    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserRoleDefinition = definedRoles.find((role) => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageDebts = currentUserPrivileges.includes("Manage Debts");
     return { canManageDebts };
@@ -52,10 +52,10 @@ const Debts = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
-  const [products, setProducts] = useState<Product[]>([]); // New state for products
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [localSearchQuery, setLocalSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(localSearchQuery, 500);
 
@@ -72,9 +72,9 @@ const Debts = () => {
 
     // Fetch Members
     const { data: membersData, error: membersError } = await supabase
-      .from('profiles')
-      .select('id, name, email')
-      .order('name', { ascending: true });
+      .from("profiles")
+      .select("id, name, email")
+      .order("name", { ascending: true });
 
     if (membersError) {
       console.error("Error fetching members:", membersError);
@@ -85,9 +85,9 @@ const Debts = () => {
 
     // Fetch Financial Accounts
     const { data: accountsData, error: accountsError } = await supabase
-      .from('financial_accounts')
-      .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments')
-      .order('name', { ascending: true });
+      .from("financial_accounts")
+      .select("id, name, current_balance, initial_balance, profile_id, can_receive_payments")
+      .order("name", { ascending: true });
 
     if (accountsError) {
       console.error("Error fetching financial accounts:", accountsError);
@@ -98,10 +98,10 @@ const Debts = () => {
 
     // Fetch Products (only active ones for sale)
     const { data: productsData, error: productsError } = await supabase
-      .from('products')
-      .select('id, name, price, current_stock, reorder_point, profile_id, is_active') // Corrected: Fetch all fields for Product type
-      .eq('is_active', true)
-      .order('name', { ascending: true });
+      .from("products")
+      .select("id, name, price, current_stock, reorder_point, profile_id, is_active")
+      .eq("is_active", true)
+      .order("name", { ascending: true });
 
     if (productsError) {
       console.error("Error fetching products:", productsError);
@@ -110,7 +110,7 @@ const Debts = () => {
       setProducts(productsData || []);
     }
 
-    let query = supabase.from('debts').select(`
+    let query = supabase.from("debts").select(`
       *,
       created_by_profile:profiles!debts_created_by_profile_id_fkey(name, email),
       debtor_profile:profiles!debts_debtor_profile_id_fkey(name, email),
@@ -118,10 +118,12 @@ const Debts = () => {
     `);
 
     if (debouncedSearchQuery) {
-      query = query.or(`customer_name.ilike.%${debouncedSearchQuery}%,description.ilike.%${debouncedSearchQuery}%`);
+      query = query.or(
+        `customer_name.ilike.%${debouncedSearchQuery}%,description.ilike.%${debouncedSearchQuery}%`,
+      );
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query.order("created_at", { ascending: false });
 
     if (error) {
       console.error("Error fetching debts:", error);
@@ -129,23 +131,25 @@ const Debts = () => {
       showError("Failed to load debts.");
       setDebts([]);
     } else {
-      setDebts((data || []).map((d: any) => ({
-        id: d.id,
-        created_by_profile_id: d.created_by_profile_id,
-        sale_id: d.sale_id || undefined,
-        debtor_profile_id: d.debtor_profile_id || undefined,
-        customer_name: d.customer_name || undefined,
-        description: d.description,
-        original_amount: d.original_amount,
-        amount_due: d.amount_due,
-        due_date: d.due_date ? parseISO(d.due_date) : undefined,
-        status: d.status,
-        notes: d.notes || undefined,
-        created_at: parseISO(d.created_at),
-        created_by_name: d.created_by_profile?.name || d.created_by_profile?.email || 'N/A',
-        debtor_name: d.debtor_profile?.name || d.debtor_profile?.email || d.customer_name || 'N/A',
-        sale_description: d.sales_transactions?.notes || undefined,
-      })) || []);
+      setDebts(
+        (data || []).map((d: any) => ({
+          id: d.id,
+          created_by_profile_id: d.created_by_profile_id,
+          sale_id: d.sale_id || undefined,
+          debtor_profile_id: d.debtor_profile_id || undefined,
+          customer_name: d.customer_name || undefined,
+          description: d.description,
+          original_amount: d.original_amount,
+          amount_due: d.amount_due,
+          due_date: d.due_date ? parseISO(d.due_date) : undefined,
+          status: d.status,
+          notes: d.notes || undefined,
+          created_at: parseISO(d.created_at),
+          created_by_name: d.created_by_profile?.name || d.created_by_profile?.email || "N/A",
+          debtor_name: d.debtor_profile?.name || d.debtor_profile?.email || d.customer_name || "N/A",
+          sale_description: d.sales_transactions?.notes || undefined,
+        })) || [],
+      );
     }
     setLoading(false);
   }, [debouncedSearchQuery, currentUser]);
@@ -154,7 +158,12 @@ const Debts = () => {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  const handleSaveDebt = async (debtData: Omit<Debt, 'id' | 'created_at' | 'created_by_name' | 'debtor_name' | 'sale_description' | 'created_by_profile_id'> & { id?: string; sale_items?: { product_id: string; quantity: number; unit_price: number; subtotal: number; }[] }) => {
+  const handleSaveDebt = async (
+    debtData: Omit<
+      Debt,
+      "id" | "created_at" | "created_by_name" | "debtor_name" | "sale_description" | "created_by_profile_id"
+    > & { id?: string; sale_items?: { product_id: string; quantity: number; unit_price: number; subtotal: number }[] },
+  ) => {
     if (!currentUser || !session) {
       showError("You must be logged in to manage debts.");
       return;
@@ -166,7 +175,7 @@ const Debts = () => {
       if (debtData.id) {
         // Update existing debt (no stock sale logic for updates)
         const { error } = await supabase
-          .from('debts')
+          .from("debts")
           .update({
             customer_name: debtData.customer_name,
             description: debtData.description,
@@ -177,8 +186,8 @@ const Debts = () => {
             notes: debtData.notes || null,
             status: debtData.status,
           })
-          .eq('id', debtData.id);
-        
+          .eq("id", debtData.id);
+
         if (error) {
           console.error("Error updating debt:", error);
           showError("Failed to update debt.");
@@ -191,7 +200,7 @@ const Debts = () => {
         if (debtData.sale_items && debtData.sale_items.length > 0) {
           // Use Edge Function for debt sale
           const toastId = showLoading("Recording debt sale...");
-          const { data, error: edgeFunctionError } = await supabase.functions.invoke('record-debt-sale', {
+          const { data, error: edgeFunctionError } = await supabase.functions.invoke("record-debt-sale", {
             body: JSON.stringify({
               debt_data: {
                 customer_name: debtData.customer_name,
@@ -205,7 +214,7 @@ const Debts = () => {
             }),
             headers: {
               Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
           });
 
@@ -224,20 +233,18 @@ const Debts = () => {
           fetchInitialData(); // Re-fetch data to update tables and stock
         } else {
           // Add new regular debt
-          const { error } = await supabase
-            .from('debts')
-            .insert({
-              created_by_profile_id: currentUser.id,
-              customer_name: debtData.customer_name || null,
-              description: debtData.description,
-              original_amount: debtData.original_amount,
-              amount_due: debtData.original_amount,
-              due_date: debtData.due_date?.toISOString() || null,
-              debtor_profile_id: debtData.debtor_profile_id || null,
-              notes: debtData.notes || null,
-              status: "Outstanding",
-            });
-          
+          const { error } = await supabase.from("debts").insert({
+            created_by_profile_id: currentUser.id,
+            customer_name: debtData.customer_name || null,
+            description: debtData.description,
+            original_amount: debtData.original_amount,
+            amount_due: debtData.original_amount,
+            due_date: debtData.due_date?.toISOString() || null,
+            debtor_profile_id: debtData.debtor_profile_id || null,
+            notes: debtData.notes || null,
+            status: "Outstanding",
+          });
+
           if (error) {
             console.error("Error adding debt:", error);
             showError("Failed to add debt.");
@@ -249,7 +256,7 @@ const Debts = () => {
       }
     } catch (err: any) {
       console.error("Unexpected error in handleSaveDebt:", err);
-      showError(`An unexpected error occurred: ${err.message || 'Please try again.'}`);
+      showError(`An unexpected error occurred: ${err.message || "Please try again."}`);
     } finally {
       setIsProcessing(false);
     }
@@ -261,10 +268,7 @@ const Debts = () => {
       return;
     }
     setIsProcessing(true);
-    const { error } = await supabase
-      .from('debts')
-      .delete()
-      .eq('id', deletingDebtId);
+    const { error } = await supabase.from("debts").delete().eq("id", deletingDebtId);
 
     if (error) {
       console.error("Error deleting debt:", error);
@@ -281,7 +285,6 @@ const Debts = () => {
     debtId: string;
     amount: number;
     paymentDate: Date;
-    paymentMethod: string;
     receivedIntoAccountId: string;
     notes?: string;
   }) => {
@@ -292,11 +295,11 @@ const Debts = () => {
 
     setIsProcessing(true);
 
-    const { error: rpcError } = await supabase.rpc('record_debt_payment_atomic', {
+    const { error: rpcError } = await supabase.rpc("record_debt_payment_atomic", {
       p_debt_id: paymentData.debtId,
       p_amount: paymentData.amount,
       p_payment_date: paymentData.paymentDate.toISOString(),
-      p_payment_method: paymentData.paymentMethod,
+      p_payment_method: "N/A",
       p_received_into_account_id: paymentData.receivedIntoAccountId,
       p_notes: paymentData.notes || null,
       p_actor_profile_id: currentUser.id,
@@ -306,8 +309,10 @@ const Debts = () => {
       console.error("Error recording debt payment:", rpcError);
       showError(`Failed to record debt payment: ${rpcError.message}`);
     } else {
-      showSuccess(`Payment of ${currency.symbol}${paymentData.amount.toFixed(2)} recorded successfully!`);
-      fetchInitialData(); // Re-fetch to update the list and status
+      showSuccess(
+        `Payment of ${currency.symbol}${paymentData.amount.toFixed(2)} recorded successfully!`,
+      );
+      fetchInitialData();
     }
     setIsProcessing(false);
   };
@@ -365,11 +370,16 @@ const Debts = () => {
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
-            {canManageDebts && (
-              <Button onClick={() => { setEditingDebt(undefined); setIsAddEditDebtDialogOpen(true); }}>
+            {canManageDebts ? (
+              <Button
+                onClick={() => {
+                  setEditingDebt(undefined);
+                  setIsAddEditDebtDialogOpen(true);
+                }}
+              >
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Debt
               </Button>
-            )}
+            ) : null}
           </div>
         </CardHeader>
         <CardContent>
@@ -384,7 +394,7 @@ const Debts = () => {
                   <TableHead className="text-right">Balance Due</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead>Status</TableHead>
-                  {canManageDebts && <TableHead className="text-center">Actions</TableHead>}
+                  {canManageDebts ? <TableHead className="text-center">Actions</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -392,21 +402,38 @@ const Debts = () => {
                   <TableRow key={debt.id}>
                     <TableCell className="font-medium">{debt.debtor_name}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{debt.description || "-"}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{debt.original_amount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{(debt.original_amount - debt.amount_due).toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {currency.symbol}{debt.amount_due.toFixed(2)}
+                    <TableCell className="text-right">
+                      {currency.symbol}
+                      {debt.original_amount.toFixed(2)}
                     </TableCell>
-                    <TableCell>{debt.due_date ? format(debt.due_date, "MMM dd, yyyy") : "-"}</TableCell>
+                    <TableCell className="text-right">
+                      {currency.symbol}
+                      {(debt.original_amount - debt.amount_due).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {currency.symbol}
+                      {debt.amount_due.toFixed(2)}
+                    </TableCell>
                     <TableCell>
-                      <span className={`font-medium ${debt.status === "Paid" ? "text-green-600" : debt.status === "Overdue" ? "text-destructive" : "text-yellow-600"}`}>
+                      {debt.due_date ? format(debt.due_date, "MMM dd, yyyy") : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`font-medium ${
+                          debt.status === "Paid"
+                            ? "text-green-600"
+                            : debt.status === "Overdue"
+                              ? "text-destructive"
+                              : "text-yellow-600"
+                        }`}
+                      >
                         {debt.status}
                       </span>
                     </TableCell>
-                    {canManageDebts && (
+                    {canManageDebts ? (
                       <TableCell className="text-center">
                         <div className="flex justify-center space-x-2">
-                          {debt.amount_due > 0 && (
+                          {debt.amount_due > 0 ? (
                             <Button
                               variant="outline"
                               size="sm"
@@ -415,27 +442,38 @@ const Debts = () => {
                             >
                               <DollarSign className="h-4 w-4" />
                             </Button>
-                          )}
-                          <Button variant="outline" size="sm" onClick={() => openEditDialog(debt)} disabled={isProcessing}>
+                          ) : null}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(debt)}
+                            disabled={isProcessing}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(debt.id)} disabled={isProcessing}>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => openDeleteDialog(debt.id)}
+                            disabled={isProcessing}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
-                    )}
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center mt-4">No debts found matching your search or filters.</p>
+            <p className="text-muted-foreground text-center mt-4">
+              No debts found matching your search or filters.
+            </p>
           )}
         </CardContent>
       </Card>
 
-      {/* Add/Edit Debt Dialog */}
       <AddEditDebtDialog
         isOpen={isAddEditDebtDialogOpen}
         setIsOpen={setIsAddEditDebtDialogOpen}
@@ -443,11 +481,10 @@ const Debts = () => {
         onSave={handleSaveDebt}
         canManageDebts={canManageDebts}
         members={members}
-        products={products} // Pass products here
+        products={products}
       />
 
-      {/* Record Payment Dialog */}
-      {selectedDebtForPayment && (
+      {selectedDebtForPayment ? (
         <RecordDebtPaymentDialog
           isOpen={isRecordPaymentDialogOpen}
           setIsOpen={setIsRecordPaymentDialogOpen}
@@ -457,9 +494,8 @@ const Debts = () => {
           financialAccounts={financialAccounts}
           isProcessing={isProcessing}
         />
-      )}
+      ) : null}
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingDebtId} onOpenChange={(open) => !open && setDeletingDebtId(undefined)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -470,7 +506,11 @@ const Debts = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteDebt} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isProcessing}>
+            <AlertDialogAction
+              onClick={handleDeleteDebt}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isProcessing}
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

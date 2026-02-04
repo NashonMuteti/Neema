@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import { FinancialAccount } from "@/types/common"; // Import FinancialAccount
+import { FinancialAccount } from "@/types/common";
 
 interface Product {
   id: string;
@@ -66,13 +66,6 @@ interface SaleFormProps {
   }) => Promise<void>;
 }
 
-const paymentMethods = [
-  { value: "cash", label: "Cash" },
-  { value: "bank-transfer", label: "Bank Transfer" },
-  { value: "online-payment", label: "Online Payment" },
-  { value: "mobile-money", label: "Mobile Money" },
-];
-
 const SaleForm: React.FC<SaleFormProps> = ({
   products,
   financialAccounts,
@@ -84,7 +77,6 @@ const SaleForm: React.FC<SaleFormProps> = ({
 
   const [saleDate, setSaleDate] = useState<Date | undefined>(new Date());
   const [customerName, setCustomerName] = useState("");
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | undefined>(paymentMethods[0]?.value);
   const [selectedReceivedIntoAccount, setSelectedReceivedIntoAccount] = useState<string | undefined>(undefined);
   const [saleNotes, setSaleNotes] = useState("");
   const [currentSaleItems, setCurrentSaleItems] = useState<SaleItem[]>([]);
@@ -92,7 +84,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
   const [itemQuantity, setItemQuantity] = useState("1");
 
   const receivableAccounts = useMemo(() => {
-    return financialAccounts.filter(account => account.can_receive_payments);
+    return financialAccounts.filter((account) => account.can_receive_payments);
   }, [financialAccounts]);
 
   useEffect(() => {
@@ -114,7 +106,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
       showError("Please select a product and enter a quantity.");
       return;
     }
-    const product = products.find(p => p.id === selectedProductId);
+    const product = products.find((p) => p.id === selectedProductId);
     const quantity = parseFloat(itemQuantity);
 
     if (!product) {
@@ -130,7 +122,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
       return;
     }
 
-    const existingItemIndex = currentSaleItems.findIndex(item => item.product_id === selectedProductId);
+    const existingItemIndex = currentSaleItems.findIndex((item) => item.product_id === selectedProductId);
     if (existingItemIndex > -1) {
       const updatedItems = [...currentSaleItems];
       const existingItem = updatedItems[existingItemIndex];
@@ -148,7 +140,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
       };
       setCurrentSaleItems(updatedItems);
     } else {
-      setCurrentSaleItems(prev => [
+      setCurrentSaleItems((prev) => [
         ...prev,
         {
           product_id: product.id,
@@ -160,11 +152,11 @@ const SaleForm: React.FC<SaleFormProps> = ({
       ]);
     }
 
-    setItemQuantity("1"); // Reset quantity
+    setItemQuantity("1");
   };
 
   const handleRemoveSaleItem = (productId: string) => {
-    setCurrentSaleItems(prev => prev.filter(item => item.product_id !== productId));
+    setCurrentSaleItems((prev) => prev.filter((item) => item.product_id !== productId));
   };
 
   const calculateCartTotal = useMemo(() => {
@@ -172,18 +164,18 @@ const SaleForm: React.FC<SaleFormProps> = ({
   }, [currentSaleItems]);
 
   const handleSubmitSale = async () => {
-    if (!saleDate || !selectedPaymentMethod || !selectedReceivedIntoAccount || currentSaleItems.length === 0) {
-      showError("Sale date, payment method, received account, and at least one item are required.");
+    if (!saleDate || !selectedReceivedIntoAccount || currentSaleItems.length === 0) {
+      showError("Sale date, received account, and at least one item are required.");
       return;
     }
 
     await onRecordSale({
       customer_name: customerName.trim() || undefined,
       sale_date: saleDate.toISOString(),
-      payment_method: selectedPaymentMethod,
+      payment_method: "N/A",
       received_into_account_id: selectedReceivedIntoAccount,
       notes: saleNotes.trim() || undefined,
-      sale_items: currentSaleItems.map(item => ({
+      sale_items: currentSaleItems.map((item) => ({
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
@@ -194,7 +186,6 @@ const SaleForm: React.FC<SaleFormProps> = ({
     // Reset form after successful submission
     setSaleDate(new Date());
     setCustomerName("");
-    setSelectedPaymentMethod(paymentMethods[0]?.value);
     setSelectedReceivedIntoAccount(receivableAccounts.length > 0 ? receivableAccounts[0].id : undefined);
     setSaleNotes("");
     setCurrentSaleItems([]);
@@ -217,7 +208,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
                 id="sale-date"
                 className={cn(
                   "w-full justify-start text-left font-normal",
-                  !saleDate && "text-muted-foreground"
+                  !saleDate && "text-muted-foreground",
                 )}
                 disabled={!canManageDailySales || isProcessing}
               >
@@ -226,12 +217,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={saleDate}
-                onSelect={setSaleDate}
-                initialFocus
-              />
+              <Calendar mode="single" selected={saleDate} onSelect={setSaleDate} initialFocus />
             </PopoverContent>
           </Popover>
         </div>
@@ -248,27 +234,12 @@ const SaleForm: React.FC<SaleFormProps> = ({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="payment-method">Payment Method</Label>
-          <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod} disabled={!canManageDailySales || isProcessing}>
-            <SelectTrigger id="payment-method">
-              <SelectValue placeholder="Select method" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Payment Methods</SelectLabel>
-                {paymentMethods.map((method) => (
-                  <SelectItem key={method.value} value={method.value}>
-                    {method.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-1.5">
           <Label htmlFor="received-into-account">Received Into Account</Label>
-          <Select value={selectedReceivedIntoAccount} onValueChange={setSelectedReceivedIntoAccount} disabled={!canManageDailySales || receivableAccounts.length === 0 || isProcessing}>
+          <Select
+            value={selectedReceivedIntoAccount}
+            onValueChange={setSelectedReceivedIntoAccount}
+            disabled={!canManageDailySales || receivableAccounts.length === 0 || isProcessing}
+          >
             <SelectTrigger id="received-into-account">
               <SelectValue placeholder="Select account" />
             </SelectTrigger>
@@ -283,7 +254,11 @@ const SaleForm: React.FC<SaleFormProps> = ({
               </SelectGroup>
             </SelectContent>
           </Select>
-          {receivableAccounts.length === 0 && <p className="text-sm text-destructive">No financial accounts found that can receive payments. Please enable one in Admin Settings.</p>}
+          {receivableAccounts.length === 0 ? (
+            <p className="text-sm text-destructive">
+              No financial accounts found that can receive payments. Please enable one in Admin Settings.
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-1.5">
@@ -299,7 +274,11 @@ const SaleForm: React.FC<SaleFormProps> = ({
 
         <h3 className="text-md font-semibold mt-4">Add Items to Sale</h3>
         <div className="flex gap-2">
-          <Select value={selectedProductId} onValueChange={setSelectedProductId} disabled={!canManageDailySales || products.length === 0 || isProcessing}>
+          <Select
+            value={selectedProductId}
+            onValueChange={setSelectedProductId}
+            disabled={!canManageDailySales || products.length === 0 || isProcessing}
+          >
             <SelectTrigger className="flex-1">
               <SelectValue placeholder="Select Product" />
             </SelectTrigger>
@@ -323,12 +302,16 @@ const SaleForm: React.FC<SaleFormProps> = ({
             min="1"
             disabled={!canManageDailySales || isProcessing}
           />
-          <Button onClick={handleAddSaleItem} size="icon" disabled={!canManageDailySales || !selectedProductId || !itemQuantity || products.length === 0 || isProcessing}>
+          <Button
+            onClick={handleAddSaleItem}
+            size="icon"
+            disabled={!canManageDailySales || !selectedProductId || !itemQuantity || products.length === 0 || isProcessing}
+          >
             <PlusCircle className="h-4 w-4" />
           </Button>
         </div>
 
-        {currentSaleItems.length > 0 && (
+        {currentSaleItems.length > 0 ? (
           <div className="mt-4 border rounded-md">
             <Table>
               <TableHeader>
@@ -341,14 +324,25 @@ const SaleForm: React.FC<SaleFormProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentSaleItems.map((item, index) => (
+                {currentSaleItems.map((item) => (
                   <TableRow key={item.product_id}>
                     <TableCell>{item.product_name}</TableCell>
                     <TableCell className="text-right">{item.quantity}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{item.unit_price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{item.subtotal.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      {currency.symbol}
+                      {item.unit_price.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {currency.symbol}
+                      {item.subtotal.toFixed(2)}
+                    </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => handleRemoveSaleItem(item.product_id)} disabled={isProcessing}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveSaleItem(item.product_id)}
+                        disabled={isProcessing}
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -356,18 +350,21 @@ const SaleForm: React.FC<SaleFormProps> = ({
                 ))}
                 <TableRow className="font-bold bg-muted/50">
                   <TableCell colSpan={3}>Total</TableCell>
-                  <TableCell className="text-right">{currency.symbol}{calculateCartTotal.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">
+                    {currency.symbol}
+                    {calculateCartTotal.toFixed(2)}
+                  </TableCell>
                   <TableCell></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
           </div>
-        )}
+        ) : null}
 
         <Button
           onClick={handleSubmitSale}
           className="w-full mt-6"
-          disabled={!canManageDailySales || isProcessing || currentSaleItems.length === 0 || !saleDate || !selectedPaymentMethod || !selectedReceivedIntoAccount || receivableAccounts.length === 0}
+          disabled={!canManageDailySales || isProcessing || currentSaleItems.length === 0 || !saleDate || !selectedReceivedIntoAccount || receivableAccounts.length === 0}
         >
           {isProcessing ? "Recording Sale..." : "Record Sale"}
         </Button>

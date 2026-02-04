@@ -42,13 +42,6 @@ interface CollectionsDialogProps {
   onCollectionAdded: () => void;
 }
 
-const paymentMethods = [
-  { value: "cash", label: "Cash" },
-  { value: "bank-transfer", label: "Bank Transfer" },
-  { value: "online-payment", label: "Online Payment" },
-  { value: "mobile-money", label: "Mobile Money" },
-];
-
 const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
   projectId,
   projectName,
@@ -84,7 +77,6 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
   const [memberId, setMemberId] = React.useState<string | undefined>(undefined);
   const [receivedIntoAccount, setReceivedIntoAccount] = React.useState<string | undefined>(undefined);
   const [collectionDate, setCollectionDate] = React.useState<Date | undefined>(new Date());
-  const [paymentMethod, setPaymentMethod] = React.useState<string | undefined>(undefined);
 
   // Shared data
   const [members, setMembers] = React.useState<Member[]>([]);
@@ -145,7 +137,6 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
       fetchMembersAndAccounts();
       setAmount("");
       setCollectionDate(new Date());
-      setPaymentMethod(paymentMethods[0]?.value);
       setIsProcessing(false);
     }
   }, [isOpen, fetchMembersAndAccounts]);
@@ -165,7 +156,7 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
   };
 
   const handleAddCollection = async () => {
-    if (!amount || !memberId || !receivedIntoAccount || !collectionDate || !paymentMethod) {
+    if (!amount || !memberId || !receivedIntoAccount || !collectionDate) {
       showError("All collection fields are required.");
       return;
     }
@@ -188,7 +179,6 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
       p_actor_profile_id: currentUser.id,
       p_project_id: projectId,
       p_member_id: memberId,
-      p_payment_method: paymentMethod,
       p_collection_date: collectionDate.toISOString(),
       p_source: `Project Collection: ${projectName}`,
     });
@@ -327,29 +317,6 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
                 ) : null}
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="payment-method">Payment Method</Label>
-                <Select
-                  value={paymentMethod}
-                  onValueChange={setPaymentMethod}
-                  disabled={!canManageCollections || isProcessing}
-                >
-                  <SelectTrigger id="payment-method">
-                    <SelectValue placeholder="Select payment method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Methods</SelectLabel>
-                      {paymentMethods.map((method) => (
-                        <SelectItem key={method.value} value={method.value}>
-                          {method.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="flex justify-end">
                 <Button
                   onClick={handleAddCollection}
@@ -359,7 +326,6 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
                     !memberId ||
                     !receivedIntoAccount ||
                     !collectionDate ||
-                    !paymentMethod ||
                     isProcessing ||
                     members.length === 0 ||
                     receivableAccounts.length === 0
@@ -390,7 +356,6 @@ const CollectionsDialog: React.FC<CollectionsDialogProps> = ({
                 onComplete={() => {
                   handleCollectionSaved();
                 }}
-
               />
             ) : (
               <p className="text-sm text-muted-foreground">Please log in to use bulk upload.</p>

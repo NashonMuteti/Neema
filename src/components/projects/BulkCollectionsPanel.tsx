@@ -18,13 +18,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import type { FinancialAccount, Member } from "@/types/common";
 
-const paymentMethods = [
-  { value: "cash", label: "Cash" },
-  { value: "bank-transfer", label: "Bank Transfer" },
-  { value: "online-payment", label: "Online Payment" },
-  { value: "mobile-money", label: "Mobile Money" },
-];
-
 type OnlineRow = {
   memberId: string;
   memberName: string;
@@ -37,7 +30,6 @@ type ParsedExcelRow = {
   memberId: string;
   amount: number;
   accountId: string;
-  paymentMethod: string;
   collectionDate: Date;
 };
 
@@ -77,7 +69,6 @@ export default function BulkCollectionsPanel({
   onComplete,
 }: Props) {
   const [collectionDate, setCollectionDate] = React.useState<Date | undefined>(new Date());
-  const [paymentMethod, setPaymentMethod] = React.useState(paymentMethods[0]?.value ?? "cash");
 
   const [rows, setRows] = React.useState<OnlineRow[]>([]);
   const [isProcessing, setIsProcessing] = React.useState(false);
@@ -154,7 +145,6 @@ export default function BulkCollectionsPanel({
           p_actor_profile_id: actorProfileId,
           p_project_id: projectId,
           p_member_id: entry.memberId,
-          p_payment_method: entry.paymentMethod,
           p_collection_date: entry.collectionDate.toISOString(),
           p_source: `Project Collection: ${projectName}`,
         });
@@ -200,7 +190,6 @@ export default function BulkCollectionsPanel({
       amount: "",
       receiving_account_id: defaultAccount?.id || "",
       receiving_account_name: defaultAccount?.name || "",
-      payment_method: paymentMethod,
       collection_date: format(collectionDate, "yyyy-MM-dd"),
     }));
 
@@ -273,14 +262,12 @@ export default function BulkCollectionsPanel({
           continue;
         }
 
-        const pm = String(row.payment_method || paymentMethod).trim() || paymentMethod;
         const d = parseLooseDate(row.collection_date, baseDate);
 
         parsed.push({
           memberId: member.id,
           amount,
           accountId: account.id,
-          paymentMethod: pm,
           collectionDate: d,
         });
       }
@@ -311,7 +298,6 @@ export default function BulkCollectionsPanel({
         memberId: r.memberId,
         amount: amt,
         accountId: r.accountId,
-        paymentMethod,
         collectionDate: d,
       });
     }
@@ -345,26 +331,17 @@ export default function BulkCollectionsPanel({
         </div>
 
         <div className="grid gap-1.5">
-          <Label>Default Payment Method</Label>
-          <select
-            className="h-10 rounded-md border bg-background px-3 text-sm"
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            disabled={disabled || isProcessing}
-          >
-            {paymentMethods.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid gap-1.5">
           <Label className="text-muted-foreground">Receiving accounts</Label>
           <div className="h-10 rounded-md border bg-muted/30 px-3 text-sm flex items-center">
             {receivableAccounts.length} available
           </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label className="text-muted-foreground">Template</Label>
+          <Button variant="outline" onClick={downloadTemplate} disabled={disabled || isProcessing}>
+            <Download className="mr-2 h-4 w-4" /> Download Excel template
+          </Button>
         </div>
       </div>
 
@@ -467,16 +444,8 @@ export default function BulkCollectionsPanel({
 
         <TabsContent value="excel" className="mt-4">
           <div className="rounded-lg border p-4 space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-medium">Download template</div>
-                <div className="text-xs text-muted-foreground">
-                  Template includes all active members. Fill in amount + receiving account fields, then upload.
-                </div>
-              </div>
-              <Button variant="outline" onClick={downloadTemplate} disabled={disabled || isProcessing}>
-                <Download className="mr-2 h-4 w-4" /> Download Excel template
-              </Button>
+            <div className="text-xs text-muted-foreground">
+              Upload the completed template. Only rows with an amount &gt; 0 will be imported.
             </div>
 
             <div className="grid gap-2">
