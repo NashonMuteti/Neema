@@ -21,7 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
-import { exportTableToPdf } from "@/utils/reportUtils";
+import { exportMultiTableToPdf } from "@/utils/reportUtils";
 import { showError } from "@/utils/toast";
 import { FinancialAccount } from "@/types/common";
 
@@ -260,27 +260,97 @@ const ProjectFinancialsDetail: React.FC = () => {
   };
 
   const handlePrintPdf = async () => {
-    const rows: Array<Array<string | number>> = collectionsSorted.map((c) => {
+    const collectionsRows: Array<Array<string | number>> = collectionsSorted.map((c) => {
       const receivingAccount =
         c.receiving_account_name ||
         (c.receiving_account_id ? accountNameById.get(c.receiving_account_id) : "") ||
         "";
 
-      return [format(c.date, "yyyy-MM-dd"), c.member_name, formatMoney(currency.symbol, c.amount), receivingAccount];
+      return [
+        format(c.date, "yyyy-MM-dd"),
+        c.member_name,
+        formatMoney(currency.symbol, c.amount),
+        receivingAccount,
+      ];
     });
 
-    rows.push(["", "GRAND TOTAL", formatMoney(currency.symbol, totalCollections), ""]);
+    const memberTotalsRows: Array<Array<string | number>> = memberGroups.map((g) => {
+      const paid = totalPaidByMemberId.get(g.member_id) || 0;
+      const expected = expectedPerMember;
+      const balance = expected - paid;
+      const status = expected <= 0 ? "—" : balance <= 0 ? "Cleared" : "Due";
 
-    await exportTableToPdf({
+      return [
+        g.member_name,
+        formatMoney(currency.symbol, expected),
+        formatMoney(currency.symbol, paid),
+        formatMoney(currency.symbol, Math.abs(balance)),
+        status,
+      ];
+    });
+
+    // Grand total row (vivid)
+    memberTotalsRows.push([
+      "GRAND TOTAL",
+      formatMoney(currency.symbol, expectedTotalForShownMembers),
+      formatMoney(currency.symbol, totalCollections),
+      formatMoney(currency.symbol, Math.max(expectedTotalForShownMembers - totalCollections, 0)),
+      expectedTotalForShownMembers > 0 && totalCollections >= expectedTotalForShownMembers ? "Cleared" : "Due",
+    ]);
+
+    const pledgesRows: Array<Array<string | number>> = pledges
+      .slice()
+      .sort((a, b) => (a.member_name || "").localeCompare(b.member_name || ""))
+      .map((p) => {
+        const remaining = p.original_amount - p.paid_amount;
+        return [
+          p.member_name,
+          formatMoney(currency.symbol, p.original_amount),
+          formatMoney(currency.symbol, p.paid_amount),
+          formatMoney(currency.symbol, remaining),
+          format(p.due_date, "yyyy-MM-dd"),
+          getDisplayPledgeStatus(p),
+        ];
+      });
+
+    // Totals for pledges
+    if (pledgesRows.length > 0) {
+      const totalPaid = pledges.reduce((sum, p) => sum + (p.paid_amount || 0), 0);
+      pledgesRows.push([
+        "TOTAL",
+        formatMoney(currency.symbol, totalPledged),
+        formatMoney(currency.symbol, totalPaid),
+        formatMoney(currency.symbol, Math.max(totalPledged - totalPaid, 0)),
+        "",
+        "",
+      ]);
+    }
+
+    await exportMultiTableToPdf({
       title: `Project Financials: ${projectDetails.name}`,
-      subtitle: `Collections (Expected per member: ${formatMoney(currency.symbol, expectedPerMember)})`,
+      subtitle: `Expected per member: ${formatMoney(currency.symbol, expectedPerMember)}`,
       fileName: `Project_Financials_${projectDetails.name}`,
-      columns: ["Date", "Member", "Amount", "Receiving Account"],
-      rows,
       brandLogoUrl,
       tagline,
       mode: "open",
       orientation: "auto",
+      tables: [
+        {
+          title: "Collections",
+          columns: ["Date", "Member", "Amount", "Receiving Account"],
+          rows: collectionsRows,
+        },
+        {
+          title: "Subtotals by Member (Paid vs Expected)",
+          columns: ["Member", "Expected", "Paid", "Balance", "Status"],
+          rows: memberTotalsRows,
+        },
+        {
+          title: "Pledges",
+          columns: ["Member", "Pledged", "Paid", "Remaining", "Due Date", "Status"],
+          rows: pledgesRows.length > 0 ? pledgesRows : [["(no pledges)", "", "", "", "", ""]],
+        },
+      ],
     });
   };
 
