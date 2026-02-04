@@ -101,10 +101,10 @@ function applySubtotalRowStyles(hookData: any) {
   const raw = hookData.row?.raw as Array<string | number> | undefined;
   if (!raw || !Array.isArray(raw)) return;
 
-  const label = String(raw[0] ?? "").trim();
+  const label = String(raw[0] ?? "").trim().toLowerCase();
   const value = String(raw[1] ?? "").trim();
 
-  const isTotal = /^(total|subtotal)$/i.test(label);
+  const isTotal = label === "total" || label === "subtotal" || label === "total for period";
   const isNetCashflow = /net\s+cashflow/i.test(label);
 
   if (!isTotal && !isNetCashflow) return;

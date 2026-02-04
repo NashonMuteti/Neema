@@ -215,7 +215,7 @@ export default function FinancialDetailedReport() {
   }, [fetchAll]);
 
   const exportPdf = async () => {
-    const subtitle = `Period: ${periodLabel} • Prepared by: ${currentUser?.name || "-"}`;
+    const subtitle = `Period: ${periodLabel} • prepared by: ${currentUser?.name || "-"}`;
 
     const summaryRows: Array<Array<string | number>> = [
       ["Cash on hand (current)", money(currency.symbol, cashOnHand)],
@@ -233,7 +233,7 @@ export default function FinancialDetailedReport() {
       money(currency.symbol, r.amount || 0),
     ]);
     if (incomeRows.length) {
-      incomeRows.push(["SUBTOTAL", "", "", money(currency.symbol, incomeTotal)]);
+      incomeRows.push(["Total for period", "", "", money(currency.symbol, incomeTotal)]);
     }
 
     const expenditureRows: Array<Array<string | number>> = expenditure.map((r) => [
@@ -243,7 +243,7 @@ export default function FinancialDetailedReport() {
       money(currency.symbol, r.amount || 0),
     ]);
     if (expenditureRows.length) {
-      expenditureRows.push(["SUBTOTAL", "", "", money(currency.symbol, expenditureTotal)]);
+      expenditureRows.push(["Total for period", "", "", money(currency.symbol, expenditureTotal)]);
     }
 
     const salesRows: Array<Array<string | number>> = sales.map((r) => [
@@ -255,7 +255,7 @@ export default function FinancialDetailedReport() {
       r.notes || "",
     ]);
     if (salesRows.length) {
-      salesRows.push(["SUBTOTAL", "", "", "", money(currency.symbol, salesTotal), ""]);
+      salesRows.push(["Total for period", "", "", "", money(currency.symbol, salesTotal), ""]);
     }
 
     const debtsRows: Array<Array<string | number>> = debts.map((d) => [
@@ -266,7 +266,7 @@ export default function FinancialDetailedReport() {
       money(currency.symbol, d.amount_due || 0),
     ]);
     if (debtsRows.length) {
-      debtsRows.push(["SUBTOTAL", "", "", "", money(currency.symbol, debtsOutstandingTotal)]);
+      debtsRows.push(["Total for period", "", "", "", money(currency.symbol, debtsOutstandingTotal)]);
     }
 
     await exportMultiTableToPdf({
