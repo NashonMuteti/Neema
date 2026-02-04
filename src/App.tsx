@@ -49,6 +49,10 @@ const Stocks = React.lazy(() => import("./pages/SalesManagement/Stocks"));
 const DailySales = React.lazy(() => import("./pages/SalesManagement/DailySales"));
 const Debts = React.lazy(() => import("./pages/SalesManagement/Debts"));
 
+// Financial Health Reports
+const FinancialSummaryReport = React.lazy(() => import("./pages/Reports/FinancialSummaryReport"));
+const FinancialDetailedReport = React.lazy(() => import("./pages/Reports/FinancialDetailedReport"));
+
 const queryClient = new QueryClient();
 
 const App = () => {
@@ -105,6 +109,8 @@ const App = () => {
                               <Route path="/reports/table-banking-summary" element={<TableBankingSummary />} />
                               <Route path="/reports/user-activity" element={<UserActivityReport />} />
                               <Route path="/reports/deleted-projects" element={<DeletedProjectsReport />} />
+                              <Route path="/reports/financial-summary" element={<FinancialSummaryReport />} />
+                              <Route path="/reports/financial-detailed" element={<FinancialDetailedReport />} />
 
                               <Route path="/initialize-balances" element={<InitializeBalances />} />
                               <Route path="/transfer-funds" element={<TransferFunds />} />

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { Link } from "react-router-dom";
 import SoonDueProjectsGraph from "@/components/dashboard/SoonDueProjectsGraph";
 import ContributionsProgressGraph from "@/components/dashboard/ContributionsProgressGraph";
 import IncomeExpenditureGraph from "@/components/dashboard/IncomeExpenditureGraph";
@@ -26,7 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
@@ -92,6 +94,25 @@ const Index = () => {
         grandTotalAccountsBalance={grandTotalAccountsBalance}
         cumulativeNetOperatingBalance={cumulativeNetOperatingBalance}
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick financial reports</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground max-w-xl">
+            Share a clear update with members anytime. Use the Summary for quick health indicators and the Detailed report for full accountability.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link to="/reports/financial-summary">Financial Summary</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/reports/financial-detailed">Financial Detailed</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex items-center gap-4 mb-4">
         <div className="grid gap-1.5">

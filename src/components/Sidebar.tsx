@@ -139,6 +139,18 @@ export const navItems: SidebarItem[] = [
     requiredPrivileges: ["View Reports"],
     children: [
       {
+        name: "Financial Summary",
+        href: "/reports/financial-summary",
+        icon: BarChart2,
+        requiredPrivileges: ["View Reports"],
+      },
+      {
+        name: "Financial Detailed",
+        href: "/reports/financial-detailed",
+        icon: FileText,
+        requiredPrivileges: ["View Reports"],
+      },
+      {
         name: "Member Contributions Report",
         href: "/reports/member-contributions",
         icon: BarChart2,
