@@ -111,6 +111,12 @@ export default function BulkCollectionsPanel({
     return map;
   }, [members]);
 
+  const memberByEmail = React.useMemo(() => {
+    const map = new Map<string, Member>();
+    members.forEach((m) => map.set(m.email.trim().toLowerCase(), m));
+    return map;
+  }, [members]);
+
   const memberByName = React.useMemo(() => {
     const map = new Map<string, Member>();
     members.forEach((m) => map.set(m.name.trim().toLowerCase(), m));
@@ -183,12 +189,12 @@ export default function BulkCollectionsPanel({
       return;
     }
 
+    // Intentionally avoid UUID columns in the user-facing template.
+    // We match members by email (preferred) or name, and accounts by name.
     const templateRows = members.map((m) => ({
-      member_id: m.id,
-      member_name: m.name,
       member_email: m.email,
+      member_name: m.name,
       amount: "",
-      receiving_account_id: defaultAccount?.id || "",
       receiving_account_name: defaultAccount?.name || "",
       collection_date: format(collectionDate, "yyyy-MM-dd"),
     }));
@@ -197,8 +203,7 @@ export default function BulkCollectionsPanel({
 
     const wsAccounts = XLSX.utils.json_to_sheet(
       receivableAccounts.map((a) => ({
-        account_id: a.id,
-        account_name: a.name,
+        receiving_account_name: a.name,
       })),
     );
 
@@ -228,14 +233,18 @@ export default function BulkCollectionsPanel({
 
       for (const [idx, row] of data.entries()) {
         const memberId = String(row.member_id || row.memberId || "").trim();
+        const memberEmail = String(row.member_email || row.memberEmail || "").trim();
         const memberName = String(row.member_name || row.memberName || "").trim();
 
         const member = memberId
           ? memberById.get(memberId)
-          : memberByName.get(memberName.toLowerCase());
+          : memberEmail
+            ? memberByEmail.get(memberEmail.toLowerCase())
+            : memberByName.get(memberName.toLowerCase());
+
         if (!member) {
           errors.push(
-            `Row ${idx + 2}: member not found (member_id="${memberId}" member_name="${memberName}")`,
+            `Row ${idx + 2}: member not found (member_email="${memberEmail}" member_name="${memberName}")`,
           );
           continue;
         }
@@ -249,7 +258,9 @@ export default function BulkCollectionsPanel({
         }
 
         const accountIdRaw = String(row.receiving_account_id || row.account_id || "").trim();
-        const accountNameRaw = String(row.receiving_account_name || row.account_name || "").trim();
+        const accountNameRaw = String(
+          row.receiving_account_name || row.account_name || row.receivingAccountName || "",
+        ).trim();
 
         const account = accountIdRaw
           ? accountById.get(accountIdRaw)
@@ -257,7 +268,7 @@ export default function BulkCollectionsPanel({
 
         if (!account) {
           errors.push(
-            `Row ${idx + 2}: receiving account not found (receiving_account_id="${accountIdRaw}" receiving_account_name="${accountNameRaw}")`,
+            `Row ${idx + 2}: receiving account not found (receiving_account_name="${accountNameRaw}")`,
           );
           continue;
         }
@@ -278,7 +289,7 @@ export default function BulkCollectionsPanel({
       }
 
       if (parsed.length === 0 && errors.length === 0) {
-        setExcelParseError("No valid rows found. Make sure you filled amount and receiving account fields.");
+        setExcelParseError("No valid rows found. Make sure you filled amount and receiving account name fields.");
       }
     } catch (e: any) {
       setExcelParseError(e?.message || "Failed to parse Excel file.");
@@ -445,7 +456,9 @@ export default function BulkCollectionsPanel({
         <TabsContent value="excel" className="mt-4">
           <div className="rounded-lg border p-4 space-y-4">
             <div className="text-xs text-muted-foreground">
-              Upload the completed template. Only rows with an amount &gt; 0 will be imported.
+              Upload the completed template. Only rows with an amount &gt; 0 will be imported. Members are matched by
+              <span className="font-medium"> email</span> (preferred) or name; receiving accounts are matched by
+              <span className="font-medium"> name</span>.
             </div>
 
             <div className="grid gap-2">
