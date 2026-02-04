@@ -37,7 +37,6 @@ interface Project {
 }
 
 type HookProjectPledge = ReturnType<typeof useProjectFinancials>["pledges"][0];
-
 type HookProjectCollection = ReturnType<typeof useProjectFinancials>["collections"][0];
 
 const getDisplayPledgeStatus = (pledge: HookProjectPledge): "Paid" | "Unpaid" => {
@@ -55,6 +54,10 @@ const getStatusBadgeClasses = (displayStatus: "Paid" | "Unpaid") => {
       return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
   }
 };
+
+function formatMoney(currencySymbol: string, value: number) {
+  return `${currencySymbol}${value.toFixed(2)}`;
+}
 
 const ProjectFinancialsDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -128,7 +131,7 @@ const ProjectFinancialsDetail: React.FC = () => {
     fetchFinancialAccounts();
   }, [projectId, currentUser]);
 
-  // IMPORTANT: keep hook order stable by computing derived values before any early returns.
+  // Keep hook order stable
   const collections = financialSummary?.collections || [];
   const pledges = financialSummary?.pledges || [];
   const totalCollections = financialSummary?.totalCollections || 0;
@@ -154,6 +157,36 @@ const ProjectFinancialsDetail: React.FC = () => {
 
     return map;
   }, [collections, pledges]);
+
+  const collectionsSorted = useMemo(() => {
+    const copy = [...collections];
+    copy.sort((a, b) => {
+      const nameCmp = (a.member_name || "").localeCompare(b.member_name || "");
+      if (nameCmp !== 0) return nameCmp;
+      return a.date.getTime() - b.date.getTime();
+    });
+    return copy;
+  }, [collections]);
+
+  const memberGroups = useMemo(() => {
+    const groups: Array<{ member_id: string; member_name: string; rows: HookProjectCollection[] }> = [];
+    const byId = new Map<string, { member_id: string; member_name: string; rows: HookProjectCollection[] }>();
+
+    for (const c of collectionsSorted) {
+      const existing = byId.get(c.member_id);
+      if (existing) {
+        existing.rows.push(c);
+      } else {
+        const group = { member_id: c.member_id, member_name: c.member_name, rows: [c] };
+        byId.set(c.member_id, group);
+        groups.push(group);
+      }
+    }
+
+    // Already in A-Z order due to collectionsSorted, but keep deterministic
+    groups.sort((a, b) => a.member_name.localeCompare(b.member_name));
+    return groups;
+  }, [collectionsSorted]);
 
   if (loadingProjectDetails || financialsLoading || loadingAccounts) {
     return (
@@ -197,7 +230,7 @@ const ProjectFinancialsDetail: React.FC = () => {
   }
 
   const handleExportExcel = () => {
-    const data = collections.map((c) => {
+    const data = collectionsSorted.map((c) => {
       const receivingAccount =
         c.receiving_account_name ||
         (c.receiving_account_id ? accountNameById.get(c.receiving_account_id) : "") ||
@@ -206,19 +239,15 @@ const ProjectFinancialsDetail: React.FC = () => {
       return {
         Date: format(c.date, "yyyy-MM-dd"),
         Member: c.member_name,
-        Expected: expectedPerMember,
         Amount: c.amount,
-        "Total Paid": totalPaidByMemberId.get(c.member_id) || 0,
         "Receiving Account": receivingAccount,
       };
     });
 
     data.push({
       Date: "",
-      Member: "TOTAL",
-      Expected: "",
+      Member: "GRAND TOTAL",
       Amount: totalCollections,
-      "Total Paid": "",
       "Receiving Account": "",
     } as any);
 
@@ -231,36 +260,22 @@ const ProjectFinancialsDetail: React.FC = () => {
   };
 
   const handlePrintPdf = async () => {
-    const rows: Array<Array<string | number>> = collections.map((c) => {
+    const rows: Array<Array<string | number>> = collectionsSorted.map((c) => {
       const receivingAccount =
         c.receiving_account_name ||
         (c.receiving_account_id ? accountNameById.get(c.receiving_account_id) : "") ||
         "";
 
-      return [
-        format(c.date, "yyyy-MM-dd"),
-        c.member_name,
-        `${currency.symbol}${expectedPerMember.toFixed(2)}`,
-        `${currency.symbol}${c.amount.toFixed(2)}`,
-        `${currency.symbol}${(totalPaidByMemberId.get(c.member_id) || 0).toFixed(2)}`,
-        receivingAccount,
-      ];
+      return [format(c.date, "yyyy-MM-dd"), c.member_name, formatMoney(currency.symbol, c.amount), receivingAccount];
     });
 
-    rows.push([
-      "",
-      "TOTAL",
-      "",
-      `${currency.symbol}${totalCollections.toFixed(2)}`,
-      "",
-      "",
-    ]);
+    rows.push(["", "GRAND TOTAL", formatMoney(currency.symbol, totalCollections), ""]);
 
     await exportTableToPdf({
       title: `Project Financials: ${projectDetails.name}`,
-      subtitle: "Collections",
+      subtitle: `Collections (Expected per member: ${formatMoney(currency.symbol, expectedPerMember)})`,
       fileName: `Project_Financials_${projectDetails.name}`,
-      columns: ["Date", "Member", "Expected", "Amount", "Total Paid", "Receiving Account"],
+      columns: ["Date", "Member", "Amount", "Receiving Account"],
       rows,
       brandLogoUrl,
       tagline,
@@ -268,6 +283,9 @@ const ProjectFinancialsDetail: React.FC = () => {
       orientation: "auto",
     });
   };
+
+  const memberCountInCollections = memberGroups.length;
+  const expectedTotalForShownMembers = expectedPerMember * memberCountInCollections;
 
   return (
     <div className="space-y-6">
@@ -328,62 +346,110 @@ const ProjectFinancialsDetail: React.FC = () => {
 
       {/* Collections Section */}
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
             Collections
           </CardTitle>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-primary text-primary-foreground hover:bg-primary">
+              Expected per member: {formatMoney(currency.symbol, expectedPerMember)}
+            </Badge>
+            <Badge variant="secondary">Members shown: {memberCountInCollections}</Badge>
+          </div>
         </CardHeader>
         <CardContent>
-          {collections.length > 0 ? (
+          {collectionsSorted.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Member</TableHead>
-                  <TableHead className="text-right">Expected</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Total Paid</TableHead>
                   <TableHead>Receiving Account</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {collections.map((collection) => {
-                  const receivingAccount =
-                    collection.receiving_account_name ||
-                    (collection.receiving_account_id
-                      ? accountNameById.get(collection.receiving_account_id)
-                      : "") ||
-                    "-";
+                {memberGroups.map((g) => {
+                  const totalPaid = totalPaidByMemberId.get(g.member_id) || 0;
+                  const balance = expectedPerMember - totalPaid;
+                  const met = totalPaid >= expectedPerMember && expectedPerMember > 0;
 
                   return (
-                    <TableRow key={collection.id}>
-                      <TableCell>{format(collection.date, "MMM dd, yyyy")}</TableCell>
-                      <TableCell>{collection.member_name}</TableCell>
-                      <TableCell className="text-right">
-                        {currency.symbol}
-                        {expectedPerMember.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {currency.symbol}
-                        {collection.amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {currency.symbol}
-                        {(totalPaidByMemberId.get(collection.member_id) || 0).toFixed(2)}
-                      </TableCell>
-                      <TableCell>{receivingAccount}</TableCell>
-                    </TableRow>
+                    <React.Fragment key={g.member_id}>
+                      {g.rows.map((collection) => {
+                        const receivingAccount =
+                          collection.receiving_account_name ||
+                          (collection.receiving_account_id
+                            ? accountNameById.get(collection.receiving_account_id)
+                            : "") ||
+                          "-";
+
+                        return (
+                          <TableRow key={collection.id}>
+                            <TableCell>{format(collection.date, "MMM dd, yyyy")}</TableCell>
+                            <TableCell className="font-medium">{collection.member_name}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {currency.symbol}
+                              {collection.amount.toFixed(2)}
+                            </TableCell>
+                            <TableCell>{receivingAccount}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+
+                      <TableRow
+                        className={
+                          met
+                            ? "bg-emerald-50/80 dark:bg-emerald-950/30"
+                            : "bg-rose-50/80 dark:bg-rose-950/30"
+                        }
+                      >
+                        <TableCell colSpan={4}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="font-extrabold">
+                              SUBTOTAL — {g.member_name}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className={met ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"}>
+                                Paid: {formatMoney(currency.symbol, totalPaid)}
+                              </Badge>
+                              <Badge variant="secondary" className="font-bold">
+                                Expected: {formatMoney(currency.symbol, expectedPerMember)}
+                              </Badge>
+                              <Badge
+                                className={
+                                  balance <= 0
+                                    ? "bg-emerald-700 text-white"
+                                    : "bg-amber-600 text-white"
+                                }
+                              >
+                                Balance: {formatMoney(currency.symbol, Math.abs(balance))}{" "}
+                                {balance <= 0 ? "(over/cleared)" : "(due)"}
+                              </Badge>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </React.Fragment>
                   );
                 })}
 
-                <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                  <TableCell colSpan={3}>Total Collections</TableCell>
-                  <TableCell className="text-right">
-                    {currency.symbol}
-                    {totalCollections.toFixed(2)}
+                <TableRow className="bg-gradient-to-r from-primary/15 via-muted/40 to-primary/15">
+                  <TableCell colSpan={4}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-lg font-extrabold text-primary">GRAND TOTAL</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="bg-primary text-primary-foreground hover:bg-primary">
+                          Collected: {formatMoney(currency.symbol, totalCollections)}
+                        </Badge>
+                        <Badge variant="secondary" className="font-bold">
+                          Expected (shown members): {formatMoney(currency.symbol, expectedTotalForShownMembers)}
+                        </Badge>
+                      </div>
+                    </div>
                   </TableCell>
-                  <TableCell colSpan={2} />
                 </TableRow>
               </TableBody>
             </Table>
