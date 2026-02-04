@@ -27,6 +27,8 @@ export interface ProjectCollection {
   amount: number;
   date: Date;
   payment_method: string;
+  receiving_account_id?: string | null;
+  receiving_account_name?: string | null;
 }
 
 export interface ProjectPledge {
@@ -57,7 +59,9 @@ interface CollectionRowWithProfile {
   amount: number;
   date: string; // ISO string from DB
   payment_method: string; // Added payment_method
+  receiving_account_id: string | null;
   profiles: JoinedProfile | null; // Joined profile data
+  financial_accounts: { name: string } | null; // joined via receiving_account_id
 }
 
 // Define the expected structure of a pledge row with joined profile and project data
@@ -83,7 +87,9 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
       amount,
       date,
       payment_method,
-      profiles ( name )
+      receiving_account_id,
+      profiles ( name ),
+      financial_accounts ( name )
     `)
     .eq('project_id', projectId)) as { data: CollectionRowWithProfile[] | null, error: PostgrestError | null };
 
@@ -100,6 +106,8 @@ export const getProjectFinancialSummary = async (projectId: string): Promise<Pro
     amount: c.amount,
     date: new Date(c.date),
     payment_method: c.payment_method, // Now correctly accessed
+    receiving_account_id: c.receiving_account_id,
+    receiving_account_name: c.financial_accounts?.name || null,
   }));
 
   // Fetch pledges
