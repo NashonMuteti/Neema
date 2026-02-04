@@ -82,7 +82,6 @@ export default function BulkCollectionsPanel({
   const [rows, setRows] = React.useState<OnlineRow[]>([]);
   const [isProcessing, setIsProcessing] = React.useState(false);
 
-  const [excelFile, setExcelFile] = React.useState<File | null>(null);
   const [parsedExcelRows, setParsedExcelRows] = React.useState<ParsedExcelRow[]>([]);
   const [excelParseError, setExcelParseError] = React.useState<string | null>(null);
 
@@ -97,6 +96,11 @@ export default function BulkCollectionsPanel({
       })),
     );
   }, [members, defaultAccountId]);
+
+  const defaultAccount = React.useMemo(() => {
+    if (!defaultAccountId) return undefined;
+    return receivableAccounts.find((a) => a.id === defaultAccountId);
+  }, [defaultAccountId, receivableAccounts]);
 
   const accountById = React.useMemo(() => {
     const map = new Map<string, FinancialAccount>();
@@ -167,7 +171,9 @@ export default function BulkCollectionsPanel({
       setIsProcessing(false);
 
       if (ok > 0) {
-        showSuccess(`Bulk collections saved: ${ok}${skipped ? ` (skipped ${skipped})` : ""}${failed ? ` (failed ${failed})` : ""}.`);
+        showSuccess(
+          `Bulk collections saved: ${ok}${skipped ? ` (skipped ${skipped})` : ""}${failed ? ` (failed ${failed})` : ""}.`,
+        );
         onComplete();
         return;
       }
@@ -192,8 +198,8 @@ export default function BulkCollectionsPanel({
       member_name: m.name,
       member_email: m.email,
       amount: "",
-      receiving_account_id: "",
-      receiving_account_name: "",
+      receiving_account_id: defaultAccount?.id || "",
+      receiving_account_name: defaultAccount?.name || "",
       payment_method: paymentMethod,
       collection_date: format(collectionDate, "yyyy-MM-dd"),
     }));
@@ -235,14 +241,19 @@ export default function BulkCollectionsPanel({
         const memberId = String(row.member_id || row.memberId || "").trim();
         const memberName = String(row.member_name || row.memberName || "").trim();
 
-        const member = memberId ? memberById.get(memberId) : memberByName.get(memberName.toLowerCase());
+        const member = memberId
+          ? memberById.get(memberId)
+          : memberByName.get(memberName.toLowerCase());
         if (!member) {
-          errors.push(`Row ${idx + 2}: member not found (member_id="${memberId}" member_name="${memberName}")`);
+          errors.push(
+            `Row ${idx + 2}: member not found (member_id="${memberId}" member_name="${memberName}")`,
+          );
           continue;
         }
 
         const amountRaw = row.amount;
-        const amount = typeof amountRaw === "number" ? amountRaw : parseFloat(String(amountRaw || "").trim());
+        const amount =
+          typeof amountRaw === "number" ? amountRaw : parseFloat(String(amountRaw || "").trim());
         if (!amount || isNaN(amount) || amount <= 0) {
           // skip silently (template pre-populates all members)
           continue;
@@ -423,7 +434,10 @@ export default function BulkCollectionsPanel({
                           {receivableAccounts.map((acc) => {
                             const id = `acc-${row.memberId}-${acc.id}`;
                             return (
-                              <div key={acc.id} className="flex items-center gap-2 rounded-md border bg-background px-2 py-1">
+                              <div
+                                key={acc.id}
+                                className="flex items-center gap-2 rounded-md border bg-background px-2 py-1"
+                              >
                                 <RadioGroupItem id={id} value={acc.id} />
                                 <Label htmlFor={id} className="cursor-pointer text-xs">
                                   {acc.name}
@@ -473,7 +487,6 @@ export default function BulkCollectionsPanel({
                 accept=".xlsx,.xls"
                 onChange={(e) => {
                   const f = e.target.files?.[0] || null;
-                  setExcelFile(f);
                   if (f) void parseExcel(f);
                 }}
                 disabled={disabled || isProcessing}
