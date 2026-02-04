@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, DollarSign, FileSpreadsheet, Handshake, Printer } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { cn } from "@/lib/utils";
 import { useProjectFinancials } from "@/hooks/use-project-financials";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
@@ -38,6 +37,7 @@ interface Project {
 }
 
 type HookProjectPledge = ReturnType<typeof useProjectFinancials>["pledges"][0];
+
 type HookProjectCollection = ReturnType<typeof useProjectFinancials>["collections"][0];
 
 const getDisplayPledgeStatus = (pledge: HookProjectPledge): "Paid" | "Unpaid" => {
@@ -128,6 +128,33 @@ const ProjectFinancialsDetail: React.FC = () => {
     fetchFinancialAccounts();
   }, [projectId, currentUser]);
 
+  // IMPORTANT: keep hook order stable by computing derived values before any early returns.
+  const collections = financialSummary?.collections || [];
+  const pledges = financialSummary?.pledges || [];
+  const totalCollections = financialSummary?.totalCollections || 0;
+  const totalPledged = financialSummary?.totalPledged || 0;
+  const expectedPerMember = projectDetails?.memberContributionAmount || 0;
+
+  const accountNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    financialAccounts.forEach((a) => map.set(a.id, a.name));
+    return map;
+  }, [financialAccounts]);
+
+  const totalPaidByMemberId = useMemo(() => {
+    const map = new Map<string, number>();
+
+    for (const c of collections) {
+      map.set(c.member_id, (map.get(c.member_id) || 0) + c.amount);
+    }
+
+    for (const p of pledges) {
+      map.set(p.member_id, (map.get(p.member_id) || 0) + (p.paid_amount || 0));
+    }
+
+    return map;
+  }, [collections, pledges]);
+
   if (loadingProjectDetails || financialsLoading || loadingAccounts) {
     return (
       <div className="space-y-6">
@@ -168,32 +195,6 @@ const ProjectFinancialsDetail: React.FC = () => {
       </div>
     );
   }
-
-  const collections = financialSummary?.collections || [];
-  const pledges = financialSummary?.pledges || [];
-  const totalCollections = financialSummary?.totalCollections || 0;
-  const totalPledged = financialSummary?.totalPledged || 0;
-  const expectedPerMember = projectDetails.memberContributionAmount || 0;
-
-  const accountNameById = React.useMemo(() => {
-    const map = new Map<string, string>();
-    financialAccounts.forEach((a) => map.set(a.id, a.name));
-    return map;
-  }, [financialAccounts]);
-
-  const totalPaidByMemberId = React.useMemo(() => {
-    const map = new Map<string, number>();
-
-    for (const c of collections) {
-      map.set(c.member_id, (map.get(c.member_id) || 0) + c.amount);
-    }
-
-    for (const p of pledges) {
-      map.set(p.member_id, (map.get(p.member_id) || 0) + (p.paid_amount || 0));
-    }
-
-    return map;
-  }, [collections, pledges]);
 
   const handleExportExcel = () => {
     const data = collections.map((c) => {
@@ -279,7 +280,9 @@ const ProjectFinancialsDetail: React.FC = () => {
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-foreground">Financial Details for {projectDetails.name}</h1>
-            <p className="text-sm text-muted-foreground">Overview of all collections and pledges related to this project.</p>
+            <p className="text-sm text-muted-foreground">
+              Overview of all collections and pledges related to this project.
+            </p>
           </div>
         </div>
 
