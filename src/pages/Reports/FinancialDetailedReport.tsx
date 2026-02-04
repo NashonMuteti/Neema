@@ -60,9 +60,32 @@ type DebtRow = {
   id: string;
   description: string;
   customer_name: string | null;
+  debtor_profile_id: string | null;
   amount_due: number;
   due_date: string | null;
   status: string;
+};
+
+type DebtorProfile = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  other_details: string | null;
+};
+
+type PledgeMember = { name: string | null; email: string | null };
+
+type PledgeRow = {
+  id: string;
+  amount: number;
+  paid_amount: number;
+  due_date: string;
+  status: string;
+  comments: string | null;
+  // Depending on relationship typing, PostgREST may return object or array.
+  projects: { name: string } | { name: string }[] | null;
+  profiles: PledgeMember | PledgeMember[] | null;
 };
 
 function money(symbol: string, v: number) {
@@ -78,6 +101,24 @@ function groupTotal<T>(rows: T[], key: (r: T) => string, value: (r: T) => number
   return Array.from(m.entries())
     .map(([k, total]) => ({ k, total }))
     .sort((a, b) => b.total - a.total);
+}
+
+function getProjectName(row: PledgeRow) {
+  if (!row.projects) return "Unknown";
+  if (Array.isArray(row.projects)) return row.projects[0]?.name || "Unknown";
+  return row.projects.name || "Unknown";
+}
+
+function getMember(row: PledgeRow) {
+  const prof = row.profiles
+    ? Array.isArray(row.profiles)
+      ? row.profiles[0]
+      : row.profiles
+    : null;
+
+  const name = prof?.name || prof?.email || "Unknown";
+  const email = prof?.email || "";
+  return { name, email };
 }
 
 export default function FinancialDetailedReport() {
@@ -100,6 +141,8 @@ export default function FinancialDetailedReport() {
   const [expenditure, setExpenditure] = React.useState<ExpenditureRow[]>([]);
   const [sales, setSales] = React.useState<SalesRow[]>([]);
   const [debts, setDebts] = React.useState<DebtRow[]>([]);
+  const [debtorProfilesById, setDebtorProfilesById] = React.useState<Record<string, DebtorProfile>>({});
+  const [pledges, setPledges] = React.useState<PledgeRow[]>([]);
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -123,11 +166,18 @@ export default function FinancialDetailedReport() {
     return m;
   }, [accounts]);
 
-  const cashOnHand = React.useMemo(() => accounts.reduce((sum, a) => sum + (a.current_balance || 0), 0), [accounts]);
+  const cashAtHand = React.useMemo(() => accounts.reduce((sum, a) => sum + (a.current_balance || 0), 0), [accounts]);
   const incomeTotal = React.useMemo(() => income.reduce((sum, r) => sum + (r.amount || 0), 0), [income]);
   const expenditureTotal = React.useMemo(() => expenditure.reduce((sum, r) => sum + (r.amount || 0), 0), [expenditure]);
   const salesTotal = React.useMemo(() => sales.reduce((sum, r) => sum + (r.total_amount || 0), 0), [sales]);
   const debtsOutstandingTotal = React.useMemo(() => debts.reduce((sum, d) => sum + (d.amount_due || 0), 0), [debts]);
+
+  const pledgesTotal = React.useMemo(() => pledges.reduce((sum, p) => sum + Number(p.amount || 0), 0), [pledges]);
+  const pledgesPaidTotal = React.useMemo(() => pledges.reduce((sum, p) => sum + Number(p.paid_amount || 0), 0), [pledges]);
+  const pledgesBalanceTotal = React.useMemo(
+    () => pledges.reduce((sum, p) => sum + Math.max(Number(p.amount || 0) - Number(p.paid_amount || 0), 0), 0),
+    [pledges],
+  );
 
   const netFlow = incomeTotal - expenditureTotal;
 
@@ -156,12 +206,14 @@ export default function FinancialDetailedReport() {
       setExpenditure([]);
       setSales([]);
       setDebts([]);
+      setDebtorProfilesById({});
+      setPledges([]);
       setLoading(false);
       return;
     }
 
     try {
-      const [accountsRes, incomeRes, expRes, salesRes, debtsRes] = await Promise.all([
+      const [accountsRes, incomeRes, expRes, salesRes, debtsRes, pledgesRes] = await Promise.all([
         supabase.from("financial_accounts").select("id, name, current_balance, can_receive_payments").order("name", { ascending: true }),
         supabase
           .from("income_transactions")
@@ -183,9 +235,15 @@ export default function FinancialDetailedReport() {
           .order("sale_date", { ascending: false }),
         supabase
           .from("debts")
-          .select("id, description, customer_name, amount_due, due_date, status")
+          .select("id, description, customer_name, debtor_profile_id, amount_due, due_date, status")
           .in("status", ["Outstanding", "Partially Paid"])
           .order("due_date", { ascending: true, nullsFirst: false }),
+        supabase
+          .from("project_pledges")
+          .select("id, amount, paid_amount, due_date, status, comments, projects(name), profiles(name,email)")
+          .gte("due_date", period.start.toISOString())
+          .lt("due_date", period.endExclusive.toISOString())
+          .order("due_date", { ascending: true }),
       ]);
 
       if (accountsRes.error) throw accountsRes.error;
@@ -193,12 +251,39 @@ export default function FinancialDetailedReport() {
       if (expRes.error) throw expRes.error;
       if (salesRes.error) throw salesRes.error;
       if (debtsRes.error) throw debtsRes.error;
+      if (pledgesRes.error) throw pledgesRes.error;
 
       setAccounts((accountsRes.data || []) as FinancialAccountRow[]);
       setIncome((incomeRes.data || []) as IncomeRow[]);
       setExpenditure((expRes.data || []) as ExpenditureRow[]);
       setSales((salesRes.data || []) as SalesRow[]);
-      setDebts((debtsRes.data || []) as DebtRow[]);
+
+      const debtsRows = (debtsRes.data || []) as DebtRow[];
+      setDebts(debtsRows);
+
+      const debtorIds = Array.from(
+        new Set(debtsRows.map((d) => d.debtor_profile_id).filter((v): v is string => !!v)),
+      );
+
+      if (debtorIds.length) {
+        const { data: profs, error: profErr } = await supabase
+          .from("profiles")
+          .select("id, name, email, phone, other_details")
+          .in("id", debtorIds);
+        if (!profErr) {
+          const map: Record<string, DebtorProfile> = {};
+          for (const p of (profs || []) as any[]) {
+            map[p.id] = p as DebtorProfile;
+          }
+          setDebtorProfilesById(map);
+        } else {
+          setDebtorProfilesById({});
+        }
+      } else {
+        setDebtorProfilesById({});
+      }
+
+      setPledges((pledgesRes.data || []) as unknown as PledgeRow[]);
 
       setLoading(false);
     } catch (e: any) {
@@ -218,10 +303,12 @@ export default function FinancialDetailedReport() {
     const subtitle = `Period: ${periodLabel} • prepared by: ${currentUser?.name || "-"}`;
 
     const summaryRows: Array<Array<string | number>> = [
-      ["Cash on hand (current)", money(currency.symbol, cashOnHand)],
+      ["Cash at hand (current)", money(currency.symbol, cashAtHand)],
       ["Income (period)", money(currency.symbol, incomeTotal)],
       ["Expenditure (period)", money(currency.symbol, expenditureTotal)],
       ["Net cashflow (period)", money(currency.symbol, netFlow)],
+      ["Pledges due (period)", money(currency.symbol, pledgesTotal)],
+      ["Pledges balance (period)", money(currency.symbol, pledgesBalanceTotal)],
       ["Sales total (period)", money(currency.symbol, salesTotal)],
       ["Debts outstanding (current)", money(currency.symbol, debtsOutstandingTotal)],
     ];
@@ -258,15 +345,54 @@ export default function FinancialDetailedReport() {
       salesRows.push(["Total for period", "", "", "", money(currency.symbol, salesTotal), ""]);
     }
 
-    const debtsRows: Array<Array<string | number>> = debts.map((d) => [
-      d.customer_name || "—",
-      d.description,
-      d.due_date ? format(new Date(d.due_date), "yyyy-MM-dd") : "—",
-      d.status,
-      money(currency.symbol, d.amount_due || 0),
-    ]);
+    const debtsRows: Array<Array<string | number>> = debts.map((d) => {
+      const prof = d.debtor_profile_id ? debtorProfilesById[d.debtor_profile_id] : undefined;
+      const displayName = d.customer_name || prof?.name || prof?.email || "—";
+      return [
+        displayName,
+        prof?.email || "",
+        prof?.phone || "",
+        prof?.other_details || "",
+        d.due_date ? format(new Date(d.due_date), "yyyy-MM-dd") : "—",
+        d.status,
+        money(currency.symbol, d.amount_due || 0),
+      ];
+    });
     if (debtsRows.length) {
-      debtsRows.push(["Total for period", "", "", "", money(currency.symbol, debtsOutstandingTotal)]);
+      debtsRows.push(["Total for period", "", "", "", "", "", money(currency.symbol, debtsOutstandingTotal)]);
+    }
+
+    const pledgesRows: Array<Array<string | number>> = pledges.map((p) => {
+      const member = getMember(p);
+      const projectName = getProjectName(p);
+      const amount = Number(p.amount || 0);
+      const paid = Number(p.paid_amount || 0);
+      const balance = Math.max(amount - paid, 0);
+
+      return [
+        member.name,
+        member.email,
+        projectName,
+        money(currency.symbol, amount),
+        money(currency.symbol, paid),
+        money(currency.symbol, balance),
+        format(new Date(p.due_date), "yyyy-MM-dd"),
+        p.status,
+        p.comments || "",
+      ];
+    });
+    if (pledgesRows.length) {
+      pledgesRows.push([
+        "Total for period",
+        "",
+        "",
+        money(currency.symbol, pledgesTotal),
+        money(currency.symbol, pledgesPaidTotal),
+        money(currency.symbol, pledgesBalanceTotal),
+        "",
+        "",
+        "",
+      ]);
     }
 
     await exportMultiTableToPdf({
@@ -304,9 +430,14 @@ export default function FinancialDetailedReport() {
           rows: salesRows.length ? salesRows : [["—", "No sales recorded", "—", "—", "—", ""]],
         },
         {
+          title: `Pledges due in period (${pledges.length})`,
+          columns: ["Member", "Email", "Project", "Amount", "Paid", "Balance", "Due date", "Status", "Comments"],
+          rows: pledgesRows.length ? pledgesRows : [["—", "", "No pledges due in this period", "", "", "", "", "", ""]],
+        },
+        {
           title: `Outstanding debts (${debts.length})`,
-          columns: ["Customer", "Description", "Due date", "Status", "Amount due"],
-          rows: debtsRows.length ? debtsRows : [["—", "No outstanding debts", "—", "—", "—"]],
+          columns: ["Customer", "Email", "Phone", "Other details", "Due date", "Status", "Amount due"],
+          rows: debtsRows.length ? debtsRows : [["—", "", "", "No outstanding debts", "—", "—", "—"]],
         },
       ],
     });
@@ -316,13 +447,15 @@ export default function FinancialDetailedReport() {
     const wsSummary = XLSX.utils.aoa_to_sheet([
       ["Financial Detailed Report"],
       [`Period: ${periodLabel}`],
-      [`Prepared by: ${currentUser?.name || ""}`],
+      [`prepared by: ${currentUser?.name || "-"}`],
       [],
       ["Metric", "Value"],
-      ["Cash on hand (current)", cashOnHand],
+      ["Cash at hand (current)", cashAtHand],
       ["Income (period)", incomeTotal],
       ["Expenditure (period)", expenditureTotal],
       ["Net cashflow (period)", netFlow],
+      ["Pledges due (period)", pledgesTotal],
+      ["Pledges balance (period)", pledgesBalanceTotal],
       ["Sales total (period)", salesTotal],
       ["Debts outstanding (current)", debtsOutstandingTotal],
       [],
@@ -359,14 +492,41 @@ export default function FinancialDetailedReport() {
       })),
     );
 
+    const wsPledges = XLSX.utils.json_to_sheet(
+      pledges.map((p) => {
+        const member = getMember(p);
+        const projectName = getProjectName(p);
+        const amount = Number(p.amount || 0);
+        const paid = Number(p.paid_amount || 0);
+        const balance = Math.max(amount - paid, 0);
+        return {
+          member: member.name,
+          member_email: member.email,
+          project: projectName,
+          amount,
+          paid_amount: paid,
+          balance,
+          due_date: format(new Date(p.due_date), "yyyy-MM-dd"),
+          status: p.status,
+          comments: p.comments || "",
+        };
+      }),
+    );
+
     const wsDebts = XLSX.utils.json_to_sheet(
-      debts.map((d) => ({
-        customer: d.customer_name || "",
-        description: d.description,
-        due_date: d.due_date ? format(new Date(d.due_date), "yyyy-MM-dd") : "",
-        status: d.status,
-        amount_due: d.amount_due,
-      })),
+      debts.map((d) => {
+        const prof = d.debtor_profile_id ? debtorProfilesById[d.debtor_profile_id] : undefined;
+        const displayName = d.customer_name || prof?.name || prof?.email || "";
+        return {
+          customer: displayName,
+          email: prof?.email || "",
+          phone: prof?.phone || "",
+          other_details: prof?.other_details || "",
+          due_date: d.due_date ? format(new Date(d.due_date), "yyyy-MM-dd") : "",
+          status: d.status,
+          amount_due: d.amount_due,
+        };
+      }),
     );
 
     const wb = XLSX.utils.book_new();
@@ -374,6 +534,7 @@ export default function FinancialDetailedReport() {
     XLSX.utils.book_append_sheet(wb, wsIncome, "Income");
     XLSX.utils.book_append_sheet(wb, wsExpenditure, "Expenditure");
     XLSX.utils.book_append_sheet(wb, wsSales, "Sales");
+    XLSX.utils.book_append_sheet(wb, wsPledges, "Pledges");
     XLSX.utils.book_append_sheet(wb, wsDebts, "Debts");
 
     XLSX.writeFile(wb, `Financial_Detailed_${periodLabel.replace(/\s+/g, "_")}.xlsx`);
@@ -473,12 +634,12 @@ export default function FinancialDetailedReport() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card className="border-primary/30">
+        <Card className="border-amber-500/40 bg-amber-50/50">
           <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">Cash on hand (current)</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Cash at hand (current)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-extrabold text-primary">{money(currency.symbol, cashOnHand)}</div>
+            <div className="text-2xl font-extrabold text-amber-800">{money(currency.symbol, cashAtHand)}</div>
             <p className="text-xs text-muted-foreground">Sum of all account balances.</p>
           </CardContent>
         </Card>
@@ -503,13 +664,13 @@ export default function FinancialDetailedReport() {
           </CardContent>
         </Card>
 
-        <Card className="border-amber-500/30">
+        <Card className="border-indigo-500/30">
           <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">Debts outstanding (current)</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Pledges due (period)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-extrabold text-amber-700">{money(currency.symbol, debtsOutstandingTotal)}</div>
-            <p className="text-xs text-muted-foreground">Outstanding + partially paid.</p>
+            <div className="text-2xl font-extrabold text-indigo-700">{money(currency.symbol, pledgesTotal)}</div>
+            <p className="text-xs text-muted-foreground">Total pledged amount due in the selected period.</p>
           </CardContent>
         </Card>
       </div>
@@ -652,6 +813,66 @@ export default function FinancialDetailedReport() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Pledges due in period</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2 pb-3 text-sm text-muted-foreground">
+            <div>
+              Paid: <span className="font-semibold text-emerald-700">{money(currency.symbol, pledgesPaidTotal)}</span>
+            </div>
+            <div>
+              Balance: <span className="font-semibold text-rose-700">{money(currency.symbol, pledgesBalanceTotal)}</span>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Member</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Paid</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead>Due date</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pledges.length ? (
+                  pledges.map((p) => {
+                    const member = getMember(p);
+                    const projectName = getProjectName(p);
+                    const amount = Number(p.amount || 0);
+                    const paid = Number(p.paid_amount || 0);
+                    const balance = Math.max(amount - paid, 0);
+
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{member.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{projectName}</TableCell>
+                        <TableCell className="text-right font-semibold">{money(currency.symbol, amount)}</TableCell>
+                        <TableCell className="text-right font-semibold text-emerald-700">{money(currency.symbol, paid)}</TableCell>
+                        <TableCell className="text-right font-semibold text-rose-700">{money(currency.symbol, balance)}</TableCell>
+                        <TableCell>{format(new Date(p.due_date), "yyyy-MM-dd")}</TableCell>
+                        <TableCell>{p.status}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-muted-foreground">
+                      No pledges due in this period.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -694,36 +915,48 @@ export default function FinancialDetailedReport() {
             <CardTitle>Outstanding debts</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Due date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount due</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {debts.length ? (
-                  debts.map((d) => (
-                    <TableRow key={d.id}>
-                      <TableCell className="font-medium">{d.customer_name || "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {d.due_date ? format(new Date(d.due_date), "yyyy-MM-dd") : "—"}
-                      </TableCell>
-                      <TableCell>{d.status}</TableCell>
-                      <TableCell className="text-right font-semibold text-amber-700">{money(currency.symbol, d.amount_due || 0)}</TableCell>
-                    </TableRow>
-                  ))
-                ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="text-muted-foreground">
-                      No outstanding debts.
-                    </TableCell>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Other details</TableHead>
+                    <TableHead>Due date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount due</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {debts.length ? (
+                    debts.map((d) => {
+                      const prof = d.debtor_profile_id ? debtorProfilesById[d.debtor_profile_id] : undefined;
+                      const displayName = d.customer_name || prof?.name || prof?.email || "—";
+                      return (
+                        <TableRow key={d.id}>
+                          <TableCell className="font-medium">{displayName}</TableCell>
+                          <TableCell className="text-muted-foreground">{prof?.email || ""}</TableCell>
+                          <TableCell className="text-muted-foreground">{prof?.phone || ""}</TableCell>
+                          <TableCell className="text-muted-foreground">{prof?.other_details || ""}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {d.due_date ? format(new Date(d.due_date), "yyyy-MM-dd") : "—"}
+                          </TableCell>
+                          <TableCell>{d.status}</TableCell>
+                          <TableCell className="text-right font-semibold text-amber-700">{money(currency.symbol, d.amount_due || 0)}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-muted-foreground">
+                        No outstanding debts.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -749,7 +982,7 @@ export default function FinancialDetailedReport() {
               ))}
               <TableRow className="bg-muted/40">
                 <TableCell className="font-extrabold">TOTAL</TableCell>
-                <TableCell className="text-right font-extrabold text-primary">{money(currency.symbol, cashOnHand)}</TableCell>
+                <TableCell className="text-right font-extrabold text-primary">{money(currency.symbol, cashAtHand)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>

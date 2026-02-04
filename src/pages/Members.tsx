@@ -61,7 +61,7 @@ const Members = () => {
     }
 
     if (debouncedSearchQuery) { // Use debounced query
-      query = query.or(`name.ilike.%${debouncedSearchQuery}%,email.ilike.%${debouncedSearchQuery}%`);
+      query = query.or(`name.ilike.%${debouncedSearchQuery}%,email.ilike.%${debouncedSearchQuery}%,phone.ilike.%${debouncedSearchQuery}%`);
     }
 
     const { data, error } = await query.order('name', { ascending: true });
@@ -76,6 +76,8 @@ const Members = () => {
         id: p.id,
         name: p.name || p.email || "Unknown",
         email: p.email || "N/A",
+        phone: p.phone || undefined,
+        otherDetails: p.other_details || undefined,
         enableLogin: p.enable_login ?? false,
         imageUrl: p.image_url || undefined,
         status: p.status as "Active" | "Inactive" | "Suspended",
@@ -135,6 +137,7 @@ const Members = () => {
     reportName: "Member List Report",
     brandLogoUrl: brandLogoUrl,
     tagline: tagline,
+    preparedBy: currentUser?.name,
   };
 
   const handlePrintPdf = () => {

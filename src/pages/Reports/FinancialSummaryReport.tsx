@@ -96,7 +96,7 @@ export default function FinancialSummaryReport() {
     return `${fromStr} - ${toStr}`;
   }, [dateRange?.from, dateRange?.to]);
 
-  const cashOnHand = React.useMemo(
+  const cashAtHand = React.useMemo(
     () => accounts.reduce((sum, a) => sum + (a.current_balance || 0), 0),
     [accounts],
   );
@@ -187,8 +187,10 @@ export default function FinancialSummaryReport() {
   }, [fetchAll]);
 
   const exportPdf = async () => {
+    const subtitle = `Period: ${periodLabel} • prepared by: ${currentUser?.name || "-"}`;
+
     const summaryRows: Array<Array<string | number>> = [
-      ["Cash on hand (current)", money(currency.symbol, cashOnHand)],
+      ["Cash at hand (current)", money(currency.symbol, cashAtHand)],
       ["Income (period)", money(currency.symbol, incomeTotal)],
       ["Expenditure (period)", money(currency.symbol, expenditureTotal)],
       ["Net cashflow (period)", money(currency.symbol, netFlow)],
@@ -202,11 +204,11 @@ export default function FinancialSummaryReport() {
       a.can_receive_payments ? "Yes" : "No",
     ]);
 
-    accountsRows.push(["TOTAL", money(currency.symbol, cashOnHand), ""]);
+    accountsRows.push(["TOTAL", money(currency.symbol, cashAtHand), ""]);
 
     await exportMultiTableToPdf({
       title: "Financial Summary Report",
-      subtitle: `Period: ${periodLabel}`,
+      subtitle,
       fileName: `Financial_Summary_${periodLabel}`,
       brandLogoUrl,
       tagline,
@@ -231,9 +233,10 @@ export default function FinancialSummaryReport() {
     const wsSummary = XLSX.utils.aoa_to_sheet([
       ["Financial Summary Report"],
       [`Period: ${periodLabel}`],
+      [`prepared by: ${currentUser?.name || "-"}`],
       [],
       ["Metric", "Value"],
-      ["Cash on hand (current)", cashOnHand],
+      ["Cash at hand (current)", cashAtHand],
       ["Income (period)", incomeTotal],
       ["Expenditure (period)", expenditureTotal],
       ["Net cashflow (period)", netFlow],
@@ -340,12 +343,12 @@ export default function FinancialSummaryReport() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card className="border-primary/30">
+        <Card className="border-amber-500/40 bg-amber-50/50">
           <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">Cash on hand (current)</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Cash at hand (current)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-extrabold text-primary">{money(currency.symbol, cashOnHand)}</div>
+            <div className="text-2xl font-extrabold text-amber-800">{money(currency.symbol, cashAtHand)}</div>
             <p className="text-xs text-muted-foreground">Sum of all account balances.</p>
           </CardContent>
         </Card>
@@ -393,7 +396,7 @@ export default function FinancialSummaryReport() {
                 ))}
                 <TableRow className="bg-muted/40">
                   <TableCell className="font-extrabold">TOTAL</TableCell>
-                  <TableCell className="text-right font-extrabold text-primary">{money(currency.symbol, cashOnHand)}</TableCell>
+                  <TableCell className="text-right font-extrabold text-primary">{money(currency.symbol, cashAtHand)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -427,7 +430,7 @@ export default function FinancialSummaryReport() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Tip: Use the Detailed report for the full transaction list (income/expenditure/sales).
+              Tip: Use the Detailed report for the full transaction list (income/expenditure/sales/pledges).
             </p>
           </CardContent>
         </Card>

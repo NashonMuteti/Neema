@@ -9,6 +9,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
+  otherDetails?: string;
   role: string;
   status: "Active" | "Inactive" | "Suspended";
   enableLogin: boolean;
@@ -70,6 +72,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let userReceiveNotifications = true;
         let userName = user.user_metadata?.full_name || user.email || "User";
         let userEmail = user.email || "";
+        let userPhone: string | undefined = undefined;
+        let userOtherDetails: string | undefined = undefined;
 
         if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found
           console.error("AuthContext: Error fetching user profile from DB, falling back to metadata:", profileError);
@@ -79,6 +83,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userEnableLogin = user.user_metadata?.enable_login ?? true;
           userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
           userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
+          userPhone = user.user_metadata?.phone;
+          userOtherDetails = user.user_metadata?.other_details;
         } else if (profileData) {
           // Use full profile data if available
           userRole = profileData.role || user.user_metadata?.role || "Contributor";
@@ -88,6 +94,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userReceiveNotifications = profileData.receive_notifications ?? true;
           userName = profileData.name || user.user_metadata?.full_name || user.email || "User";
           userEmail = profileData.email || user.email || "";
+          userPhone = profileData.phone || undefined;
+          userOtherDetails = profileData.other_details || undefined;
         } else {
           // Profile not found in DB, likely a new user or a user whose profile wasn't created by trigger
           console.warn("AuthContext: User profile not found in public.profiles, using user_metadata defaults.");
@@ -96,12 +104,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userEnableLogin = user.user_metadata?.enable_login ?? true;
           userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
           userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
+          userPhone = user.user_metadata?.phone;
+          userOtherDetails = user.user_metadata?.other_details;
         }
 
         const finalUser: User = {
           id: user.id,
           name: userName,
           email: userEmail,
+          phone: userPhone,
+          otherDetails: userOtherDetails,
           role: userRole,
           status: userStatus,
           enableLogin: userEnableLogin,

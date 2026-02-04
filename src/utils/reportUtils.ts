@@ -6,6 +6,8 @@ interface Member {
   id: string;
   name: string;
   email: string;
+  phone?: string;
+  otherDetails?: string;
   enableLogin: boolean;
   imageUrl?: string;
   status: "Active" | "Inactive" | "Suspended";
@@ -15,6 +17,7 @@ interface ReportOptions {
   reportName: string;
   brandLogoUrl?: string; // Now dynamic
   tagline?: string; // Now dynamic
+  preparedBy?: string;
 }
 
 type TablePdfOptions = {
@@ -106,10 +109,17 @@ function applySubtotalRowStyles(hookData: any) {
 
   const isTotal = label === "total" || label === "subtotal" || label === "total for period";
   const isNetCashflow = /net\s+cashflow/i.test(label);
+  const isCashAtHand = label.includes("cash on hand") || label.includes("cash at hand");
 
-  if (!isTotal && !isNetCashflow) return;
+  if (!isTotal && !isNetCashflow && !isCashAtHand) return;
 
   hookData.cell.styles.fontStyle = "bold";
+
+  if (isCashAtHand) {
+    hookData.cell.styles.fillColor = [254, 243, 199];
+    hookData.cell.styles.textColor = [146, 64, 14];
+    return;
+  }
 
   if (isTotal) {
     hookData.cell.styles.fillColor = [232, 240, 253];
@@ -278,65 +288,85 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
   const doc = new jsPDF();
 
   const addTableAndFooter = () => {
+    const subtitle = options.preparedBy ? `prepared by: ${options.preparedBy}` : undefined;
+
+    // Header
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text(options.reportName, 14, 22);
+
+    if (subtitle) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80);
+      doc.text(subtitle, 14, 36);
+      doc.setTextColor(0);
+    }
+
     // Prepare table data
-    const tableColumn = ["Name", "Email", "Login Enabled", "Status"];
+    const tableColumn = ["Name", "Email", "Phone", "Other details", "Status"];
     const tableRows = members.map((member) => [
       member.name,
       member.email,
-      member.enableLogin ? "Yes" : "No",
+      member.phone || "",
+      member.otherDetails || "",
       member.status,
     ]);
 
     autoTable(doc, {
-      startY: 30, // Start table below the header
+      startY: subtitle ? 48 : 36,
       head: [tableColumn],
       body: tableRows,
       theme: "striped",
       styles: {
-        fontSize: 10,
-        cellPadding: 2,
+        fontSize: 9,
+        cellPadding: 3,
+        overflow: "linebreak",
       },
       headStyles: {
-        fillColor: [22, 47, 79], // Dark blue for header
+        fillColor: [22, 47, 79],
         textColor: [255, 255, 255],
         fontStyle: "bold",
       },
       alternateRowStyles: {
-        fillColor: [245, 245, 245], // Light gray for alternate rows
+        fillColor: [245, 245, 245],
       },
-      margin: { top: 30 },
+      margin: { left: 14, right: 14 },
     });
 
     // Add Footer
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.setFontSize(10);
-      doc.text(options.tagline || "", 14, doc.internal.pageSize.height - 10); // Use dynamic tagline
+      doc.setFontSize(9);
+      doc.setTextColor(90);
+      doc.text(options.tagline || "", 14, doc.internal.pageSize.height - 12);
       doc.text(
         `Page ${i} of ${pageCount}`,
-        doc.internal.pageSize.width - 30,
-        doc.internal.pageSize.height - 10,
+        doc.internal.pageSize.width - 14 - 60,
+        doc.internal.pageSize.height - 12,
       );
+      doc.setTextColor(0);
     }
 
     doc.save(`${options.reportName.replace(/\s/g, "_")}.pdf`);
   };
 
-  // Add Header
-  doc.setFontSize(18);
-  doc.text(options.reportName, 14, 22);
   if (options.brandLogoUrl) {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.src = options.brandLogoUrl;
-    // Ensure the image is loaded before adding it to the PDF
     img.onload = () => {
-      doc.addImage(img, "PNG", 170, 10, 20, 20); // Adjust position and size as needed
+      try {
+        doc.addImage(img, "PNG", doc.internal.pageSize.width - 70, 10, 56, 20);
+      } catch (e) {
+        console.error("Failed to add logo to PDF:", e);
+      }
       addTableAndFooter();
     };
     img.onerror = () => {
       console.error("Failed to load brand logo for PDF report.");
-      addTableAndFooter(); // Proceed without logo if it fails to load
+      addTableAndFooter();
     };
   } else {
     addTableAndFooter();
@@ -347,12 +377,21 @@ export const exportMembersToExcel = (members: Member[], options: ReportOptions) 
   const data = members.map((member) => ({
     Name: member.name,
     Email: member.email,
-    "Login Enabled": member.enableLogin ? "Yes" : "No",
+    Phone: member.phone || "",
+    "Other details": member.otherDetails || "",
     Status: member.status,
   }));
 
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
+
+  const metaRows = [
+    [options.reportName],
+    ...(options.preparedBy ? [[`prepared by: ${options.preparedBy}`]] : []),
+    [],
+  ];
+  XLSX.utils.sheet_add_aoa(ws, metaRows, { origin: "A1" });
+
   XLSX.utils.book_append_sheet(wb, ws, options.reportName);
 
   XLSX.writeFile(wb, `${options.reportName.replace(/\s/g, "_")}.xlsx`);
