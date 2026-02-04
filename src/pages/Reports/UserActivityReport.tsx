@@ -37,6 +37,152 @@ interface UserActivityLogRow {
   timestamp: string; // ISO
 }
 
+function formatValue(v: any) {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (typeof v === "number") return Number.isFinite(v) ? v.toString() : String(v);
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (s.length <= 60) return s;
+    return `${s.slice(0, 57)}...`;
+  }
+  if (Array.isArray(v)) {
+    if (v.length === 0) return "(empty)";
+    return `[${v.length} items]`;
+  }
+  if (typeof v === "object") {
+    if ("id" in v && typeof v.id === "string") return `id=${v.id}`;
+    return "[object]";
+  }
+  return String(v);
+}
+
+function pickInterestingFields(obj: Record<string, any>) {
+  const candidates = [
+    "key",
+    "name",
+    "email",
+    "status",
+    "role",
+    "amount",
+    "paid_amount",
+    "current_balance",
+    "initial_balance",
+    "project_id",
+    "member_id",
+    "account_id",
+    "date",
+    "due_date",
+    "source",
+    "purpose",
+    "description",
+  ];
+
+  const out: Array<[string, any]> = [];
+  for (const k of candidates) {
+    if (k in obj) out.push([k, obj[k]]);
+    if (out.length >= 5) break;
+  }
+
+  if (out.length === 0) {
+    // fallback: show up to 4 primitive fields
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean" || v == null) {
+        out.push([k, v]);
+      }
+      if (out.length >= 4) break;
+    }
+  }
+
+  return out;
+}
+
+function summarizeAuditDetails(details: Record<string, any> | null) {
+  if (!details || typeof details !== "object") return "-";
+
+  // Our audit trigger writes: { table, op, old?, new? }
+  const table = details.table as string | undefined;
+  const op = details.op as string | undefined;
+  const oldRow = (details.old && typeof details.old === "object") ? (details.old as Record<string, any>) : null;
+  const newRow = (details.new && typeof details.new === "object") ? (details.new as Record<string, any>) : null;
+
+  if (!table || !op) {
+    // Not an audit payload (legacy/custom log)
+    try {
+      const pairs = pickInterestingFields(details)
+        .map(([k, v]) => `${k}: ${formatValue(v)}`)
+        .join(" • ");
+      return pairs || "-";
+    } catch {
+      return "-";
+    }
+  }
+
+  const tableLabel =
+    table === "settings"
+      ? "System settings"
+      : table === "profiles"
+        ? "User profiles"
+        : table === "financial_accounts"
+          ? "Financial accounts"
+          : table.replace(/_/g, " ");
+
+  // Special-case settings to show key/value changes clearly
+  if (table === "settings") {
+    const key = (newRow?.key ?? oldRow?.key) as string | undefined;
+    const from = oldRow?.value;
+    const to = newRow?.value;
+
+    if (op === "UPDATE" && key) {
+      return `Changed setting "${key}" from "${formatValue(from)}" to "${formatValue(to)}".`;
+    }
+    if (op === "INSERT" && key) {
+      return `Set setting "${key}" to "${formatValue(to)}".`;
+    }
+    if (op === "DELETE" && key) {
+      return `Removed setting "${key}".`;
+    }
+  }
+
+  // UPDATE: show changed fields only (shallow)
+  if (op === "UPDATE" && oldRow && newRow) {
+    const ignore = new Set(["created_at", "updated_at", "timestamp"]);
+    const keys = new Set([...Object.keys(oldRow), ...Object.keys(newRow)]);
+
+    const changes: Array<{ k: string; from: any; to: any }> = [];
+    for (const k of keys) {
+      if (ignore.has(k)) continue;
+      const from = oldRow[k];
+      const to = newRow[k];
+      if (JSON.stringify(from) !== JSON.stringify(to)) {
+        changes.push({ k, from, to });
+      }
+    }
+
+    if (changes.length === 0) return `Updated ${tableLabel}.`;
+
+    const shown = changes.slice(0, 4);
+    const rest = changes.length - shown.length;
+
+    const changedText = shown
+      .map((c) => `${c.k}: ${formatValue(c.from)} → ${formatValue(c.to)}`)
+      .join("; ");
+
+    return `Updated ${tableLabel}: ${changedText}${rest > 0 ? ` (+${rest} more)` : ""}.`;
+  }
+
+  // INSERT/DELETE: show a compact identifier
+  const base = op === "INSERT" ? `Created in ${tableLabel}` : op === "DELETE" ? `Deleted from ${tableLabel}` : `${op} ${tableLabel}`;
+  const sample = (newRow || oldRow) as Record<string, any> | null;
+  if (!sample) return `${base}.`;
+
+  const parts = pickInterestingFields(sample)
+    .map(([k, v]) => `${k}: ${formatValue(v)}`)
+    .join(" • ");
+
+  return parts ? `${base} (${parts}).` : `${base}.`;
+}
+
 const UserActivityReport = () => {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
@@ -206,7 +352,7 @@ const UserActivityReport = () => {
               a.user_id ? userLabelById.get(a.user_id) || a.user_id : "System",
               a.action,
               format(parseISO(a.timestamp), "MMM dd, yyyy hh:mm a"),
-              a.details && Object.keys(a.details).length > 0 ? JSON.stringify(a.details) : "-",
+              summarizeAuditDetails(a.details),
             ])}
           />
         </CardHeader>
@@ -305,10 +451,8 @@ const UserActivityReport = () => {
                     </TableCell>
                     <TableCell>{activity.action}</TableCell>
                     <TableCell>{format(parseISO(activity.timestamp), "MMM dd, yyyy hh:mm a")}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[360px] truncate">
-                      {activity.details && Object.keys(activity.details).length > 0
-                        ? JSON.stringify(activity.details)
-                        : "-"}
+                    <TableCell className="text-sm text-muted-foreground max-w-[520px]">
+                      {summarizeAuditDetails(activity.details)}
                     </TableCell>
                   </TableRow>
                 ))}
