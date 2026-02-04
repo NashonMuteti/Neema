@@ -29,6 +29,21 @@ type TablePdfOptions = {
   orientation?: "portrait" | "landscape" | "auto";
 };
 
+type MultiTablePdfOptions = {
+  title: string;
+  subtitle?: string;
+  fileName: string;
+  tables: Array<{
+    title?: string;
+    columns: string[];
+    rows: Array<Array<string | number>>;
+  }>;
+  brandLogoUrl?: string;
+  tagline?: string;
+  mode: "download" | "open";
+  orientation?: "portrait" | "landscape" | "auto";
+};
+
 function chooseOrientation(columns: string[], rows: Array<Array<string | number>>) {
   // Heuristic: many columns or long values => landscape
   const colCount = columns.length;
@@ -62,6 +77,23 @@ async function addLogo(doc: jsPDF, logoUrl?: string) {
     };
     img.onerror = () => resolve();
   });
+}
+
+function addFooter(doc: jsPDF, tagline?: string) {
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFontSize(9);
+    doc.setTextColor(90);
+    if (tagline) {
+      doc.text(tagline, 40, pageHeight - 18);
+    }
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 40 - 60, pageHeight - 18);
+    doc.setTextColor(0);
+  }
 }
 
 export async function exportTableToPdf(options: TablePdfOptions) {
@@ -116,21 +148,7 @@ export async function exportTableToPdf(options: TablePdfOptions) {
     margin: { left: marginX, right: marginX },
   });
 
-  // Footer
-  const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    doc.setFontSize(9);
-    doc.setTextColor(90);
-    if (options.tagline) {
-      doc.text(options.tagline, marginX, pageHeight - 18);
-    }
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - marginX - 60, pageHeight - 18);
-    doc.setTextColor(0);
-  }
+  addFooter(doc, options.tagline);
 
   const safeName = options.fileName.replace(/\s+/g, "_");
 
@@ -139,7 +157,87 @@ export async function exportTableToPdf(options: TablePdfOptions) {
     return;
   }
 
-  // open (user can print from the PDF viewer)
+  const url = doc.output("bloburl");
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export async function exportMultiTableToPdf(options: MultiTablePdfOptions) {
+  const allRows = options.tables.flatMap((t) => t.rows);
+  const allCols = options.tables.reduce((max, t) => (t.columns.length > max.length ? t.columns : max), options.tables[0]?.columns ?? []);
+
+  const orientation =
+    options.orientation === "auto" || !options.orientation
+      ? chooseOrientation(allCols, allRows)
+      : options.orientation;
+
+  const doc = new jsPDF({
+    orientation,
+    unit: "pt",
+    format: "a4",
+  });
+
+  const marginX = 40;
+
+  // Header
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(options.title, marginX, 32);
+
+  let cursorY = 54;
+
+  if (options.subtitle) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80);
+    doc.text(options.subtitle, marginX, 48);
+    doc.setTextColor(0);
+    cursorY = 64;
+  }
+
+  await addLogo(doc, options.brandLogoUrl);
+
+  for (const table of options.tables) {
+    if (table.title) {
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(table.title, marginX, cursorY);
+      cursorY += 10;
+    }
+
+    autoTable(doc, {
+      startY: cursorY,
+      head: [table.columns],
+      body: table.rows,
+      theme: "striped",
+      styles: {
+        fontSize: 9,
+        cellPadding: 4,
+        overflow: "linebreak",
+        valign: "middle",
+      },
+      headStyles: {
+        fillColor: [22, 47, 79],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+      margin: { left: marginX, right: marginX },
+    });
+
+    cursorY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 18;
+  }
+
+  addFooter(doc, options.tagline);
+
+  const safeName = options.fileName.replace(/\s+/g, "_");
+
+  if (options.mode === "download") {
+    doc.save(`${safeName}.pdf`);
+    return;
+  }
+
   const url = doc.output("bloburl");
   window.open(url, "_blank", "noopener,noreferrer");
 }
