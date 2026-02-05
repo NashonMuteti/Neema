@@ -3,21 +3,21 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCcw, Database, Upload, Download } from "lucide-react"; // Added Upload and Download icons
+import { Database, Download, Upload } from "lucide-react";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
-import { useAuth } from "@/context/AuthContext"; // New import
-import { useUserRoles } from "@/context/UserRolesContext"; // New import
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const DatabaseUpdateSettings = () => {
-  const { currentUser, session } = useAuth(); // Get session for auth header
+  const { currentUser, session } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
 
   const { canManageDatabaseMaintenance } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
       return { canManageDatabaseMaintenance: false };
     }
-    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
+    const currentUserRoleDefinition = definedRoles.find((role) => role.name === currentUser.role);
     const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
     const canManageDatabaseMaintenance = currentUserPrivileges.includes("Manage Database Maintenance");
     return { canManageDatabaseMaintenance };
@@ -41,7 +41,7 @@ const DatabaseUpdateSettings = () => {
 
     const toastId = showLoading("Initiating database backup...");
     try {
-      const { data, error } = await supabase.functions.invoke('export-database-data', {
+      const { data, error } = await supabase.functions.invoke("export-database-data", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -53,13 +53,12 @@ const DatabaseUpdateSettings = () => {
         return;
       }
 
-      // Assuming 'data' contains the JSON object with table data
       const jsonString = JSON.stringify(data, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
+      const blob = new Blob([jsonString], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `supabase_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `supabase_backup_${new Date().toISOString().split("T")[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -99,8 +98,9 @@ const DatabaseUpdateSettings = () => {
             <Upload className="mr-2 h-4 w-4" /> Restore Database
           </Button>
         </div>
-        <p className="text-sm text-destructive-foreground bg-destructive/10 p-3 rounded-md border border-destructive">
-          <span className="font-bold">Note:</span> These operations require secure backend integration (e.g., Supabase Edge Functions or a custom API) and cannot be performed directly from the client-side.
+        <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/30">
+          <span className="font-bold">Note:</span> These operations require secure backend integration (e.g., Supabase
+          Edge Functions or a custom API) and cannot be performed directly from the client-side.
         </p>
       </CardContent>
     </Card>
