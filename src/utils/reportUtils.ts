@@ -317,6 +317,8 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
   const addTableAndFooter = () => {
     const subtitle = options.preparedBy ? `prepared by: ${options.preparedBy}` : undefined;
 
+    const sorted = [...members].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+
     // Header
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
@@ -331,8 +333,9 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
     }
 
     // Prepare table data
-    const tableColumn = ["Name", "Email", "Phone", "Other details", "Status"];
-    const tableRows = members.map((member) => [
+    const tableColumn = ["#", "Name", "Email", "Phone", "Other details", "Status"];
+    const tableRows = sorted.map((member, idx) => [
+      idx + 1,
       member.name,
       member.email,
       member.phone || "",
@@ -407,7 +410,10 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
 };
 
 export const exportMembersToExcel = (members: Member[], options: ReportOptions) => {
-  const data = members.map((member) => ({
+  const sorted = [...members].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+
+  const data = sorted.map((member, idx) => ({
+    "#": idx + 1,
     Name: member.name,
     Email: member.email,
     Phone: member.phone || "",

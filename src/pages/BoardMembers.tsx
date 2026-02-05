@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddEditBoardMemberDialog, { BoardMember } from "@/components/board-members/AddEditBoardMemberDialog";
 import { showSuccess, showError } from "@/utils/toast";
-import { PlusCircle, Edit, Trash2, User as UserIcon, Search } from "lucide-react";
+import { PlusCircle, Edit, Trash2, User as UserIcon, Search, Printer, FileSpreadsheet } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,12 +28,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
+import { useBranding } from "@/context/BrandingContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import { exportTableToPdf } from "@/utils/reportUtils";
 
 const BoardMembers = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
+  const { brandLogoUrl, tagline } = useBranding();
 
   const { canManageBoardMembers } = useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -83,18 +87,16 @@ const BoardMembers = () => {
   }, [fetchBoardMembers]);
 
   const handleAddMember = async (newMemberData: Omit<BoardMember, 'id'>) => {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('board_members')
-      .insert(newMemberData)
-      .select()
-      .single();
+      .insert(newMemberData);
 
     if (error) {
       console.error("Error adding board member:", error);
       showError("Failed to add board member.");
     } else {
       showSuccess("Board member added successfully!");
-      fetchBoardMembers(); // Re-fetch to update the list
+      fetchBoardMembers();
     }
   };
 
@@ -109,7 +111,7 @@ const BoardMembers = () => {
       showError("Failed to update board member.");
     } else {
       showSuccess("Board member updated successfully!");
-      fetchBoardMembers(); // Re-fetch to update the list
+      fetchBoardMembers();
     }
   };
 
@@ -126,7 +128,7 @@ const BoardMembers = () => {
       } else {
         showSuccess("Board member deleted successfully!");
         setDeletingMemberId(undefined);
-        fetchBoardMembers(); // Re-fetch to update the list
+        fetchBoardMembers();
       }
     }
   };
@@ -138,6 +140,57 @@ const BoardMembers = () => {
 
   const openDeleteDialog = (memberId: string) => {
     setDeletingMemberId(memberId);
+  };
+
+  const exportPdf = async () => {
+    const sorted = [...boardMembers].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+
+    await exportTableToPdf({
+      title: "Board Members Report",
+      subtitle: currentUser?.name ? `prepared by: ${currentUser.name}` : undefined,
+      fileName: `Board_Members_${new Date().toISOString().slice(0, 10)}`,
+      brandLogoUrl,
+      tagline,
+      mode: "open",
+      orientation: "auto",
+      columns: ["#", "Name", "Role", "Email", "Phone", "Address", "Notes"],
+      rows: sorted.map((m, idx) => [
+        idx + 1,
+        m.name,
+        m.role,
+        m.email,
+        m.phone,
+        m.address || "",
+        m.notes || "",
+      ]),
+    });
+  };
+
+  const exportExcel = () => {
+    const sorted = [...boardMembers].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+
+    const data = sorted.map((m, idx) => ({
+      "#": idx + 1,
+      Name: m.name,
+      Role: m.role,
+      Email: m.email,
+      Phone: m.phone,
+      Address: m.address || "",
+      Notes: m.notes || "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+
+    const metaRows = [
+      ["Board Members Report"],
+      ...(currentUser?.name ? [[`prepared by: ${currentUser.name}`]] : []),
+      [],
+    ];
+    XLSX.utils.sheet_add_aoa(ws, metaRows, { origin: "A1" });
+
+    XLSX.utils.book_append_sheet(wb, ws, "Board Members");
+    XLSX.writeFile(wb, `Board_Members_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   if (loading) {
@@ -166,19 +219,27 @@ const BoardMembers = () => {
       </p>
 
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-2">
           <CardTitle className="text-xl font-semibold">Board Member List</CardTitle>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex items-center">
               <Input
                 type="text"
                 placeholder="Search board members..."
-                value={localSearchQuery} // Use local state for input
-                onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
+                value={localSearchQuery}
+                onChange={(e) => setLocalSearchQuery(e.target.value)}
                 className="pl-8"
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
+
+            <Button variant="outline" onClick={exportPdf}>
+              <Printer className="mr-2 h-4 w-4" /> Print PDF
+            </Button>
+            <Button variant="outline" onClick={exportExcel}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
+            </Button>
+
             {canManageBoardMembers && (
               <Button onClick={() => { setEditingMember(undefined); setIsAddEditDialogOpen(true); }}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Board Member
@@ -188,60 +249,61 @@ const BoardMembers = () => {
         </CardHeader>
         <CardContent>
           {boardMembers.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px]">Image</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Notes</TableHead>
-                  {canManageBoardMembers && <TableHead className="text-center">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {boardMembers.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      {member.image_url ? (
-                        <img src={member.image_url} alt={member.name} className="h-8 w-8 rounded-full object-cover" />
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                          <UserIcon className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{member.name}</TableCell>
-                    <TableCell>{member.role}</TableCell>
-                    <TableCell>{member.email}</TableCell>
-                    <TableCell>{member.phone}</TableCell>
-                    <TableCell>{member.address || "-"}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{member.notes || "-"}</TableCell>
-                    {canManageBoardMembers && (
-                      <TableCell className="text-center">
-                        <div className="flex justify-center space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => openEditDialog(member)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(member.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[60px]">Image</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Notes</TableHead>
+                    {canManageBoardMembers && <TableHead className="text-center">Actions</TableHead>}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {boardMembers.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        {member.image_url ? (
+                          <img src={member.image_url} alt={member.name} className="h-8 w-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                            <UserIcon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">{member.name}</TableCell>
+                      <TableCell>{member.role}</TableCell>
+                      <TableCell>{member.email}</TableCell>
+                      <TableCell>{member.phone}</TableCell>
+                      <TableCell>{member.address || "-"}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{member.notes || "-"}</TableCell>
+                      {canManageBoardMembers && (
+                        <TableCell className="text-center">
+                          <div className="flex justify-center space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => openEditDialog(member)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(member.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <p className="text-muted-foreground text-center mt-4">No board members found matching your search.</p>
           )}
         </CardContent>
       </Card>
 
-      {/* Add/Edit Member Dialog */}
       <AddEditBoardMemberDialog
         isOpen={isAddEditDialogOpen}
         setIsOpen={setIsAddEditDialogOpen}
@@ -249,7 +311,6 @@ const BoardMembers = () => {
         onSave={editingMember ? handleEditMember : handleAddMember}
       />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingMemberId} onOpenChange={(open) => !open && setDeletingMemberId(undefined)}>
         <AlertDialogContent>
           <AlertDialogHeader>
