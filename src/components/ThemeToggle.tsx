@@ -12,9 +12,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { markUserThemeOverride } from "@/components/SystemThemeProvider";
 
 export function ThemeToggle() {
   const { setTheme } = useTheme();
+
+  const chooseTheme = React.useCallback(
+    (theme: string) => {
+      // Mark as an explicit user choice so Admin → General default theme doesn't override it.
+      markUserThemeOverride();
+      setTheme(theme);
+    },
+    [setTheme]
+  );
 
   return (
     <DropdownMenu>
@@ -26,28 +36,14 @@ export function ThemeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          Light
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          System
-        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => chooseTheme("light")}>Light</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => chooseTheme("dark")}>Dark</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => chooseTheme("system")}>System</DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setTheme("blue")}>
-          Blue Theme
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("green")}>
-          Green Theme
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("purple")}>
-          Purple Theme
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("orange")}>
-          Orange Theme
-        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => chooseTheme("blue")}>Blue Theme</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => chooseTheme("green")}>Green Theme</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => chooseTheme("purple")}>Purple Theme</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => chooseTheme("orange")}>Orange Theme</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
