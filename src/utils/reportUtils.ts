@@ -61,6 +61,24 @@ function chooseOrientation(columns: string[], rows: Array<Array<string | number>
   return "portrait" as const;
 }
 
+function fitIntoBox(imgW: number, imgH: number, maxW: number, maxH: number) {
+  if (!imgW || !imgH) return { w: maxW, h: maxH };
+  const imgRatio = imgW / imgH;
+  const boxRatio = maxW / maxH;
+
+  if (imgRatio >= boxRatio) {
+    // limited by width
+    const w = maxW;
+    const h = maxW / imgRatio;
+    return { w, h };
+  }
+
+  // limited by height
+  const h = maxH;
+  const w = maxH * imgRatio;
+  return { w, h };
+}
+
 async function addLogo(doc: jsPDF, logoUrl?: string) {
   if (!logoUrl) return;
 
@@ -70,9 +88,18 @@ async function addLogo(doc: jsPDF, logoUrl?: string) {
     img.src = logoUrl;
     img.onload = () => {
       try {
-        // Place logo in the top-right.
         const pageWidth = doc.internal.pageSize.getWidth();
-        doc.addImage(img, "PNG", pageWidth - 70, 14, 56, 20);
+
+        // Fit logo into a fixed box but preserve aspect ratio to avoid stretching.
+        const maxW = 56;
+        const maxH = 20;
+        const { w, h } = fitIntoBox(img.naturalWidth || img.width, img.naturalHeight || img.height, maxW, maxH);
+
+        const marginRight = 14;
+        const y = 14 + (maxH - h) / 2;
+        const x = pageWidth - marginRight - w;
+
+        doc.addImage(img, "PNG", x, y, w, h);
       } catch (e) {
         console.error("Failed to add logo to PDF:", e);
       }
@@ -358,7 +385,13 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
     img.src = options.brandLogoUrl;
     img.onload = () => {
       try {
-        doc.addImage(img, "PNG", doc.internal.pageSize.width - 70, 10, 56, 20);
+        const maxW = 56;
+        const maxH = 20;
+        const { w, h } = fitIntoBox(img.naturalWidth || img.width, img.naturalHeight || img.height, maxW, maxH);
+        const marginRight = 14;
+        const x = doc.internal.pageSize.width - marginRight - w;
+        const y = 10 + (maxH - h) / 2;
+        doc.addImage(img, "PNG", x, y, w, h);
       } catch (e) {
         console.error("Failed to add logo to PDF:", e);
       }
