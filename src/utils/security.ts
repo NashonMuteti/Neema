@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
 
 // Financial amount validation schema
 export const financialAmountSchema = z.number().positive("Amount must be positive").min(0.01, "Amount must be at least 0.01");
@@ -51,8 +50,23 @@ export const canManageRoles = async (userId: string): Promise<boolean> => {
     return false;
   }
 
-  // Only Super Admins can manage roles
-  return profile?.role === 'Super Admin';
+  // Super Admin always allowed
+  if (profile?.role === 'Super Admin') return true;
+
+  // Otherwise check role privileges
+  const { data: roleRow, error: roleError } = await supabase
+    .from('roles')
+    .select('menu_privileges')
+    .eq('name', profile?.role)
+    .maybeSingle();
+
+  if (roleError) {
+    console.error('Error checking role privileges:', roleError);
+    return false;
+  }
+
+  const privileges = roleRow?.menu_privileges || [];
+  return Array.isArray(privileges) && privileges.includes('Manage User Roles');
 };
 
 // Log security events

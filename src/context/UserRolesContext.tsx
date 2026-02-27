@@ -13,79 +13,65 @@ interface UserRolesContextType {
   addRole: (role: Omit<UserRoleType, 'id'>) => Promise<void>;
   updateRole: (role: UserRoleType) => Promise<void>;
   deleteRole: (roleId: string) => Promise<void>;
-  fetchRoles: () => Promise<void>; // Add fetchRoles to context
+  fetchRoles: () => Promise<void>;
 }
 
 const UserRolesContext = createContext<UserRolesContextType | undefined>(undefined);
 
 export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { currentUser, isLoading: authLoading } = useAuth(); // Get authLoading from useAuth
+  const { currentUser, session, isLoading: authLoading } = useAuth();
   const [userRoles, setUserRoles] = useState<UserRoleType[]>([]);
-  
+
   const fetchRoles = useCallback(async () => {
     const end = perfStart('UserRolesContext:fetchRoles');
     const { data, error } = await supabase
       .from('roles')
       .select('*')
       .order('name', { ascending: true });
-      
+
     if (error) {
       console.error("Error fetching roles:", error);
       showError("Failed to load user roles.");
       setUserRoles([]);
       end({ ok: false, errorCode: error.code });
-    } else {
-      let fetchedRoles: UserRoleType[] = data.map(role => ({
-        id: role.id,
-        name: role.name,
-        description: role.description || '',
-        menuPrivileges: role.menu_privileges || [],
-      }));
-
-      // Inject Super Admin privileges if current user is Super Admin
-      if (currentUser?.role === "Super Admin") {
-        fetchedRoles = fetchedRoles.map(role => {
-          if (role.name === "Super Admin") {
-            const currentPrivilegesSet = new Set(role.menuPrivileges);
-            const allPrivilegesSet = new Set(allPrivilegeNames);
-
-            // Check if current privileges are already a superset of allPrivilegeNames
-            const needsUpdate = allPrivilegeNames.some(p => !currentPrivilegesSet.has(p)) ||
-                                currentPrivilegesSet.size !== allPrivilegesSet.size; 
-
-            if (needsUpdate) {
-              const updatedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames])).sort();
-              // Only update if the sorted array of privileges is actually different
-              if (JSON.stringify(updatedPrivileges) !== JSON.stringify(role.menuPrivileges.sort())) {
-                return {
-                  ...role,
-                  menuPrivileges: updatedPrivileges
-                };
-              }
-            }
-          }
-          return role;
-        });
-      }
-
-      setUserRoles(fetchedRoles);
-      // Keep this as debug-level info to avoid noisy logs, but still useful for performance investigation.
-      // eslint-disable-next-line no-console
-      console.debug("[perf] UserRolesContext: roles loaded", { count: fetchedRoles.length });
-      end({ ok: true, rows: data.length });
+      return;
     }
-  }, [currentUser]); // Now fetchRoles depends on currentUser
+
+    let fetchedRoles: UserRoleType[] = data.map(role => ({
+      id: role.id,
+      name: role.name,
+      description: role.description || '',
+      menuPrivileges: role.menu_privileges || [],
+    }));
+
+    // Ensure Super Admin always has all privileges in the UI when the current user is Super Admin.
+    if (currentUser?.role === "Super Admin") {
+      fetchedRoles = fetchedRoles.map(role => {
+        if (role.name !== "Super Admin") return role;
+
+        const updatedPrivileges = Array.from(new Set([...role.menuPrivileges, ...allPrivilegeNames])).sort();
+        return {
+          ...role,
+          menuPrivileges: updatedPrivileges,
+        };
+      });
+    }
+
+    setUserRoles(fetchedRoles);
+    // eslint-disable-next-line no-console
+    console.debug("[perf] UserRolesContext: roles loaded", { count: fetchedRoles.length });
+    end({ ok: true, rows: data.length });
+  }, [currentUser?.role]);
 
   useEffect(() => {
     perfMark('UserRolesContext:mount');
-    // Fetch roles only when auth is not loading and currentUser is available
-    if (!authLoading && currentUser) {
+    // Fetch roles as soon as we have a session, so privilege-gated UI doesn't flicker/deny.
+    if (!authLoading && session) {
       fetchRoles();
     }
-  }, [fetchRoles, currentUser, authLoading]); // Add currentUser and authLoading to dependencies
+  }, [fetchRoles, session, authLoading]);
 
   const addRole = async (role: Omit<UserRoleType, 'id'>) => {
-    // Security check: Only Super Admins can manage roles
     if (!currentUser || !(await canManageRoles(currentUser.id))) {
       logSecurityEvent('Unauthorized role creation attempt', {
         userId: currentUser?.id,
@@ -94,7 +80,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       showError("You are not authorized to create roles.");
       return;
     }
-    
+
     const { error } = await supabase
       .from('roles')
       .insert({
@@ -102,17 +88,16 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         description: role.description,
         menu_privileges: role.menuPrivileges,
       });
-      
+
     if (error) {
       console.error("Error adding role:", error);
       showError("Failed to add new role.");
     } else {
-      await fetchRoles(); // Re-fetch roles to update state
+      await fetchRoles();
     }
   };
 
   const updateRole = async (updatedRole: UserRoleType) => {
-    // Security check: Only Super Admins can manage roles
     if (!currentUser || !(await canManageRoles(currentUser.id))) {
       logSecurityEvent('Unauthorized role update attempt', {
         userId: currentUser?.id,
@@ -122,7 +107,7 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       showError("You are not authorized to update roles.");
       return;
     }
-    
+
     const { error } = await supabase
       .from('roles')
       .update({
@@ -131,17 +116,16 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
         menu_privileges: updatedRole.menuPrivileges,
       })
       .eq('id', updatedRole.id);
-      
+
     if (error) {
       console.error("Error updating role:", error);
       showError("Failed to update role.");
     } else {
-      await fetchRoles(); // Re-fetch roles to update state
+      await fetchRoles();
     }
   };
 
   const deleteRole = async (roleId: string) => {
-    // Security check: Only Super Admins can manage roles
     if (!currentUser || !(await canManageRoles(currentUser.id))) {
       logSecurityEvent('Unauthorized role deletion attempt', {
         userId: currentUser?.id,
@@ -150,34 +134,36 @@ export const UserRolesProvider: React.FC<{ children: ReactNode }> = ({ children 
       showError("You are not authorized to delete roles.");
       return;
     }
-    
+
+    const roleName = userRoles.find(r => r.id === roleId)?.name;
+
     // Before deleting a role, check if any users are assigned to it
     const { count, error: countError } = await supabase
       .from('profiles')
       .select('id', { count: 'exact' })
-      .eq('role', userRoles.find(r => r.id === roleId)?.name);
-      
+      .eq('role', roleName);
+
     if (countError) {
       console.error("Error checking users in role:", countError);
       showError("Failed to check if users are assigned to this role.");
       return;
     }
-    
+
     if (count && count > 0) {
       showError(`Cannot delete role: ${count} users are currently assigned to it. Please reassign them first.`);
       return;
     }
-    
+
     const { error } = await supabase
       .from('roles')
       .delete()
       .eq('id', roleId);
-      
+
     if (error) {
       console.error("Error deleting role:", error);
       showError("Failed to delete role.");
     } else {
-      await fetchRoles(); // Re-fetch roles to update state
+      await fetchRoles();
     }
   };
 

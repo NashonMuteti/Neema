@@ -4,6 +4,7 @@ export const allPrivilegeNames = [
   "View Dashboard",
   "View Project Accounts",
   "Manage Projects",
+  "Manage Collections",
   // "View Petty Cash", // Removed
   // "Manage Petty Cash", // Removed
   "View Pledges",
