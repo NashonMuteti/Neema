@@ -1,172 +1,211 @@
 "use client";
+
 import React from "react";
-import { format, getMonth, getYear, parseISO } from "date-fns";
+import { endOfDay, format, parseISO, startOfDay, startOfMonth, endOfMonth } from "date-fns";
+import { DateRange } from "react-day-picker";
+
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
-import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-import { useQueryClient } from "@tanstack/react-query"; // New import
+import { useSystemSettings } from "@/context/SystemSettingsContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 import IncomeForm from "@/components/income/IncomeForm";
-import IncomeTable from "@/components/income/IncomeTable";
-import EditIncomeDialog from "@/components/income/EditIncomeDialog"; // New import
-import DeleteIncomeDialog from "@/components/income/DeleteIncomeDialog"; // New import
-import { FinancialAccount, Member, MonthYearOption } from "@/types/common"; // Unified imports
-import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import IncomeTable, { IncomeTransactionRow } from "@/components/income/IncomeTable";
+import EditIncomeDialog from "@/components/income/EditIncomeDialog";
+import DeleteIncomeDialog from "@/components/income/DeleteIncomeDialog";
+import { FinancialAccount, Member } from "@/types/common";
+import { useDebounce } from "@/hooks/use-debounce";
 
-interface IncomeTransaction {
-  id: string;
-  date: Date;
-  amount: number;
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import DateRangePicker from "@/components/reports/DateRangePicker";
+import ReportActions from "@/components/reports/ReportActions";
+
+interface IncomeTransaction extends IncomeTransactionRow {
   account_id: string;
-  source: string;
-  profile_id: string; // Changed from user_id to profile_id
-  account_name: string; // Joined from financial_accounts
+  profile_id: string;
 }
 
-const Income = () => {
+export default function Income() {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
-  const queryClient = useQueryClient(); // Initialize queryClient
-  
+  const queryClient = useQueryClient();
+
+  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
+
   const { canManageIncome } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
       return { canManageIncome: false };
     }
-    
-    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
-    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-    const canManageIncome = currentUserPrivileges.includes("Manage Income");
-    return { canManageIncome };
+
+    const roleDef = definedRoles.find((r) => r.name === currentUser.role);
+    const privileges = roleDef?.menuPrivileges || [];
+    return { canManageIncome: privileges.includes("Manage Income") };
   }, [currentUser, definedRoles]);
 
+  const defaultRange = React.useMemo<DateRange>(() => {
+    const now = new Date();
+    return { from: startOfMonth(now), to: endOfMonth(now) };
+  }, []);
+
   const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
-  const [members, setMembers] = React.useState<Member[]>([]); // New state for members
+  const [members, setMembers] = React.useState<Member[]>([]);
   const [transactions, setTransactions] = React.useState<IncomeTransaction[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  
-  // State for Edit/Delete Dialogs
+
   const [editingTransaction, setEditingTransaction] = React.useState<IncomeTransaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = React.useState<IncomeTransaction | null>(null);
-  
-  // Filter State
-  const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date()); // 0-indexed
-  const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
-  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  
-  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
-  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
 
-  const months: MonthYearOption[] = Array.from({ length: 12 }, (_, i) => ({
-    value: i.toString(),
-    label: format(new Date(0, i), "MMMM"),
-  }));
+  // Filters
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(defaultRange);
+  const [accountId, setAccountId] = React.useState<string>("All");
+  const [memberId, setMemberId] = React.useState<string>("All");
+  const [minAmount, setMinAmount] = React.useState<string>("");
+  const [maxAmount, setMaxAmount] = React.useState<string>("");
 
-  const years: MonthYearOption[] = Array.from({ length: 5 }, (_, i) => ({
-    value: (currentYear - 2 + i).toString(),
-    label: (currentYear - 2 + i).toString(),
-  }));
+  const [localSearchQuery, setLocalSearchQuery] = React.useState("");
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 400);
 
   const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
-    let query = supabase
-      .from('financial_accounts')
-      .select('id, name, current_balance, initial_balance, profile_id, can_receive_payments'); // Select all fields for FinancialAccount type
-      
-    const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
-    if (!isAdmin && currentUser) {
-      query = query.eq('profile_id', currentUser.id); // Filter by profile_id for non-admins
+    if (!currentUser) return;
+
+    let accountsQuery = supabase
+      .from("financial_accounts")
+      .select("id, name, current_balance, initial_balance, profile_id, can_receive_payments")
+      .order("name", { ascending: true });
+
+    if (!isAdmin) {
+      accountsQuery = accountsQuery.eq("profile_id", currentUser.id);
     }
-      
-    const { data: accountsData, error: accountsError } = await query;
-      
+
+    const { data: accountsData, error: accountsError } = await accountsQuery;
     if (accountsError) {
       console.error("Error fetching financial accounts:", accountsError);
       showError("Failed to load financial accounts.");
+      setFinancialAccounts([]);
     } else {
-      setFinancialAccounts(accountsData || []);
+      setFinancialAccounts((accountsData || []) as FinancialAccount[]);
     }
 
-    // Fetch all members for the optional selector
     const { data: membersData, error: membersError } = await supabase
-      .from('profiles')
-      .select('id, name, email')
-      .order('name', { ascending: true });
+      .from("profiles")
+      .select("id, name, email")
+      .order("name", { ascending: true });
 
     if (membersError) {
       console.error("Error fetching members:", membersError);
-      showError("Failed to load members for income association.");
+      showError("Failed to load members.");
+      setMembers([]);
     } else {
-      setMembers(membersData || []);
+      setMembers(
+        (membersData || []).map((m) => ({
+          id: m.id,
+          name: m.name || m.email || "Unknown",
+          email: m.email || "",
+        })),
+      );
     }
-
-  }, [currentUser]);
+  }, [currentUser, isAdmin]);
 
   const fetchIncomeTransactions = React.useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     if (!currentUser) {
       setLoading(false);
       return;
     }
-    
-    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
-    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
-    
+
+    const from = dateRange?.from ? startOfDay(dateRange.from) : null;
+    const to = dateRange?.to ? endOfDay(dateRange.to) : null;
+
+    if (!from || !to) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+
     let query = supabase
-      .from('income_transactions')
-      .select('*, financial_accounts(name)')
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString());
-      
-    // Conditionally apply profile_id filter based on admin status
-    const isAdmin = currentUser.role === "Admin" || currentUser.role === "Super Admin";
+      .from("income_transactions")
+      .select("id, date, amount, source, account_id, profile_id, financial_accounts(name), profiles(name,email)")
+      .gte("date", from.toISOString())
+      .lte("date", to.toISOString());
+
     if (!isAdmin) {
-      query = query.eq('profile_id', currentUser.id); // Use profile_id
+      query = query.eq("profile_id", currentUser.id);
+    } else if (memberId !== "All") {
+      query = query.eq("profile_id", memberId);
     }
-      
-    if (debouncedSearchQuery) { // Use debounced query
-      query = query.ilike('source', `%${debouncedSearchQuery}%`);
+
+    if (accountId !== "All") {
+      query = query.eq("account_id", accountId);
     }
-    
-    const { data, error } = await query.order('date', { ascending: false });
-    
+
+    const q = debouncedSearchQuery.trim();
+    if (q) {
+      query = query.ilike("source", `%${q}%`);
+    }
+
+    const min = minAmount ? Number(minAmount) : null;
+    const max = maxAmount ? Number(maxAmount) : null;
+    if (min !== null && Number.isFinite(min)) query = query.gte("amount", min);
+    if (max !== null && Number.isFinite(max)) query = query.lte("amount", max);
+
+    const { data, error } = await query.order("date", { ascending: false });
+
     if (error) {
       console.error("Error fetching income transactions:", error);
       setError("Failed to load income transactions.");
       showError("Failed to load income transactions.");
       setTransactions([]);
-    } else {
-      setTransactions(data.map(tx => ({
+      setLoading(false);
+      return;
+    }
+
+    setTransactions(
+      (data || []).map((tx: any) => ({
         id: tx.id,
         date: parseISO(tx.date),
         amount: tx.amount,
-        account_id: tx.account_id,
         source: tx.source,
-        profile_id: tx.profile_id, // Use profile_id
-        account_name: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
-      })));
-    }
-    
+        account_id: tx.account_id,
+        profile_id: tx.profile_id,
+        account_name: tx.financial_accounts?.name || "Unknown Account",
+        profile_name: tx.profiles?.name || tx.profiles?.email || undefined,
+      })),
+    );
+
     setLoading(false);
-  }, [currentUser, filterMonth, filterYear, debouncedSearchQuery]); // Depend on debounced query
+  }, [currentUser, isAdmin, dateRange?.from, dateRange?.to, accountId, memberId, debouncedSearchQuery, minAmount, maxAmount]);
 
   React.useEffect(() => {
     fetchFinancialAccountsAndMembers();
+  }, [fetchFinancialAccountsAndMembers]);
+
+  React.useEffect(() => {
     fetchIncomeTransactions();
-  }, [fetchFinancialAccountsAndMembers, fetchIncomeTransactions]);
+  }, [fetchIncomeTransactions]);
 
   const invalidateDashboardQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['financialData'] });
-    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
-    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] }); // In case project collections/pledges affect it
-    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] }); // In case project collections/pledges affect it
+    queryClient.invalidateQueries({ queryKey: ["financialData"] });
+    queryClient.invalidateQueries({ queryKey: ["financialSummary"] });
+    queryClient.invalidateQueries({ queryKey: ["recentTransactions"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboardProjects"] });
+    queryClient.invalidateQueries({ queryKey: ["contributionsProgress"] });
   };
 
   const handlePostIncome = async (formData: {
@@ -180,7 +219,7 @@ const Income = () => {
       showError("You must be logged in to post income.");
       return;
     }
-    
+
     const { incomeDate, incomeAmount, incomeAccount, incomeSource, selectedIncomeMemberId } = formData;
 
     const validation = validateFinancialTransaction(incomeAmount, incomeAccount, currentUser.id);
@@ -188,59 +227,54 @@ const Income = () => {
       showError(validation.error || "Invalid income amount.");
       return;
     }
-    
-    const currentAccount = financialAccounts.find(acc => acc.id === incomeAccount);
+
+    const currentAccount = financialAccounts.find((acc) => acc.id === incomeAccount);
     if (!currentAccount) {
       showError("Selected account not found.");
       return;
     }
-    
+
     const transactionProfileId = selectedIncomeMemberId || currentUser.id;
 
-    const { error: insertError } = await supabase
-      .from('income_transactions')
-      .insert({
-        date: incomeDate.toISOString(),
-        amount: incomeAmount,
-        account_id: incomeAccount,
-        source: incomeSource,
-        profile_id: transactionProfileId, // Use the determined profile_id
-      });
-      
+    const { error: insertError } = await supabase.from("income_transactions").insert({
+      date: incomeDate.toISOString(),
+      amount: incomeAmount,
+      account_id: incomeAccount,
+      source: incomeSource,
+      profile_id: transactionProfileId,
+    });
+
     if (insertError) {
       console.error("Error posting income:", insertError);
       showError("Failed to post income.");
-    } else {
-      const newBalance = currentAccount.current_balance + incomeAmount;
-      const { error: updateBalanceError } = await supabase
-        .from('financial_accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', incomeAccount)
-        .eq('profile_id', currentAccount.profile_id); // Use the account's profile_id
-        
-      if (updateBalanceError) {
-        console.error("Error updating account balance:", updateBalanceError);
-        showError("Income posted, but failed to update account balance.");
-      }
-      
-      showSuccess("Income posted successfully!");
-      await fetchIncomeTransactions(); // Refresh transactions
-      await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
-      invalidateDashboardQueries(); // Invalidate dashboard queries
+      return;
     }
+
+    const newBalance = currentAccount.current_balance + incomeAmount;
+    const { error: updateBalanceError } = await supabase
+      .from("financial_accounts")
+      .update({ current_balance: newBalance })
+      .eq("id", incomeAccount)
+      .eq("profile_id", currentAccount.profile_id);
+
+    if (updateBalanceError) {
+      console.error("Error updating account balance:", updateBalanceError);
+      showError("Income posted, but failed to update account balance.");
+    }
+
+    showSuccess("Income posted successfully!");
+    await fetchIncomeTransactions();
+    await fetchFinancialAccountsAndMembers();
+    invalidateDashboardQueries();
   };
 
-  const handleEditTransaction = (transaction: IncomeTransaction) => {
-    setEditingTransaction(transaction);
-  };
-
-  const handleSaveEditedTransaction = async (updatedTx: IncomeTransaction) => {
+  const handleSaveEditedTransaction = async (updatedTx: any) => {
     if (!currentUser) {
       showError("You must be logged in to edit income.");
       return;
     }
 
-    const oldTx = transactions.find(t => t.id === updatedTx.id);
+    const oldTx = transactions.find((t) => t.id === updatedTx.id);
     if (!oldTx) {
       showError("Original transaction not found.");
       return;
@@ -253,9 +287,8 @@ const Income = () => {
       return;
     }
 
-    // Update the income transaction itself
     const { error: updateTxError } = await supabase
-      .from('income_transactions')
+      .from("income_transactions")
       .update({
         date: updatedTx.date.toISOString(),
         amount: parsedAmount,
@@ -263,8 +296,8 @@ const Income = () => {
         source: updatedTx.source,
         profile_id: updatedTx.profile_id,
       })
-      .eq('id', updatedTx.id)
-      .eq('profile_id', oldTx.profile_id); // Use the transaction's original profile_id
+      .eq("id", updatedTx.id)
+      .eq("profile_id", oldTx.profile_id);
 
     if (updateTxError) {
       console.error("Error updating income transaction:", updateTxError);
@@ -272,8 +305,8 @@ const Income = () => {
       return;
     }
 
-    const oldAccount = financialAccounts.find(acc => acc.id === oldTx.account_id);
-    const newAccount = financialAccounts.find(acc => acc.id === updatedTx.account_id);
+    const oldAccount = financialAccounts.find((acc) => acc.id === oldTx.account_id);
+    const newAccount = financialAccounts.find((acc) => acc.id === updatedTx.account_id);
 
     if (!oldAccount || !newAccount) {
       showError("One or more financial accounts not found for balance adjustment.");
@@ -281,34 +314,32 @@ const Income = () => {
     }
 
     if (oldTx.account_id === updatedTx.account_id) {
-      // If account is the same, just adjust its balance
       const amountDifference = parsedAmount - oldTx.amount;
       const newBalance = oldAccount.current_balance + amountDifference;
       const { error: updateBalanceError } = await supabase
-        .from('financial_accounts')
+        .from("financial_accounts")
         .update({ current_balance: newBalance })
-        .eq('id', oldAccount.id)
-        .eq('profile_id', oldAccount.profile_id); // Use the account's profile_id
+        .eq("id", oldAccount.id)
+        .eq("profile_id", oldAccount.profile_id);
       if (updateBalanceError) {
         console.error("Error updating account balance for same account:", updateBalanceError);
         showError("Transaction updated, but failed to adjust account balance.");
       }
     } else {
-      // If account changed, debit old account and credit new account
       const oldAccountNewBalance = oldAccount.current_balance - oldTx.amount;
       const newAccountNewBalance = newAccount.current_balance + parsedAmount;
 
       const { error: updateOldAccountError } = await supabase
-        .from('financial_accounts')
+        .from("financial_accounts")
         .update({ current_balance: oldAccountNewBalance })
-        .eq('id', oldAccount.id)
-        .eq('profile_id', oldAccount.profile_id); // Use the old account's profile_id
+        .eq("id", oldAccount.id)
+        .eq("profile_id", oldAccount.profile_id);
 
       const { error: updateNewAccountError } = await supabase
-        .from('financial_accounts')
+        .from("financial_accounts")
         .update({ current_balance: newAccountNewBalance })
-        .eq('id', newAccount.id)
-        .eq('profile_id', newAccount.profile_id); // Use the new account's profile_id
+        .eq("id", newAccount.id)
+        .eq("profile_id", newAccount.profile_id);
 
       if (updateOldAccountError || updateNewAccountError) {
         console.error("Error updating account balances for different accounts:", updateOldAccountError, updateNewAccountError);
@@ -318,13 +349,9 @@ const Income = () => {
 
     showSuccess("Income transaction updated successfully!");
     setEditingTransaction(null);
-    await fetchIncomeTransactions(); // Refresh transactions
-    await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
-    invalidateDashboardQueries(); // Invalidate dashboard queries
-  };
-
-  const handleDeleteTransaction = (transaction: IncomeTransaction) => {
-    setDeletingTransaction(transaction);
+    await fetchIncomeTransactions();
+    await fetchFinancialAccountsAndMembers();
+    invalidateDashboardQueries();
   };
 
   const handleConfirmDeleteTransaction = async () => {
@@ -332,43 +359,73 @@ const Income = () => {
       showError("No transaction selected for deletion or user not logged in.");
       return;
     }
-    
+
     const { id, amount, account_id, profile_id } = deletingTransaction;
 
-    // Delete the income transaction
     const { error: deleteError } = await supabase
-      .from('income_transactions')
+      .from("income_transactions")
       .delete()
-      .eq('id', id)
-      .eq('profile_id', profile_id); // Use the transaction's profile_id
-      
+      .eq("id", id)
+      .eq("profile_id", profile_id);
+
     if (deleteError) {
       console.error("Error deleting income transaction:", deleteError);
       showError("Failed to delete income transaction.");
-    } else {
-      // Revert account balance
-      const currentAccount = financialAccounts.find(acc => acc.id === account_id);
-      if (currentAccount) {
-        const newBalance = currentAccount.current_balance - amount; // Correctly debiting the account
-        const { error: updateBalanceError } = await supabase
-          .from('financial_accounts')
-          .update({ current_balance: newBalance })
-          .eq('id', account_id)
-          .eq('profile_id', currentAccount.profile_id); // Use the account's profile_id
-          
-        if (updateBalanceError) {
-          console.error("Error reverting account balance:", updateBalanceError);
-          showError("Income transaction deleted, but failed to revert account balance.");
-        }
-      }
-      
-      showSuccess("Income transaction deleted successfully!");
-      setDeletingTransaction(null);
-      await fetchIncomeTransactions(); // Refresh transactions
-      await fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
-      invalidateDashboardQueries(); // Invalidate dashboard queries
+      return;
     }
+
+    const currentAccount = financialAccounts.find((acc) => acc.id === account_id);
+    if (currentAccount) {
+      const newBalance = currentAccount.current_balance - amount;
+      const { error: updateBalanceError } = await supabase
+        .from("financial_accounts")
+        .update({ current_balance: newBalance })
+        .eq("id", account_id)
+        .eq("profile_id", currentAccount.profile_id);
+
+      if (updateBalanceError) {
+        console.error("Error reverting account balance:", updateBalanceError);
+        showError("Income transaction deleted, but failed to revert account balance.");
+      }
+    }
+
+    showSuccess("Income transaction deleted successfully!");
+    setDeletingTransaction(null);
+    await fetchIncomeTransactions();
+    await fetchFinancialAccountsAndMembers();
+    invalidateDashboardQueries();
   };
+
+  const reportSubtitle = React.useMemo(() => {
+    const fromStr = dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : "-";
+    const toStr = dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : "-";
+
+    const accountName =
+      accountId === "All" ? "All Accounts" : financialAccounts.find((a) => a.id === accountId)?.name || "Account";
+
+    const memberName = !isAdmin
+      ? "My Transactions"
+      : memberId === "All"
+        ? "All Members"
+        : members.find((m) => m.id === memberId)?.name || "Member";
+
+    const parts = [`Date: ${fromStr} → ${toStr}`, accountName, memberName];
+    const q = debouncedSearchQuery.trim();
+    if (q) parts.push(`Search: ${q}`);
+    if (minAmount) parts.push(`Min: ${currency.symbol}${minAmount}`);
+    if (maxAmount) parts.push(`Max: ${currency.symbol}${maxAmount}`);
+    return parts.join(" • ");
+  }, [dateRange?.from, dateRange?.to, accountId, memberId, isAdmin, debouncedSearchQuery, minAmount, maxAmount, financialAccounts, members, currency.symbol]);
+
+  const reportRows = React.useMemo(() => {
+    return transactions.map((t) => [
+      format(t.date, "MMM dd, yyyy"),
+      t.profile_name || "-",
+      t.source,
+      t.account_name,
+      `${currency.symbol}${t.amount.toFixed(2)}`,
+    ]);
+  }, [transactions, currency.symbol]);
 
   if (loading) {
     return (
@@ -391,10 +448,8 @@ const Income = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Income</h1>
-      <p className="text-lg text-muted-foreground">
-        Record and manage all financial inflows.
-      </p>
-      
+      <p className="text-lg text-muted-foreground">Record and manage all financial inflows.</p>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <IncomeForm
@@ -404,49 +459,122 @@ const Income = () => {
             onPostIncome={handlePostIncome}
           />
         </div>
-        
+
         <div className="lg:col-span-2">
-          <IncomeTable
-            transactions={transactions}
-            canManageIncome={canManageIncome}
-            filterMonth={filterMonth}
-            setFilterMonth={setFilterMonth}
-            filterYear={filterYear}
-            setFilterYear={setFilterYear}
-            searchQuery={localSearchQuery} // Pass local state to table component
-            setSearchQuery={setLocalSearchQuery} // Pass local state setter
-            months={months}
-            years={years}
-            onEditTransaction={handleEditTransaction}
-            onDeleteTransaction={handleDeleteTransaction}
-          />
+          <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle>Income Transactions</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">{reportSubtitle}</p>
+              </div>
+              <ReportActions
+                title="Income Report"
+                subtitle={reportSubtitle}
+                columns={["Date", "Member", "Source", "Account", "Amount"]}
+                rows={reportRows}
+                fileName={`Income_${format(new Date(), "yyyy-MM-dd")}`}
+              />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-4">
+                <div className="grid gap-1.5 min-w-[260px]">
+                  <Label>Date range</Label>
+                  <DateRangePicker value={dateRange} onChange={setDateRange} className="w-[260px]" />
+                </div>
+
+                <div className="grid gap-1.5 min-w-[220px]">
+                  <Label>Account</Label>
+                  <Select value={accountId} onValueChange={setAccountId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All accounts" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="All">All accounts</SelectItem>
+                        {financialAccounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {isAdmin ? (
+                  <div className="grid gap-1.5 min-w-[220px]">
+                    <Label>Member</Label>
+                    <Select value={memberId} onValueChange={setMemberId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All members" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="All">All members</SelectItem>
+                          {members.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name} ({m.email})
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-1.5 min-w-[120px]">
+                  <Label>Min</Label>
+                  <Input value={minAmount} onChange={(e) => setMinAmount(e.target.value)} placeholder="0" type="number" step="0.01" />
+                </div>
+
+                <div className="grid gap-1.5 min-w-[120px]">
+                  <Label>Max</Label>
+                  <Input value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} placeholder="0" type="number" step="0.01" />
+                </div>
+
+                <div className="grid gap-1.5 flex-1 min-w-[220px]">
+                  <Label>Search</Label>
+                  <Input
+                    value={localSearchQuery}
+                    onChange={(e) => setLocalSearchQuery(e.target.value)}
+                    placeholder="Search source..."
+                  />
+                </div>
+              </div>
+
+              <IncomeTable
+                transactions={transactions}
+                canManageIncome={canManageIncome}
+                onEditTransaction={(t) => setEditingTransaction(t as IncomeTransaction)}
+                onDeleteTransaction={(t) => setDeletingTransaction(t as IncomeTransaction)}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {editingTransaction && (
+      {editingTransaction ? (
         <EditIncomeDialog
           isOpen={!!editingTransaction}
           setIsOpen={() => setEditingTransaction(null)}
-          initialData={editingTransaction}
+          initialData={editingTransaction as any}
           onSave={handleSaveEditedTransaction}
           financialAccounts={financialAccounts}
           members={members}
           canManageIncome={canManageIncome}
           currency={currency}
         />
-      )}
+      ) : null}
 
-      {deletingTransaction && (
+      {deletingTransaction ? (
         <DeleteIncomeDialog
           isOpen={!!deletingTransaction}
           setIsOpen={() => setDeletingTransaction(null)}
-          transaction={deletingTransaction}
+          transaction={deletingTransaction as any}
           onConfirm={handleConfirmDeleteTransaction}
           currency={currency}
         />
-      )}
+      ) : null}
     </div>
   );
-};
-
-export default Income;
+}

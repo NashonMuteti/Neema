@@ -1,31 +1,45 @@
 "use client";
+
 import React from "react";
+import { endOfDay, format, parseISO, startOfDay, startOfMonth, endOfMonth } from "date-fns";
+import { DateRange } from "react-day-picker";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,} from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { format, getMonth, getYear, parseISO } from "date-fns";
-import { CalendarIcon, Edit, Trash2, Search } from "lucide-react";
+import { CalendarIcon, Edit, Trash2 } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import { useAuth } from "@/context/AuthContext";
 import { useUserRoles } from "@/context/UserRolesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFinancialTransaction } from "@/utils/security";
-import { useSystemSettings } from "@/context/SystemSettingsContext"; // Import useSystemSettings
-import { useQueryClient } from "@tanstack/react-query"; // New import
-import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import { useSystemSettings } from "@/context/SystemSettingsContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/use-debounce";
+import ReportActions from "@/components/reports/ReportActions";
+import DateRangePicker from "@/components/reports/DateRangePicker";
 
 interface FinancialAccount {
   id: string;
   name: string;
   current_balance: number;
-  profile_id: string; // Added profile_id
+  profile_id: string;
 }
 
 interface Member {
@@ -40,155 +54,187 @@ interface ExpenditureTransaction {
   amount: number;
   account_id: string;
   purpose: string;
-  profile_id: string; // Changed from user_id to profile_id
+  profile_id: string;
+  account_name: string;
+  profile_name?: string;
 }
 
-const Expenditure = () => {
+export default function Expenditure() {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
-  const queryClient = useQueryClient(); // Initialize queryClient
-  
+  const queryClient = useQueryClient();
+
+  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
+
   const { canManageExpenditure } = React.useMemo(() => {
     if (!currentUser || !definedRoles) {
       return { canManageExpenditure: false };
     }
-    
-    const currentUserRoleDefinition = definedRoles.find(role => role.name === currentUser.role);
-    const currentUserPrivileges = currentUserRoleDefinition?.menuPrivileges || [];
-    const canManageExpenditure = currentUserPrivileges.includes("Manage Expenditure");
-    return { canManageExpenditure };
+
+    const roleDef = definedRoles.find((r) => r.name === currentUser.role);
+    const privileges = roleDef?.menuPrivileges || [];
+    return { canManageExpenditure: privileges.includes("Manage Expenditure") };
   }, [currentUser, definedRoles]);
 
+  const defaultRange = React.useMemo<DateRange>(() => {
+    const now = new Date();
+    return { from: startOfMonth(now), to: endOfMonth(now) };
+  }, []);
+
   const [financialAccounts, setFinancialAccounts] = React.useState<FinancialAccount[]>([]);
-  const [members, setMembers] = React.useState<Member[]>([]); // New state for members
+  const [members, setMembers] = React.useState<Member[]>([]);
   const [transactions, setTransactions] = React.useState<ExpenditureTransaction[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  
+
   // Form State
   const [expenditureDate, setExpenditureDate] = React.useState<Date | undefined>(new Date());
   const [expenditureAmount, setExpenditureAmount] = React.useState("");
   const [expenditureAccount, setExpenditureAccount] = React.useState<string | undefined>(undefined);
   const [expenditurePurpose, setExpenditurePurpose] = React.useState("");
-  const [selectedExpenditureMemberId, setSelectedExpenditureMemberId] = React.useState<string | undefined>(undefined); // New state for member
-  
-  // Filter State
-  const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date()); // 0-indexed
-  const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
-  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  
-  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
-  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+  const [selectedExpenditureMemberId, setSelectedExpenditureMemberId] = React.useState<string | undefined>(undefined);
 
-  const months = Array.from({ length: 12 }, (_, i) => ({
-    value: i.toString(),
-    label: format(new Date(0, i), "MMMM"),
-  }));
+  // Filters
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(defaultRange);
+  const [accountId, setAccountId] = React.useState<string>("All");
+  const [memberId, setMemberId] = React.useState<string>("All");
+  const [minAmount, setMinAmount] = React.useState<string>("");
+  const [maxAmount, setMaxAmount] = React.useState<string>("");
 
-  const years = Array.from({ length: 5 }, (_, i) => ({
-    value: (currentYear - 2 + i).toString(),
-    label: (currentYear - 2 + i).toString(),
-  }));
+  const [localSearchQuery, setLocalSearchQuery] = React.useState("");
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 400);
 
   const fetchFinancialAccountsAndMembers = React.useCallback(async () => {
-    let query = supabase
-      .from('financial_accounts')
-      .select('id, name, current_balance, initial_balance, profile_id'); // Select all fields for FinancialAccount type
-      
-    const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
-    if (!isAdmin && currentUser) {
-      query = query.eq('profile_id', currentUser.id); // Filter by profile_id for non-admins
+    if (!currentUser) return;
+
+    let accountsQuery = supabase
+      .from("financial_accounts")
+      .select("id, name, current_balance, initial_balance, profile_id")
+      .order("name", { ascending: true });
+
+    if (!isAdmin) {
+      accountsQuery = accountsQuery.eq("profile_id", currentUser.id);
     }
-      
-    const { data: accountsData, error: accountsError } = await query;
-      
+
+    const { data: accountsData, error: accountsError } = await accountsQuery;
+
     if (accountsError) {
       console.error("Error fetching financial accounts:", accountsError);
       showError("Failed to load financial accounts.");
+      setFinancialAccounts([]);
     } else {
       setFinancialAccounts(accountsData || []);
       if (!expenditureAccount && accountsData && accountsData.length > 0) {
-        setExpenditureAccount(accountsData[0].id); // Set default account if none selected
+        setExpenditureAccount(accountsData[0].id);
       }
     }
 
-    // Fetch all members for the optional selector
     const { data: membersData, error: membersError } = await supabase
-      .from('profiles')
-      .select('id, name, email')
-      .order('name', { ascending: true });
+      .from("profiles")
+      .select("id, name, email")
+      .order("name", { ascending: true });
 
     if (membersError) {
       console.error("Error fetching members:", membersError);
       showError("Failed to load members for expenditure association.");
+      setMembers([]);
     } else {
-      setMembers(membersData || []);
+      setMembers(
+        (membersData || []).map((m) => ({
+          id: m.id,
+          name: m.name || m.email || "Unknown",
+          email: m.email || "",
+        })),
+      );
     }
-  }, [expenditureAccount, currentUser]);
+  }, [currentUser, isAdmin, expenditureAccount]);
 
   const fetchExpenditureTransactions = React.useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     if (!currentUser) {
       setLoading(false);
       return;
     }
-    
-    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
-    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
-    
+
+    const from = dateRange?.from ? startOfDay(dateRange.from) : null;
+    const to = dateRange?.to ? endOfDay(dateRange.to) : null;
+
+    if (!from || !to) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+
     let query = supabase
-      .from('expenditure_transactions')
-      .select('*, financial_accounts(name)')
-      .gte('date', startOfMonth.toISOString())
-      .lte('date', endOfMonth.toISOString());
-      
-    // Conditionally apply profile_id filter based on admin status
-    const isAdmin = currentUser.role === "Admin" || currentUser.role === "Super Admin";
+      .from("expenditure_transactions")
+      .select("id, date, amount, purpose, account_id, profile_id, financial_accounts(name), profiles(name,email)")
+      .gte("date", from.toISOString())
+      .lte("date", to.toISOString());
+
     if (!isAdmin) {
-      query = query.eq('profile_id', currentUser.id);
+      query = query.eq("profile_id", currentUser.id);
+    } else if (memberId !== "All") {
+      query = query.eq("profile_id", memberId);
     }
-      
-    if (debouncedSearchQuery) { // Use debounced query
-      query = query.ilike('purpose', `%${debouncedSearchQuery}%`);
+
+    if (accountId !== "All") {
+      query = query.eq("account_id", accountId);
     }
-    
-    const { data, error } = await query.order('date', { ascending: false });
-    
+
+    const q = debouncedSearchQuery.trim();
+    if (q) {
+      query = query.ilike("purpose", `%${q}%`);
+    }
+
+    const min = minAmount ? Number(minAmount) : null;
+    const max = maxAmount ? Number(maxAmount) : null;
+    if (min !== null && Number.isFinite(min)) query = query.gte("amount", min);
+    if (max !== null && Number.isFinite(max)) query = query.lte("amount", max);
+
+    const { data, error } = await query.order("date", { ascending: false });
+
     if (error) {
       console.error("Error fetching expenditure transactions:", error);
       setError("Failed to load expenditure transactions.");
       showError("Failed to load expenditure transactions.");
       setTransactions([]);
-    } else {
-      setTransactions(data.map(tx => ({
+      setLoading(false);
+      return;
+    }
+
+    setTransactions(
+      (data || []).map((tx: any) => ({
         id: tx.id,
         date: parseISO(tx.date),
         amount: tx.amount,
         account_id: tx.account_id,
         purpose: tx.purpose,
-        profile_id: tx.profile_id, // Changed to profile_id
-        account_name: (tx.financial_accounts as { name: string })?.name || 'Unknown Account'
-      })));
-    }
-    
+        profile_id: tx.profile_id,
+        account_name: tx.financial_accounts?.name || "Unknown Account",
+        profile_name: tx.profiles?.name || tx.profiles?.email || undefined,
+      })),
+    );
+
     setLoading(false);
-  }, [currentUser, filterMonth, filterYear, debouncedSearchQuery]); // Depend on debounced query
+  }, [currentUser, isAdmin, dateRange?.from, dateRange?.to, accountId, memberId, debouncedSearchQuery, minAmount, maxAmount]);
 
   React.useEffect(() => {
     fetchFinancialAccountsAndMembers();
+  }, [fetchFinancialAccountsAndMembers]);
+
+  React.useEffect(() => {
     fetchExpenditureTransactions();
-  }, [fetchFinancialAccountsAndMembers, fetchExpenditureTransactions]);
+  }, [fetchExpenditureTransactions]);
 
   const invalidateDashboardQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['financialData'] });
-    queryClient.invalidateQueries({ queryKey: ['financialSummary'] });
-    queryClient.invalidateQueries({ queryKey: ['recentTransactions'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboardProjects'] });
-    queryClient.invalidateQueries({ queryKey: ['contributionsProgress'] });
+    queryClient.invalidateQueries({ queryKey: ["financialData"] });
+    queryClient.invalidateQueries({ queryKey: ["financialSummary"] });
+    queryClient.invalidateQueries({ queryKey: ["recentTransactions"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboardProjects"] });
+    queryClient.invalidateQueries({ queryKey: ["contributionsProgress"] });
   };
 
   const handlePostExpenditure = async () => {
@@ -196,113 +242,139 @@ const Expenditure = () => {
       showError("You must be logged in to post expenditure.");
       return;
     }
-    
+
     if (!expenditureDate || !expenditureAmount || !expenditureAccount || !expenditurePurpose) {
       showError("All expenditure fields are required.");
       return;
     }
-    
+
     const amount = parseFloat(expenditureAmount);
-    
-    // Server-side validation
+
     const validation = validateFinancialTransaction(amount, expenditureAccount, currentUser.id);
     if (!validation.isValid) {
       showError(validation.error || "Invalid expenditure amount.");
       return;
     }
-    
-    const currentAccount = financialAccounts.find(acc => acc.id === expenditureAccount);
+
+    const currentAccount = financialAccounts.find((acc) => acc.id === expenditureAccount);
     if (!currentAccount) {
       showError("Selected account not found.");
       return;
     }
-    
+
     if (currentAccount.current_balance < amount) {
       showError("Insufficient balance in the selected account.");
       return;
     }
 
-    // Determine the profile_id for the transaction
     const transactionProfileId = selectedExpenditureMemberId || currentUser.id;
-    
-    const { error: insertError } = await supabase
-      .from('expenditure_transactions')
-      .insert({
-        date: expenditureDate.toISOString(),
-        amount,
-        account_id: expenditureAccount,
-        purpose: expenditurePurpose,
-        profile_id: transactionProfileId, // Use the determined profile_id
-      });
-      
+
+    const { error: insertError } = await supabase.from("expenditure_transactions").insert({
+      date: expenditureDate.toISOString(),
+      amount,
+      account_id: expenditureAccount,
+      purpose: expenditurePurpose,
+      profile_id: transactionProfileId,
+    });
+
     if (insertError) {
       console.error("Error posting expenditure:", insertError);
       showError("Failed to post expenditure.");
-    } else {
-      // Update account balance
-      const newBalance = currentAccount.current_balance - amount;
-      const { error: updateBalanceError } = await supabase
-        .from('financial_accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', expenditureAccount)
-        .eq('profile_id', currentAccount.profile_id); // Ensure user owns the account
-        
-      if (updateBalanceError) {
-        console.error("Error updating account balance:", updateBalanceError);
-        showError("Expenditure posted, but failed to update account balance.");
-      }
-      
-      showSuccess("Expenditure posted successfully!");
-      fetchExpenditureTransactions();
-      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
-      invalidateDashboardQueries(); // Invalidate dashboard queries
+      return;
     }
+
+    const newBalance = currentAccount.current_balance - amount;
+    const { error: updateBalanceError } = await supabase
+      .from("financial_accounts")
+      .update({ current_balance: newBalance })
+      .eq("id", expenditureAccount)
+      .eq("profile_id", currentAccount.profile_id);
+
+    if (updateBalanceError) {
+      console.error("Error updating account balance:", updateBalanceError);
+      showError("Expenditure posted, but failed to update account balance.");
+    }
+
+    showSuccess("Expenditure posted successfully!");
+    fetchExpenditureTransactions();
+    fetchFinancialAccountsAndMembers();
+    invalidateDashboardQueries();
   };
 
   const handleEditTransaction = (id: string) => {
-    // In a real app, this would open an edit dialog pre-filled with transaction data
     console.log("Editing expenditure transaction:", id);
     showError("Edit functionality is not yet implemented for expenditure transactions.");
   };
 
-  const handleDeleteTransaction = async (id: string, amount: number, accountId: string, profileId: string) => {
+  const handleDeleteTransaction = async (tx: ExpenditureTransaction) => {
     if (!currentUser) {
-      showError("You must be logged in to delete income.");
+      showError("You must be logged in to delete expenditure.");
       return;
     }
-    
+
     const { error: deleteError } = await supabase
-      .from('expenditure_transactions')
+      .from("expenditure_transactions")
       .delete()
-      .eq('id', id)
-      .eq('profile_id', profileId); // Ensure only owner can delete
-      
+      .eq("id", tx.id)
+      .eq("profile_id", tx.profile_id);
+
     if (deleteError) {
       console.error("Error deleting expenditure transaction:", deleteError);
       showError("Failed to delete expenditure transaction.");
-    } else {
-      // Revert account balance
-      const currentAccount = financialAccounts.find(acc => acc.id === accountId);
-      if (currentAccount) {
-        const newBalance = currentAccount.current_balance + amount;
-        const { error: updateBalanceError } = await supabase
-          .from('financial_accounts')
-          .update({ current_balance: newBalance })
-          .eq('id', accountId)
-          .eq('profile_id', currentAccount.profile_id); // Ensure user owns the account
-          
-        if (updateBalanceError) {
-          console.error("Error reverting account balance:", updateBalanceError);
-          showError("Expenditure transaction deleted, but failed to revert account balance.");
-        }
-      }
-      
-      showSuccess("Expenditure transaction deleted successfully!");
-      fetchExpenditureTransactions();
-      fetchFinancialAccountsAndMembers(); // Re-fetch accounts to update balances
-      invalidateDashboardQueries(); // Invalidate dashboard queries
+      return;
     }
+
+    const currentAccount = financialAccounts.find((acc) => acc.id === tx.account_id);
+    if (currentAccount) {
+      const newBalance = currentAccount.current_balance + tx.amount;
+      const { error: updateBalanceError } = await supabase
+        .from("financial_accounts")
+        .update({ current_balance: newBalance })
+        .eq("id", tx.account_id)
+        .eq("profile_id", currentAccount.profile_id);
+
+      if (updateBalanceError) {
+        console.error("Error reverting account balance:", updateBalanceError);
+        showError("Expenditure transaction deleted, but failed to revert account balance.");
+      }
+    }
+
+    showSuccess("Expenditure transaction deleted successfully!");
+    fetchExpenditureTransactions();
+    fetchFinancialAccountsAndMembers();
+    invalidateDashboardQueries();
   };
+
+  const reportSubtitle = React.useMemo(() => {
+    const fromStr = dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : "-";
+    const toStr = dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : "-";
+
+    const accountName =
+      accountId === "All" ? "All Accounts" : financialAccounts.find((a) => a.id === accountId)?.name || "Account";
+
+    const memberName = !isAdmin
+      ? "My Transactions"
+      : memberId === "All"
+        ? "All Members"
+        : members.find((m) => m.id === memberId)?.name || "Member";
+
+    const parts = [`Date: ${fromStr} → ${toStr}`, accountName, memberName];
+    const q = debouncedSearchQuery.trim();
+    if (q) parts.push(`Search: ${q}`);
+    if (minAmount) parts.push(`Min: ${currency.symbol}${minAmount}`);
+    if (maxAmount) parts.push(`Max: ${currency.symbol}${maxAmount}`);
+    return parts.join(" • ");
+  }, [dateRange?.from, dateRange?.to, accountId, memberId, isAdmin, debouncedSearchQuery, minAmount, maxAmount, financialAccounts, members, currency.symbol]);
+
+  const reportRows = React.useMemo(() => {
+    return transactions.map((t) => [
+      format(t.date, "MMM dd, yyyy"),
+      t.profile_name || "-",
+      t.purpose,
+      t.account_name,
+      `${currency.symbol}${t.amount.toFixed(2)}`,
+    ]);
+  }, [transactions, currency.symbol]);
 
   if (loading) {
     return (
@@ -325,27 +397,23 @@ const Expenditure = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Expenditure</h1>
-      <p className="text-lg text-muted-foreground">
-        Record and manage all financial outflows.
-      </p>
-      
+      <p className="text-lg text-muted-foreground">Record and manage all financial outflows.</p>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Record Expenditure Card */}
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
           <CardHeader>
             <CardTitle>Record New Expenditure</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-form-date">Date of Expenditure</Label>
+              <Label>Date of Expenditure</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant={"outline"}
-                    id="expenditure-form-date"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !expenditureDate && "text-muted-foreground"
+                      !expenditureDate && "text-muted-foreground",
                     )}
                     disabled={!canManageExpenditure}
                   >
@@ -354,20 +422,14 @@ const Expenditure = () => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={expenditureDate}
-                    onSelect={setExpenditureDate}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={expenditureDate} onSelect={setExpenditureDate} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
-            
+
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-form-amount">Amount</Label>
+              <Label>Amount</Label>
               <Input
-                id="expenditure-form-amount"
                 type="number"
                 step="0.01"
                 placeholder="0.00"
@@ -376,11 +438,11 @@ const Expenditure = () => {
                 disabled={!canManageExpenditure}
               />
             </div>
-            
+
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-form-account">Debited From Account</Label>
+              <Label>Debited From Account</Label>
               <Select value={expenditureAccount} onValueChange={setExpenditureAccount} disabled={!canManageExpenditure}>
-                <SelectTrigger id="expenditure-form-account">
+                <SelectTrigger>
                   <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
                 <SelectContent>
@@ -397,9 +459,13 @@ const Expenditure = () => {
             </div>
 
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-form-member">Expended On Behalf Of Member (Optional)</Label>
-              <Select value={selectedExpenditureMemberId} onValueChange={setSelectedExpenditureMemberId} disabled={!canManageExpenditure || members.length === 0}>
-                <SelectTrigger id="expenditure-form-member">
+              <Label>Expended On Behalf Of Member (Optional)</Label>
+              <Select
+                value={selectedExpenditureMemberId}
+                onValueChange={setSelectedExpenditureMemberId}
+                disabled={!canManageExpenditure || members.length === 0}
+              >
+                <SelectTrigger>
                   <SelectValue placeholder="Select a member" />
                 </SelectTrigger>
                 <SelectContent>
@@ -413,118 +479,151 @@ const Expenditure = () => {
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              {members.length === 0 && <p className="text-sm text-muted-foreground">No members available.</p>}
+              {members.length === 0 ? <p className="text-sm text-muted-foreground">No members available.</p> : null}
             </div>
-            
+
             <div className="grid gap-1.5">
-              <Label htmlFor="expenditure-form-purpose">Purpose/Description</Label>
+              <Label>Purpose/Description</Label>
               <Textarea
-                id="expenditure-form-purpose"
                 placeholder="e.g., Equipment rental, Travel expenses, Office supplies"
                 value={expenditurePurpose}
                 onChange={(e) => setExpenditurePurpose(e.target.value)}
                 disabled={!canManageExpenditure}
               />
             </div>
-            
+
             <Button onClick={handlePostExpenditure} className="w-full" disabled={!canManageExpenditure}>
               Post Expenditure
             </Button>
           </CardContent>
         </Card>
-        
-        {/* Recent Expenditure Transactions Card */}
+
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-          <CardHeader>
-            <CardTitle>Recent Expenditure Transactions</CardTitle>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Expenditure Transactions</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">{reportSubtitle}</p>
+            </div>
+            <ReportActions
+              title="Expenditure Report"
+              subtitle={reportSubtitle}
+              columns={["Date", "Member", "Purpose", "Account", "Amount"]}
+              rows={reportRows}
+              fileName={`Expenditure_${format(new Date(), "yyyy-MM-dd")}`}
+            />
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-4 mb-4">
-              <div className="grid gap-1.5 flex-1 min-w-[120px]">
-                <Label htmlFor="expenditure-filter-month">Month</Label>
-                <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger id="expenditure-filter-month">
-                    <SelectValue placeholder="Select month" />
+            <div className="flex flex-wrap gap-4">
+              <div className="grid gap-1.5 min-w-[260px]">
+                <Label>Date range</Label>
+                <DateRangePicker value={dateRange} onChange={setDateRange} className="w-[260px]" />
+              </div>
+
+              <div className="grid gap-1.5 min-w-[220px]">
+                <Label>Account</Label>
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All accounts" />
                   </SelectTrigger>
                   <SelectContent>
-                    {months.map((month) => (
-                      <SelectItem key={month.value} value={month.value}>
-                        {month.label}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      <SelectItem value="All">All accounts</SelectItem>
+                      {financialAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-1.5 flex-1 min-w-[100px]">
-                <Label htmlFor="expenditure-filter-year">Year</Label>
-                <Select value={filterYear} onValueChange={setFilterYear}>
-                  <SelectTrigger id="expenditure-filter-year">
-                    <SelectValue placeholder="Select year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.map((year) => (
-                      <SelectItem key={year.value} value={year.value}>
-                        {year.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              {isAdmin ? (
+                <div className="grid gap-1.5 min-w-[220px]">
+                  <Label>Member</Label>
+                  <Select value={memberId} onValueChange={setMemberId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All members" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="All">All members</SelectItem>
+                        {members.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name} ({m.email})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+
+              <div className="grid gap-1.5 min-w-[120px]">
+                <Label>Min</Label>
+                <Input value={minAmount} onChange={(e) => setMinAmount(e.target.value)} placeholder="0" type="number" step="0.01" />
               </div>
-              <div className="relative flex items-center flex-1 min-w-[180px]">
+
+              <div className="grid gap-1.5 min-w-[120px]">
+                <Label>Max</Label>
+                <Input value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} placeholder="0" type="number" step="0.01" />
+              </div>
+
+              <div className="grid gap-1.5 flex-1 min-w-[220px]">
+                <Label>Search</Label>
                 <Input
-                  type="text"
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
                   placeholder="Search purpose..."
-                  value={localSearchQuery} // Use local state for input
-                  onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
-                  className="pl-8"
-                  id="expenditure-search-query"
                 />
-                <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
               </div>
             </div>
-            
+
             {transactions.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    {isAdmin ? <TableHead>Member</TableHead> : null}
                     <TableHead>Purpose</TableHead>
                     <TableHead>Account</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
-                    {canManageExpenditure && <TableHead className="text-center">Actions</TableHead>}
+                    {canManageExpenditure ? <TableHead className="text-center">Actions</TableHead> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transactions.map((tx) => (
                     <TableRow key={tx.id}>
                       <TableCell>{format(tx.date, "MMM dd, yyyy")}</TableCell>
+                      {isAdmin ? <TableCell>{tx.profile_name || "-"}</TableCell> : null}
                       <TableCell>{tx.purpose}</TableCell>
-                      <TableCell>{(tx as any).account_name}</TableCell>
-                      <TableCell className="text-right">{currency.symbol}{tx.amount.toFixed(2)}</TableCell>
-                      {canManageExpenditure && (
+                      <TableCell>{tx.account_name}</TableCell>
+                      <TableCell className="text-right">
+                        {currency.symbol}
+                        {tx.amount.toFixed(2)}
+                      </TableCell>
+                      {canManageExpenditure ? (
                         <TableCell className="text-center">
-                          <div className="flex justify-center space-x-2">
+                          <div className="flex justify-center gap-2">
                             <Button variant="ghost" size="icon" onClick={() => handleEditTransaction(tx.id)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx.id, tx.amount, tx.account_id, tx.profile_id)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTransaction(tx)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
                         </TableCell>
-                      )}
+                      ) : null}
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground">No expenditure transactions found for the selected period or matching your search.</p>
+              <p className="text-muted-foreground">No expenditure transactions found for the selected filters.</p>
             )}
           </CardContent>
         </Card>
       </div>
     </div>
   );
-};
-
-export default Expenditure;
+}

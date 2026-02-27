@@ -12,78 +12,117 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { MonthYearOption } from "@/types/common"; // Updated import
+import { DateRange } from "react-day-picker";
+import DateRangePicker from "@/components/reports/DateRangePicker";
 
-interface PledgeFiltersProps {
-  filterStatus: "All" | "Paid" | "Unpaid"; // Updated filter options
-  setFilterStatus: (status: "All" | "Paid" | "Unpaid") => void; // Updated filter options
-  // Removed filterMonth and setFilterMonth props
-  filterYear: string;
-  setFilterYear: (year: string) => void;
+export type PledgeStatusFilter = "All" | "Paid" | "Unpaid" | "Overdue";
+
+type ProjectOption = { id: string; name: string };
+type MemberOption = { id: string; name: string; email: string };
+
+interface Props {
+  dateRange: DateRange | undefined;
+  setDateRange: (range: DateRange | undefined) => void;
+  status: PledgeStatusFilter;
+  setStatus: (status: PledgeStatusFilter) => void;
+  projectId: string;
+  setProjectId: (id: string) => void;
+  memberId: string;
+  setMemberId: (id: string) => void;
+  projects: ProjectOption[];
+  members: MemberOption[];
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  months: MonthYearOption[];
-  years: MonthYearOption[];
 }
 
-const PledgeFilters: React.FC<PledgeFiltersProps> = ({
-  filterStatus,
-  setFilterStatus,
-  // Removed filterMonth
-  // Removed setFilterMonth
-  filterYear,
-  setFilterYear,
+export default function PledgeFilters({
+  dateRange,
+  setDateRange,
+  status,
+  setStatus,
+  projectId,
+  setProjectId,
+  memberId,
+  setMemberId,
+  projects,
+  members,
   searchQuery,
   setSearchQuery,
-  months,
-  years,
-}) => {
+}: Props) {
   return (
-    <div className="flex flex-wrap gap-4 mb-4">
-      <div className="grid gap-1.5 flex-1 min-w-[120px]">
-        <Label htmlFor="pledge-filter-status">Status</Label>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger id="pledge-filter-status">
-            <SelectValue placeholder="Filter by status" />
+    <div className="flex flex-wrap gap-4">
+      <div className="grid gap-1.5 min-w-[260px]">
+        <Label>Due date range</Label>
+        <DateRangePicker value={dateRange} onChange={setDateRange} className="w-[260px]" />
+      </div>
+
+      <div className="grid gap-1.5 min-w-[160px]">
+        <Label>Status</Label>
+        <Select value={status} onValueChange={(v) => setStatus(v as PledgeStatusFilter)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="All">All Pledges</SelectItem>
+              <SelectItem value="All">All</SelectItem>
               <SelectItem value="Paid">Paid</SelectItem>
-              <SelectItem value="Unpaid">Unpaid</SelectItem> {/* Consolidated Active and Overdue */}
+              <SelectItem value="Unpaid">Unpaid</SelectItem>
+              <SelectItem value="Overdue">Overdue</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
       </div>
-      {/* Removed Month Filter */}
-      <div className="grid gap-1.5 flex-1 min-w-[100px]">
-        <Label htmlFor="pledge-filter-year">Year</Label>
-        <Select value={filterYear} onValueChange={setFilterYear}>
-          <SelectTrigger id="pledge-filter-year">
-            <SelectValue placeholder="Select year" />
+
+      <div className="grid gap-1.5 min-w-[220px]">
+        <Label>Project</Label>
+        <Select value={projectId} onValueChange={setProjectId}>
+          <SelectTrigger>
+            <SelectValue placeholder="All projects" />
           </SelectTrigger>
           <SelectContent>
-            {years.map((year) => (
-              <SelectItem key={year.value} value={year.value}>
-                {year.label}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              <SelectItem value="All">All projects</SelectItem>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
-      <div className="relative flex items-center flex-1 min-w-[180px]">
-        <Input
-          type="text"
-          placeholder="Search member/project..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-8"
-          id="pledge-search-query"
-        />
-        <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+
+      <div className="grid gap-1.5 min-w-[220px]">
+        <Label>Member</Label>
+        <Select value={memberId} onValueChange={setMemberId}>
+          <SelectTrigger>
+            <SelectValue placeholder="All members" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="All">All members</SelectItem>
+              {members.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name} ({m.email})
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-1.5 flex-1 min-w-[220px]">
+        <Label>Search</Label>
+        <div className="relative flex items-center">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Member, project, comments..."
+            className="pl-8"
+          />
+          <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+        </div>
       </div>
     </div>
   );
-};
-
-export default PledgeFilters;
+}
