@@ -126,16 +126,63 @@ function addFooter(doc: jsPDF, tagline?: string) {
   }
 }
 
+function getWrappedLines(doc: jsPDF, text: string, maxWidth: number) {
+  const cleaned = String(text ?? "").trim();
+  if (!cleaned) return [] as string[];
+  return doc.splitTextToSize(cleaned, maxWidth) as string[];
+}
+
+function addWrappedHeader(doc: jsPDF, opts: { title: string; subtitle?: string; marginX: number; hasLogo: boolean }) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const reservedLogoWidth = opts.hasLogo ? 56 + 14 + 10 : 0;
+  const maxTextWidth = Math.max(120, pageWidth - opts.marginX * 2 - reservedLogoWidth);
+
+  doc.setLineHeightFactor(1.15);
+
+  let y = 32;
+
+  // Title
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  const titleLines = getWrappedLines(doc, opts.title, maxTextWidth);
+  doc.text(titleLines.length ? titleLines : [opts.title], opts.marginX, y);
+  y += (titleLines.length || 1) * 16 * 1.15;
+
+  // Subtitle
+  if (opts.subtitle) {
+    y += 6;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80);
+    const subtitleLines = getWrappedLines(doc, opts.subtitle, maxTextWidth);
+    doc.text(subtitleLines.length ? subtitleLines : [opts.subtitle], opts.marginX, y);
+    y += (subtitleLines.length || 1) * 10 * 1.15;
+    doc.setTextColor(0);
+  }
+
+  return y + 14;
+}
+
 function applySubtotalRowStyles(hookData: any) {
   if (hookData.section !== "body") return;
+
   const raw = hookData.row?.raw as Array<string | number> | undefined;
-  if (!raw || !Array.isArray(raw)) return;
+  if (!raw || !Array.isArray(raw) || raw.length === 0) return;
 
-  const label = String(raw[0] ?? "").trim().toLowerCase();
-  const value = String(raw[1] ?? "").trim();
+  const firstCell = String(raw[0] ?? "").trim();
+  const label = firstCell.toLowerCase();
+  const lastCell = String(raw[raw.length - 1] ?? "").trim();
 
-  const isTotal = label === "total" || label === "subtotal" || label === "total for period";
-  const isNetCashflow = /net\s+cashflow/i.test(label);
+  const isTotal =
+    label === "total" ||
+    label === "grand total" ||
+    label === "subtotal" ||
+    label.startsWith("total ") ||
+    label.startsWith("subtotal") ||
+    label === "total for period" ||
+    label === "grand total";
+
+  const isNetCashflow = /net\s+cashflow/i.test(firstCell);
   const isCashAtHand = label.includes("cash on hand") || label.includes("cash at hand");
 
   if (!isTotal && !isNetCashflow && !isCashAtHand) return;
@@ -155,7 +202,7 @@ function applySubtotalRowStyles(hookData: any) {
   }
 
   // Net cashflow styling (green/red)
-  const isNegative = value.includes("-");
+  const isNegative = lastCell.includes("-");
   hookData.cell.styles.fillColor = isNegative ? [254, 242, 242] : [240, 253, 244];
   hookData.cell.styles.textColor = isNegative ? [190, 18, 60] : [21, 128, 61];
 }
@@ -174,24 +221,17 @@ export async function exportTableToPdf(options: TablePdfOptions) {
 
   const marginX = 40;
 
-  // Header
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  doc.text(options.title, marginX, 32);
-
-  if (options.subtitle) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80);
-    doc.text(options.subtitle, marginX, 48);
-    doc.setTextColor(0);
-  }
+  const startY = addWrappedHeader(doc, {
+    title: options.title,
+    subtitle: options.subtitle,
+    marginX,
+    hasLogo: !!options.brandLogoUrl,
+  });
 
   await addLogo(doc, options.brandLogoUrl);
 
-  // Table
   autoTable(doc, {
-    startY: options.subtitle ? 64 : 54,
+    startY,
     head: [options.columns],
     body: options.rows,
     theme: "striped",
@@ -205,6 +245,7 @@ export async function exportTableToPdf(options: TablePdfOptions) {
       fillColor: [22, 47, 79],
       textColor: [255, 255, 255],
       fontStyle: "bold",
+      overflow: "linebreak",
     },
     alternateRowStyles: {
       fillColor: [245, 245, 245],
@@ -246,21 +287,12 @@ export async function exportMultiTableToPdf(options: MultiTablePdfOptions) {
 
   const marginX = 40;
 
-  // Header
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  doc.text(options.title, marginX, 32);
-
-  let cursorY = 54;
-
-  if (options.subtitle) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80);
-    doc.text(options.subtitle, marginX, 48);
-    doc.setTextColor(0);
-    cursorY = 64;
-  }
+  let cursorY = addWrappedHeader(doc, {
+    title: options.title,
+    subtitle: options.subtitle,
+    marginX,
+    hasLogo: !!options.brandLogoUrl,
+  });
 
   await addLogo(doc, options.brandLogoUrl);
 
@@ -268,8 +300,11 @@ export async function exportMultiTableToPdf(options: MultiTablePdfOptions) {
     if (table.title) {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text(table.title, marginX, cursorY);
-      cursorY += 10;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const maxWidth = Math.max(120, pageWidth - marginX * 2);
+      const lines = getWrappedLines(doc, table.title, maxWidth);
+      doc.text(lines.length ? lines : [table.title], marginX, cursorY);
+      cursorY += (lines.length || 1) * 12 * 1.15;
     }
 
     autoTable(doc, {
@@ -287,6 +322,7 @@ export async function exportMultiTableToPdf(options: MultiTablePdfOptions) {
         fillColor: [22, 47, 79],
         textColor: [255, 255, 255],
         fontStyle: "bold",
+        overflow: "linebreak",
       },
       alternateRowStyles: {
         fillColor: [245, 245, 245],

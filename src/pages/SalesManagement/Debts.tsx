@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Edit, Trash2, Search, DollarSign } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, DollarSign, Printer, FileSpreadsheet } from "lucide-react";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import {
   AlertDialog,
@@ -33,11 +33,15 @@ import RecordDebtPaymentDialog from "@/components/sales-management/RecordDebtPay
 import { useDebounce } from "@/hooks/use-debounce";
 import { format, parseISO } from "date-fns";
 import { Member, FinancialAccount, Product } from "@/types/common";
+import * as XLSX from "xlsx";
+import { exportTableToPdf } from "@/utils/reportUtils";
+import { useBranding } from "@/context/BrandingContext";
 
 const Debts = () => {
   const { currentUser, session } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
+  const { brandLogoUrl, tagline } = useBranding();
 
   const { canManageDebts } = useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -331,6 +335,215 @@ const Debts = () => {
     setIsRecordPaymentDialogOpen(true);
   };
 
+  const exportDebtsPdf = async () => {
+    const title = "Sales Debts Report";
+    const subtitle = `Generated: ${format(new Date(), "MMM dd, yyyy")}` +
+      (currentUser?.name ? ` • prepared by: ${currentUser.name}` : "");
+
+    const columns = [
+      "Debtor",
+      "Description",
+      "Original Amount",
+      "Amount Paid",
+      "Balance Due",
+      "Due Date",
+      "Status",
+      "Notes",
+    ];
+
+    const statusOrder = ["Outstanding", "Partially Paid", "Overdue", "Paid"];
+    const statusRank = new Map(statusOrder.map((s, i) => [s.toLowerCase(), i] as const));
+
+    const sorted = debts
+      .slice()
+      .sort((a, b) => {
+        const ra = statusRank.get(String(a.status).toLowerCase()) ?? 999;
+        const rb = statusRank.get(String(b.status).toLowerCase()) ?? 999;
+        if (ra !== rb) return ra - rb;
+        const da = a.due_date ? a.due_date.getTime() : Number.POSITIVE_INFINITY;
+        const db = b.due_date ? b.due_date.getTime() : Number.POSITIVE_INFINITY;
+        return da - db;
+      });
+
+    const money = (v: number) => `${currency.symbol}${Number(v || 0).toFixed(2)}`;
+
+    const rows: Array<Array<string | number>> = [];
+
+    const totals = { original: 0, paid: 0, due: 0 };
+    let currentStatus: string | null = null;
+    let group = { original: 0, paid: 0, due: 0 };
+
+    const flushGroup = () => {
+      if (!currentStatus) return;
+      rows.push([
+        `Subtotal ${currentStatus}`,
+        "",
+        money(group.original),
+        money(group.paid),
+        money(group.due),
+        "",
+        "",
+        "",
+      ]);
+      group = { original: 0, paid: 0, due: 0 };
+    };
+
+    for (const d of sorted) {
+      const status = String(d.status || "").trim() || "Unknown";
+      if (currentStatus !== null && status !== currentStatus) {
+        flushGroup();
+      }
+      if (currentStatus === null) currentStatus = status;
+      if (status !== currentStatus) currentStatus = status;
+
+      const original = Number(d.original_amount || 0);
+      const due = Number(d.amount_due || 0);
+      const paid = Math.max(original - due, 0);
+
+      totals.original += original;
+      totals.paid += paid;
+      totals.due += due;
+
+      group.original += original;
+      group.paid += paid;
+      group.due += due;
+
+      rows.push([
+        d.debtor_name || d.customer_name || "N/A",
+        d.description || "-",
+        money(original),
+        money(paid),
+        money(due),
+        d.due_date ? format(d.due_date, "MMM dd, yyyy") : "-",
+        status,
+        d.notes || "",
+      ]);
+    }
+
+    flushGroup();
+
+    rows.push([
+      "TOTAL",
+      "",
+      money(totals.original),
+      money(totals.paid),
+      money(totals.due),
+      "",
+      "",
+      "",
+    ]);
+
+    await exportTableToPdf({
+      title,
+      subtitle,
+      fileName: `Sales_Debts_${format(new Date(), "yyyy-MM-dd")}`,
+      columns,
+      rows: rows.length ? rows : [["No debts found", "", "", "", "", "", "", ""]],
+      brandLogoUrl,
+      tagline,
+      mode: "open",
+      orientation: "auto",
+    });
+  };
+
+  const exportDebtsExcel = () => {
+    const header = [
+      ["Sales Debts Report"],
+      [`Generated: ${format(new Date(), "MMM dd, yyyy")}`],
+      ...(currentUser?.name ? [[`prepared by: ${currentUser.name}`]] : []),
+      [],
+      [
+        "Debtor",
+        "Description",
+        "Original Amount",
+        "Amount Paid",
+        "Balance Due",
+        "Due Date",
+        "Status",
+        "Notes",
+      ],
+    ];
+
+    const moneyNum = (v: number) => Number(Number(v || 0).toFixed(2));
+
+    const statusOrder = ["Outstanding", "Partially Paid", "Overdue", "Paid"];
+    const statusRank = new Map(statusOrder.map((s, i) => [s.toLowerCase(), i] as const));
+
+    const sorted = debts
+      .slice()
+      .sort((a, b) => {
+        const ra = statusRank.get(String(a.status).toLowerCase()) ?? 999;
+        const rb = statusRank.get(String(b.status).toLowerCase()) ?? 999;
+        if (ra !== rb) return ra - rb;
+        const da = a.due_date ? a.due_date.getTime() : Number.POSITIVE_INFINITY;
+        const db = b.due_date ? b.due_date.getTime() : Number.POSITIVE_INFINITY;
+        return da - db;
+      });
+
+    const body: any[][] = [];
+
+    const totals = { original: 0, paid: 0, due: 0 };
+    let currentStatus: string | null = null;
+    let group = { original: 0, paid: 0, due: 0 };
+
+    const flushGroup = () => {
+      if (!currentStatus) return;
+      body.push([
+        `Subtotal ${currentStatus}`,
+        "",
+        moneyNum(group.original),
+        moneyNum(group.paid),
+        moneyNum(group.due),
+        "",
+        "",
+        "",
+      ]);
+      group = { original: 0, paid: 0, due: 0 };
+    };
+
+    for (const d of sorted) {
+      const status = String(d.status || "").trim() || "Unknown";
+      if (currentStatus !== null && status !== currentStatus) {
+        flushGroup();
+      }
+      if (currentStatus === null) currentStatus = status;
+      if (status !== currentStatus) currentStatus = status;
+
+      const original = Number(d.original_amount || 0);
+      const due = Number(d.amount_due || 0);
+      const paid = Math.max(original - due, 0);
+
+      totals.original += original;
+      totals.paid += paid;
+      totals.due += due;
+
+      group.original += original;
+      group.paid += paid;
+      group.due += due;
+
+      body.push([
+        d.debtor_name || d.customer_name || "N/A",
+        d.description || "-",
+        moneyNum(original),
+        moneyNum(paid),
+        moneyNum(due),
+        d.due_date ? format(d.due_date, "yyyy-MM-dd") : "",
+        status,
+        d.notes || "",
+      ]);
+    }
+
+    flushGroup();
+
+    body.push(["TOTAL", "", moneyNum(totals.original), moneyNum(totals.paid), moneyNum(totals.due), "", "", ""]);
+
+    const ws = XLSX.utils.aoa_to_sheet([...header, ...body]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Debts");
+
+    XLSX.writeFile(wb, `Sales_Debts_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -357,9 +570,9 @@ const Debts = () => {
       </p>
 
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-2">
           <CardTitle className="text-xl font-semibold">Debt List</CardTitle>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex items-center">
               <Input
                 type="text"
@@ -370,6 +583,14 @@ const Debts = () => {
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
             </div>
+
+            <Button variant="outline" onClick={exportDebtsPdf}>
+              <Printer className="mr-2 h-4 w-4" /> Print (PDF)
+            </Button>
+            <Button variant="outline" onClick={exportDebtsExcel}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
+            </Button>
+
             {canManageDebts ? (
               <Button
                 onClick={() => {
