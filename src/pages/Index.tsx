@@ -81,29 +81,30 @@ const Index = () => {
       <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
       <p className="text-lg text-muted-foreground">Welcome to your Financial Hub!</p>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-        <FinancialSummaryBar
-          totalUnpaidPledges={totalUnpaidPledges}
-          totalOutstandingDebts={totalOutstandingDebts}
-          activeFinancialAccounts={activeFinancialAccounts}
-          grandTotalAccountsBalance={grandTotalAccountsBalance}
-          cumulativeNetOperatingBalance={cumulativeNetOperatingBalance}
-        />
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        <div className="xl:col-span-9">
+          <FinancialSummaryBar
+            totalUnpaidPledges={totalUnpaidPledges}
+            totalOutstandingDebts={totalOutstandingDebts}
+            activeFinancialAccounts={activeFinancialAccounts}
+            grandTotalAccountsBalance={grandTotalAccountsBalance}
+            cumulativeNetOperatingBalance={cumulativeNetOperatingBalance}
+          />
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick financial reports</CardTitle>
+        <Card className="xl:col-span-3">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Quick financial reports</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground max-w-xl">
-              Share a clear update with members anytime. Use the Summary for quick health indicators and the Detailed
-              report for full accountability.
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Generate a quick summary or a detailed report.
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline">
+            <div className="flex flex-col gap-2">
+              <Button asChild variant="outline" className="justify-start">
                 <Link to="/reports/financial-summary">Financial Summary</Link>
               </Button>
-              <Button asChild>
+              <Button asChild className="justify-start">
                 <Link to="/reports/financial-detailed">Financial Detailed</Link>
               </Button>
             </div>
