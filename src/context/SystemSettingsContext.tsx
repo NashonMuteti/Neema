@@ -12,9 +12,11 @@ interface CurrencyInfo {
 
 interface SystemSettingsContextType {
   currency: CurrencyInfo;
-  defaultTheme: string; // New: Default theme
+  defaultTheme: string;
+  sessionTimeoutMinutes: number;
   setCurrency: (code: string) => Promise<void>;
-  setDefaultTheme: (theme: string) => Promise<void>; // New: Setter for default theme
+  setDefaultTheme: (theme: string) => Promise<void>;
+  setSessionTimeoutMinutes: (minutes: number) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -22,7 +24,8 @@ const SystemSettingsContext = createContext<SystemSettingsContextType | undefine
 
 export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currency, setCurrencyState] = useState<CurrencyInfo>({ code: "USD", symbol: "$" });
-  const [defaultTheme, setDefaultThemeState] = useState("system"); // New: Default theme state
+  const [defaultTheme, setDefaultThemeState] = useState("system");
+  const [sessionTimeoutMinutes, setSessionTimeoutMinutesState] = useState(60);
   const [isLoading, setIsLoading] = useState(true);
 
   const currencyMap: Record<string, string> = {
@@ -42,35 +45,24 @@ export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ chil
     const { data, error } = await supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['default_currency_code', 'default_theme']); // Fetch both settings
+      .in('key', ['default_currency_code', 'default_theme', 'session_timeout_minutes']);
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+    if (error && error.code !== 'PGRST116') {
       console.error("Error fetching system settings:", error);
       showError("Failed to load system settings.");
     } else if (data) {
       const settingsMap = new Map(data.map(item => [item.key, item.value]));
+
       const fetchedCurrencyCode = settingsMap.get('default_currency_code') || 'USD';
       setCurrencyState({ code: fetchedCurrencyCode, symbol: currencyMap[fetchedCurrencyCode] || "$" });
-      setDefaultThemeState(settingsMap.get('default_theme') || 'system'); // Set fetched default theme
-    } else {
-      // If no setting found, insert defaults
-      const insertEnd = perfStart('SystemSettingsContext:insertDefaults');
-      const { error: insertError } = await supabase
-        .from('settings')
-        .insert([
-          { key: 'default_currency_code', value: 'USD' },
-          { key: 'default_theme', value: 'system' }
-        ]);
-      insertEnd({ ok: !insertError, errorCode: insertError?.code });
-      
-      if (insertError) {
-        console.error("Error inserting default settings:", insertError);
-        showError("Failed to set default system settings.");
-      } else {
-        setCurrencyState({ code: 'USD', symbol: '$' });
-        setDefaultThemeState('system');
-      }
+
+      setDefaultThemeState(settingsMap.get('default_theme') || 'system');
+
+      const timeoutRaw = settingsMap.get('session_timeout_minutes');
+      const timeoutNum = timeoutRaw ? Number(timeoutRaw) : 60;
+      setSessionTimeoutMinutesState(Number.isFinite(timeoutNum) && timeoutNum > 0 ? timeoutNum : 60);
     }
+
     setIsLoading(false);
     end({ rows: data?.length ?? 0, errorCode: error?.code });
   }, []);
@@ -111,8 +103,24 @@ export const SystemSettingsProvider: React.FC<{ children: ReactNode }> = ({ chil
     }
   };
 
+  const setSessionTimeoutMinutes = async (minutes: number) => {
+    if (await updateSetting('session_timeout_minutes', String(minutes))) {
+      setSessionTimeoutMinutesState(minutes);
+    }
+  };
+
   return (
-    <SystemSettingsContext.Provider value={{ currency, defaultTheme, setCurrency, setDefaultTheme, isLoading }}>
+    <SystemSettingsContext.Provider
+      value={{
+        currency,
+        defaultTheme,
+        sessionTimeoutMinutes,
+        setCurrency,
+        setDefaultTheme,
+        setSessionTimeoutMinutes,
+        isLoading,
+      }}
+    >
       {children}
     </SystemSettingsContext.Provider>
   );

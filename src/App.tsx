@@ -15,6 +15,7 @@ import { perfMark } from "@/utils/perf";
 import PerfLogger from "@/components/PerfLogger";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 import BrandingMeta from "@/components/BrandingMeta";
+import SessionTimeoutManager from "@/components/SessionTimeoutManager";
 
 // Layout and ProtectedRoute
 import Layout from "./components/Layout";
@@ -68,6 +69,7 @@ const App = () => {
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <PerfLogger />
             <AuthProvider>
+              <SessionTimeoutManager />
               <BrandingProvider>
                 <BrandingMeta />
                 <UserRolesProvider>
