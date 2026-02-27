@@ -100,14 +100,17 @@ const FinancialSummaryBar: React.FC<FinancialSummaryBarProps> = ({
         </Card>
       </div>
 
-      {/* Row 2: account balances */}
+      {/* Row 2: account balances (keep in one row; scroll if needed) */}
       {activeFinancialAccounts.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="flex gap-4 overflow-x-auto pb-2">
           {activeFinancialAccounts.map((account) => (
-            <Card key={account.id} className="transition-all duration-300 ease-in-out hover:shadow-xl">
+            <Card
+              key={account.id}
+              className="shrink-0 w-[240px] transition-all duration-300 ease-in-out hover:shadow-xl"
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
-                <Wallet className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium truncate">{account.name}</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground shrink-0" />
               </CardHeader>
               <CardContent className="p-3">
                 <div className="text-xl font-bold">
