@@ -37,6 +37,13 @@ type DebtRow = {
   status: string;
 };
 
+type PledgeRow = {
+  id: string;
+  amount: number;
+  paid_amount: number;
+  status: string;
+};
+
 type IncomeRow = {
   id: string;
   amount: number;
@@ -75,8 +82,13 @@ export default function FinancialSummaryReport() {
   const [incomeTotal, setIncomeTotal] = React.useState(0);
   const [expenditureTotal, setExpenditureTotal] = React.useState(0);
   const [salesTotal, setSalesTotal] = React.useState(0);
+
   const [debtsOutstandingTotal, setDebtsOutstandingTotal] = React.useState(0);
   const [debtsOutstandingCount, setDebtsOutstandingCount] = React.useState(0);
+
+  const [pledgesOutstandingTotal, setPledgesOutstandingTotal] = React.useState(0);
+  const [pledgesOutstandingCount, setPledgesOutstandingCount] = React.useState(0);
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -119,12 +131,14 @@ export default function FinancialSummaryReport() {
       setSalesTotal(0);
       setDebtsOutstandingTotal(0);
       setDebtsOutstandingCount(0);
+      setPledgesOutstandingTotal(0);
+      setPledgesOutstandingCount(0);
       setLoading(false);
       return;
     }
 
     try {
-      const [accountsRes, incomeRes, expRes, salesRes, debtsRes] = await Promise.all([
+      const [accountsRes, incomeRes, expRes, salesRes, debtsRes, pledgesRes] = await Promise.all([
         supabase
           .from("financial_accounts")
           .select("id, name, current_balance, can_receive_payments")
@@ -148,6 +162,11 @@ export default function FinancialSummaryReport() {
           .from("debts")
           .select("id, description, customer_name, amount_due, status")
           .in("status", ["Outstanding", "Partially Paid"]),
+        // Outstanding pledges are "current" (not tied to selected period)
+        supabase
+          .from("project_pledges")
+          .select("id, amount, paid_amount, status")
+          .in("status", ["Active", "Overdue"]),
       ]);
 
       if (accountsRes.error) throw accountsRes.error;
@@ -155,6 +174,7 @@ export default function FinancialSummaryReport() {
       if (expRes.error) throw expRes.error;
       if (salesRes.error) throw salesRes.error;
       if (debtsRes.error) throw debtsRes.error;
+      if (pledgesRes.error) throw pledgesRes.error;
 
       const acc = (accountsRes.data || []) as FinancialAccountRow[];
       setAccounts(acc);
@@ -172,6 +192,14 @@ export default function FinancialSummaryReport() {
       const dueTotal = debts.reduce((sum, d) => sum + (d.amount_due || 0), 0);
       setDebtsOutstandingTotal(dueTotal);
       setDebtsOutstandingCount(debts.length);
+
+      const pledges = (pledgesRes.data || []) as PledgeRow[];
+      const pledgeBalances = pledges
+        .map((p) => Math.max(Number(p.amount || 0) - Number(p.paid_amount || 0), 0))
+        .filter((b) => b > 0);
+
+      setPledgesOutstandingTotal(pledgeBalances.reduce((sum, b) => sum + b, 0));
+      setPledgesOutstandingCount(pledgeBalances.length);
 
       setLoading(false);
     } catch (e: any) {
@@ -196,6 +224,7 @@ export default function FinancialSummaryReport() {
       ["Net cashflow (period)", money(currency.symbol, netFlow)],
       ["Sales total (period)", money(currency.symbol, salesTotal)],
       ["Debts outstanding (current)", money(currency.symbol, debtsOutstandingTotal)],
+      ["Pledges outstanding (current)", money(currency.symbol, pledgesOutstandingTotal)],
     ];
 
     const accountsRows = accounts.map((a) => [
@@ -242,8 +271,10 @@ export default function FinancialSummaryReport() {
       ["Net cashflow (period)", netFlow],
       ["Sales total (period)", salesTotal],
       ["Debts outstanding (current)", debtsOutstandingTotal],
+      ["Pledges outstanding (current)", pledgesOutstandingTotal],
       [],
       ["Debts count (current)", debtsOutstandingCount],
+      ["Pledges count (current)", pledgesOutstandingCount],
     ]);
 
     const wsAccounts = XLSX.utils.json_to_sheet(
@@ -336,7 +367,8 @@ export default function FinancialSummaryReport() {
             </div>
 
             <Badge variant="secondary" className="font-semibold">
-              Net cashflow: <span className={netFlow >= 0 ? "text-emerald-700" : "text-rose-700"}>{money(currency.symbol, netFlow)}</span>
+              Net cashflow:{" "}
+              <span className={netFlow >= 0 ? "text-emerald-700" : "text-rose-700"}>{money(currency.symbol, netFlow)}</span>
             </Badge>
           </div>
         </CardContent>
@@ -414,6 +446,14 @@ export default function FinancialSummaryReport() {
                 <div className="text-xs text-muted-foreground">Count: {debtsOutstandingCount}</div>
               </div>
               <div className="text-lg font-extrabold text-amber-700">{money(currency.symbol, debtsOutstandingTotal)}</div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border bg-indigo-50/60 p-3">
+              <div>
+                <div className="text-sm font-semibold">Outstanding pledges</div>
+                <div className="text-xs text-muted-foreground">Count: {pledgesOutstandingCount}</div>
+              </div>
+              <div className="text-lg font-extrabold text-indigo-700">{money(currency.symbol, pledgesOutstandingTotal)}</div>
             </div>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
