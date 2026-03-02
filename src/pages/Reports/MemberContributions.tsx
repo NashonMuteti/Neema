@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -11,91 +11,112 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { format, getMonth, getYear, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
-import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import { useDebounce } from "@/hooks/use-debounce";
 import ReportActions from "@/components/reports/ReportActions";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import DateRangePicker from "@/components/reports/DateRangePicker";
+import { DateRange } from "react-day-picker";
 
-interface MemberContribution {
+interface MemberObligationsRow {
   member_id: string;
   member_name: string;
   member_email: string;
-  total_contributed: number;
-  last_contribution_date: string | null; // ISO string
+  total_owed: number;
+  total_paid: number;
+  total_due: number;
 }
 
 const MemberContributions = () => {
   const { currency } = useSystemSettings();
-  const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date()); // 0-indexed
 
-  const [filterMonth, setFilterMonth] = React.useState<string>(currentMonth.toString());
-  const [filterYear, setFilterYear] = React.useState<string>(currentYear.toString());
-  
-  const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
-  const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+  const defaultRange = React.useMemo<DateRange>(() => {
+    const now = new Date();
+    return {
+      from: new Date(now.getFullYear(), now.getMonth(), 1),
+      to: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+    };
+  }, []);
 
-  const [contributions, setContributions] = React.useState<MemberContribution[]>([]);
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(defaultRange);
+
+  const [localSearchQuery, setLocalSearchQuery] = React.useState("");
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 500);
+
+  const [rows, setRows] = React.useState<MemberObligationsRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const months = Array.from({ length: 12 }, (_, i) => ({
-    value: i.toString(),
-    label: format(new Date(0, i), "MMMM"),
-  }));
-  const years = Array.from({ length: 5 }, (_, i) => ({
-    value: (currentYear - 2 + i).toString(),
-    label: (currentYear - 2 + i).toString(),
-  }));
-
-  const fetchMemberContributions = useCallback(async () => {
+  const fetchReport = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const startOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 1);
-    const endOfMonth = new Date(parseInt(filterYear), parseInt(filterMonth) + 1, 0, 23, 59, 59);
+    const from = dateRange?.from ? new Date(dateRange.from) : null;
+    const to = dateRange?.to ? new Date(dateRange.to) : null;
 
-    const { data, error } = await supabase.rpc('get_member_contributions_summary', {
-      p_start_date: startOfMonth.toISOString(),
-      p_end_date: endOfMonth.toISOString(),
-      p_search_query: debouncedSearchQuery, // Use debounced query
+    if (!from || !to) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
+    // make sure the end includes the full day
+    to.setHours(23, 59, 59, 999);
+
+    const { data, error } = await supabase.rpc("get_member_obligations_summary", {
+      p_start_date: from.toISOString(),
+      p_end_date: to.toISOString(),
+      p_search_query: debouncedSearchQuery,
     });
 
     if (error) {
-      console.error("Error fetching member contributions:", error);
-      setError("Failed to load member contributions.");
-      showError("Failed to load member contributions.");
-      setContributions([]);
-    } else {
-      setContributions(data || []);
+      console.error("Error fetching member obligations summary:", error);
+      setError("Failed to load contributions summary.");
+      showError("Failed to load contributions summary.");
+      setRows([]);
+      setLoading(false);
+      return;
     }
+
+    setRows((data || []) as MemberObligationsRow[]);
     setLoading(false);
-  }, [filterMonth, filterYear, debouncedSearchQuery]); // Depend on debounced query
+  }, [dateRange?.from, dateRange?.to, debouncedSearchQuery]);
 
   useEffect(() => {
-    fetchMemberContributions();
-  }, [fetchMemberContributions]);
+    fetchReport();
+  }, [fetchReport]);
+
+  const periodLabel = React.useMemo(() => {
+    const fromStr = dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : "-";
+    const toStr = dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : "-";
+    return `${fromStr} - ${toStr}`;
+  }, [dateRange?.from, dateRange?.to]);
+
+  const subtitle = `Period: ${periodLabel}${debouncedSearchQuery ? ` • Search: ${debouncedSearchQuery}` : ""}`;
+
+  const totals = React.useMemo(() => {
+    return rows.reduce(
+      (acc, r) => {
+        acc.owed += Number(r.total_owed || 0);
+        acc.paid += Number(r.total_paid || 0);
+        acc.due += Number(r.total_due || 0);
+        return acc;
+      },
+      { owed: 0, paid: 0, due: 0 },
+    );
+  }, [rows]);
+
+  const money = (v: number) => `${currency.symbol}${Number(v || 0).toFixed(2)}`;
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-foreground">Member Contributions Report</h1>
-        <p className="text-lg text-muted-foreground">Loading member contributions...</p>
+        <h1 className="text-3xl font-bold text-foreground">Contributions Summary Report</h1>
+        <p className="text-lg text-muted-foreground">Loading report…</p>
       </div>
     );
   }
@@ -103,83 +124,61 @@ const MemberContributions = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-foreground">Member Contributions Report</h1>
+        <h1 className="text-3xl font-bold text-foreground">Contributions Summary Report</h1>
         <p className="text-lg text-destructive">{error}</p>
       </div>
     );
   }
 
-  const subtitle = `Period: ${months.find((m) => m.value === filterMonth)?.label} ${filterYear}${debouncedSearchQuery ? ` • Search: ${debouncedSearchQuery}` : ""}`;
-
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">Member Contributions Report</h1>
+      <h1 className="text-3xl font-bold text-foreground">Contributions Summary Report</h1>
       <p className="text-lg text-muted-foreground">
-        View a summary of financial contributions made by each member.
+        Summary of member obligations (pledges) and payments for a selected date range.
       </p>
+
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle>Contributions Summary</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
           </div>
+
           <ReportActions
-            title="Member Contributions Report"
+            title="Contributions Summary Report"
             subtitle={subtitle}
-            columns={["Member Name", "Member Email", "Total Contributed", "Last Contribution Date"]}
-            rows={contributions.map((c) => [
-              c.member_name,
-              c.member_email,
-              `${currency.symbol}${c.total_contributed.toFixed(2)}`,
-              c.last_contribution_date ? format(parseISO(c.last_contribution_date), "MMM dd, yyyy") : "N/A",
-            ])}
+            columns={[
+              "Member Name",
+              "Total owed (all obligations)",
+              "Total paid (all obligations)",
+              "Due to pay",
+            ]}
+            rows={[
+              ...rows.map((r) => [
+                r.member_name,
+                money(r.total_owed),
+                money(r.total_paid),
+                money(r.total_due),
+              ]),
+              ["TOTAL", money(totals.owed), money(totals.paid), money(totals.due)],
+            ]}
           />
         </CardHeader>
+
         <CardContent>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-            <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4">
+            <div className="flex flex-wrap items-end gap-4">
               <div className="grid gap-1.5">
-                <Label htmlFor="filter-month">Month</Label>
-                <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger id="filter-month" className="w-[140px]">
-                    <SelectValue placeholder="Select month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Month</SelectLabel>
-                      {months.map((month) => (
-                        <SelectItem key={month.value} value={month.value}>
-                          {month.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <Label>Date range</Label>
+                <DateRangePicker value={dateRange} onChange={setDateRange} className="w-[280px]" />
               </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="filter-year">Year</Label>
-                <Select value={filterYear} onValueChange={setFilterYear}>
-                  <SelectTrigger id="filter-year" className="w-[120px]">
-                    <SelectValue placeholder="Select year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Year</SelectLabel>
-                      {years.map((year) => (
-                        <SelectItem key={year.value} value={year.value}>
-                          {year.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
+
               <div className="relative flex items-center">
                 <Input
                   type="text"
                   placeholder="Search member..."
-                  value={localSearchQuery} // Use local state for input
-                  onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
                   className="pl-8"
                 />
                 <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
@@ -187,39 +186,38 @@ const MemberContributions = () => {
             </div>
           </div>
 
-          {contributions.length > 0 ? (
+          {rows.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Member Name</TableHead>
-                  <TableHead>Member Email</TableHead>
-                  <TableHead className="text-right">Total Contributed</TableHead>
-                  <TableHead>Last Contribution Date</TableHead>
-                  <TableHead className="text-right">Details</TableHead>
+                  <TableHead className="text-right">Total owed (all obligations)</TableHead>
+                  <TableHead className="text-right">Total paid (all obligations)</TableHead>
+                  <TableHead className="text-right">Due to pay</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contributions.map((contribution) => (
-                  <TableRow key={contribution.member_id}>
-                    <TableCell className="font-medium">{contribution.member_name}</TableCell>
-                    <TableCell>{contribution.member_email}</TableCell>
-                    <TableCell className="text-right font-medium">{currency.symbol}{contribution.total_contributed.toFixed(2)}</TableCell>
-                    <TableCell>
-                      {contribution.last_contribution_date
-                        ? format(parseISO(contribution.last_contribution_date), "MMM dd, yyyy")
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={`/members/${contribution.member_id}/contributions`}>View</Link>
-                      </Button>
-                    </TableCell>
+                {rows.map((r) => (
+                  <TableRow key={r.member_id}>
+                    <TableCell className="font-medium">{r.member_name}</TableCell>
+                    <TableCell className="text-right font-medium">{money(r.total_owed)}</TableCell>
+                    <TableCell className="text-right font-medium">{money(r.total_paid)}</TableCell>
+                    <TableCell className="text-right font-semibold text-primary">{money(r.total_due)}</TableCell>
                   </TableRow>
                 ))}
+
+                <TableRow className="bg-muted/40 font-bold hover:bg-muted/40">
+                  <TableCell>TOTAL</TableCell>
+                  <TableCell className="text-right">{money(totals.owed)}</TableCell>
+                  <TableCell className="text-right">{money(totals.paid)}</TableCell>
+                  <TableCell className="text-right text-primary">{money(totals.due)}</TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center mt-4">No member contributions found for the selected period or matching your search.</p>
+            <p className="text-muted-foreground text-center mt-4">
+              No records found for the selected date range or matching your search.
+            </p>
           )}
         </CardContent>
       </Card>
