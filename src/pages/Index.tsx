@@ -107,6 +107,12 @@ const Index = () => {
               <Button asChild className="justify-start">
                 <Link to="/reports/financial-detailed">Financial Detailed</Link>
               </Button>
+              <Button asChild variant="outline" className="justify-start">
+                <Link to="/reports/member-contributions">Member Contributions</Link>
+              </Button>
+              <Button asChild variant="outline" className="justify-start">
+                <Link to="/reports/table-banking-summary">Table Banking Summary</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
