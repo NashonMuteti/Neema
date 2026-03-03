@@ -39,6 +39,13 @@ export default function IncomeTable({
 }: Props) {
   const { currency } = useSystemSettings();
 
+  const humanizeSource = (source: string) => {
+    const s = String(source || "").trim();
+    const m = s.match(/^daily\s*sale:\s*([0-9a-f-]{8,})$/i);
+    if (m) return `Sale (ref: ${m[1].slice(0, 8)})`;
+    return s || "-";
+  };
+
   if (transactions.length === 0) {
     return <p className="text-muted-foreground">No income transactions found for the selected filters.</p>;
   }
@@ -63,7 +70,7 @@ export default function IncomeTable({
           <TableRow key={tx.id}>
             <TableCell>{format(tx.date, "MMM dd, yyyy")}</TableCell>
             {showMember ? <TableCell>{tx.profile_name || "-"}</TableCell> : null}
-            <TableCell>{tx.source}</TableCell>
+            <TableCell>{humanizeSource(tx.source)}</TableCell>
             <TableCell>{tx.account_name}</TableCell>
             <TableCell className="text-right">
               {currency.symbol}

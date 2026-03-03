@@ -465,10 +465,17 @@ export default function Income() {
   }, [dateRange?.from, dateRange?.to, accountId, memberId, isAdmin, debouncedSearchQuery, minAmount, maxAmount, financialAccounts, members, currency.symbol]);
 
   const reportRows = React.useMemo(() => {
+    const humanizeSource = (source: string) => {
+      const s = String(source || "").trim();
+      const m = s.match(/^daily\s*sale:\s*([0-9a-f-]{8,})$/i);
+      if (m) return `Sale (ref: ${m[1].slice(0, 8)})`;
+      return s || "-";
+    };
+
     const base = transactions.map((t) => [
       format(t.date, "MMM dd, yyyy"),
       t.profile_name || "-",
-      t.source,
+      humanizeSource(t.source),
       t.account_name,
       `${currency.symbol}${t.amount.toFixed(2)}`,
     ]);

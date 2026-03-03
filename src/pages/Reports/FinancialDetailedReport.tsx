@@ -92,6 +92,13 @@ function money(symbol: string, v: number) {
   return `${symbol}${v.toFixed(2)}`;
 }
 
+function humanizeIncomeSource(source: string) {
+  const s = String(source || "").trim();
+  const m = s.match(/^daily\s*sale:\s*([0-9a-f-]{8,})$/i);
+  if (m) return `Sale (ref: ${m[1].slice(0, 8)})`;
+  return s || "—";
+}
+
 function groupTotal<T>(rows: T[], key: (r: T) => string, value: (r: T) => number) {
   const m = new Map<string, number>();
   for (const r of rows) {
@@ -315,7 +322,7 @@ export default function FinancialDetailedReport() {
 
     const incomeRows: Array<Array<string | number>> = income.map((r) => [
       format(new Date(r.date), "yyyy-MM-dd"),
-      r.source,
+      humanizeIncomeSource(r.source),
       accountNameById.get(r.account_id) || r.account_id,
       money(currency.symbol, r.amount || 0),
     ]);

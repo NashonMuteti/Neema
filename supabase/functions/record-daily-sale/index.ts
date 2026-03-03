@@ -69,6 +69,7 @@ serve(async (req) => {
 
     let total_amount = 0;
     const productUpdates: Array<{ id: string; new_stock: number }> = [];
+    const itemLabels: string[] = [];
 
     for (const item of sale_items) {
       const { product_id, quantity, unit_price } = item;
@@ -78,7 +79,7 @@ serve(async (req) => {
 
       const { data: product, error: productError } = await supabaseServiceRole
         .from('products')
-        .select('current_stock')
+        .select('current_stock, name')
         .eq('id', product_id)
         .single();
 
@@ -96,6 +97,10 @@ serve(async (req) => {
         id: product_id,
         new_stock: product.current_stock - quantity,
       });
+
+      if (product.name) {
+        itemLabels.push(`${quantity}× ${product.name}`);
+      }
     }
 
     const total_paid = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
@@ -131,6 +136,22 @@ serve(async (req) => {
     }
 
     const sale_id = saleData.id;
+
+    const shortSaleId = String(sale_id).slice(0, 8);
+    const customerLabel = String(customer_name || "").trim() || "Walk-in";
+    const itemsSummary = itemLabels.length
+      ? `Items: ${itemLabels.slice(0, 3).join(", ")}${itemLabels.length > 3 ? ` +${itemLabels.length - 3} more` : ""}`
+      : "";
+
+    const makeSaleIncomeSource = () => {
+      const base = [
+        `Sale: ${customerLabel}`,
+        itemsSummary,
+        `#${shortSaleId}`,
+      ].filter(Boolean).join(" • ");
+
+      return base.length > 140 ? `${base.slice(0, 137)}...` : base;
+    };
 
     for (const item of sale_items) {
       const { product_id, quantity, unit_price } = item;
@@ -200,7 +221,7 @@ serve(async (req) => {
           profile_id: user.id,
           account_id,
           amount,
-          source: `Daily Sale: ${sale_id}`,
+          source: makeSaleIncomeSource(),
           date: sale_date,
         });
 
