@@ -1,6 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Printer } from "lucide-react";
+import { useBranding } from "@/context/BrandingContext";
+import { useAuth } from "@/context/AuthContext";
+import { exportTableToPdf } from "@/utils/reportUtils";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, getMonth, getYear } from "date-fns";
@@ -56,9 +61,12 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   totalYearlyPaidAmount,
   allActiveProjects, // Use ALL active projects
   memberId, // Use memberId
-  renderDay
+  renderDay,
+  memberName,
 }) => {
   const { currency } = useSystemSettings();
+  const { brandLogoUrl, tagline } = useBranding();
+  const { currentUser } = useAuth();
   const [memberProjectContributionsSummary, setMemberProjectContributionsSummary] = useState<
     { projectId: string; projectName: string; expected: number; pledged: number; paid: number; }[]
   >([]);
@@ -125,6 +133,42 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
   const subtotalPledged = memberProjectContributionsSummary.reduce((sum, p) => sum + p.pledged, 0);
   const subtotalPaid = memberProjectContributionsSummary.reduce((sum, p) => sum + p.paid, 0);
   const overallBalanceDue = subtotalExpected - subtotalPaid;
+
+  const handlePrintProjectSummary = async () => {
+    const columns = ["Project", "Expected", "Pledged", "Paid"];
+    const rows: Array<Array<string | number>> = [
+      ...memberProjectContributionsSummary.map((p) => [
+        p.projectName,
+        `${currency.symbol}${p.expected.toFixed(2)}`,
+        `${currency.symbol}${p.pledged.toFixed(2)}`,
+        `${currency.symbol}${p.paid.toFixed(2)}`,
+      ]),
+      [
+        "Subtotal",
+        `${currency.symbol}${subtotalExpected.toFixed(2)}`,
+        `${currency.symbol}${subtotalPledged.toFixed(2)}`,
+        `${currency.symbol}${subtotalPaid.toFixed(2)}`,
+      ],
+      [
+        "Balance to Pay",
+        "",
+        "",
+        `${currency.symbol}${overallBalanceDue.toFixed(2)}`,
+      ],
+    ];
+
+    await exportTableToPdf({
+      title: `Contributions Summary per Project - ${memberName} (${filterYear})`,
+      subtitle: currentUser?.name ? `prepared by: ${currentUser.name}` : undefined,
+      fileName: `Member_Contributions_Project_Summary_${memberName}_${filterYear}`,
+      columns,
+      rows,
+      brandLogoUrl,
+      tagline,
+      mode: "open",
+      orientation: "auto",
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> {/* Changed to lg:grid-cols-3 */}
@@ -233,8 +277,11 @@ const MemberContributionsOverview: React.FC<MemberContributionsOverviewProps> = 
         </Card>
 
         <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-          <CardHeader>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Contributions Summary per Project</CardTitle>
+            <Button variant="outline" size="sm" onClick={handlePrintProjectSummary}>
+              <Printer className="mr-2 h-4 w-4" /> Print
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             {loadingMemberProjectContributionsSummary ? (

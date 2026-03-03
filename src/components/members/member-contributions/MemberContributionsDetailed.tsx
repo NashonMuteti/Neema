@@ -1,6 +1,11 @@
 "use client";
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Printer } from "lucide-react";
+import { useBranding } from "@/context/BrandingContext";
+import { useAuth } from "@/context/AuthContext";
+import { exportTableToPdf } from "@/utils/reportUtils";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,16 +43,53 @@ const MemberContributionsDetailed: React.FC<MemberContributionsDetailedProps> = 
   memberContributions
 }) => {
   const { currency } = useSystemSettings(); // Use currency from context
+  const { brandLogoUrl, tagline } = useBranding();
+  const { currentUser } = useAuth();
 
   // Filter transactions to only show 'income' and 'pledge' types
   const filteredContributionsAndPledges = React.useMemo(() => {
     return memberContributions.filter(c => c.type === 'income' || c.type === 'pledge' || c.type === 'expenditure'); // Added expenditure
   }, [memberContributions]);
 
+  const handlePrint = async () => {
+    const columns = ["Date", "Type", "Description", "Account/Project", "Amount", "Due Date"];
+
+    const rows = filteredContributionsAndPledges.map((c) => {
+      const status = getContributionStatus(c.type, c.status);
+      const isIncomeOrPaidPledge = c.type === 'income' || (c.type === 'pledge' && c.status === 'Paid');
+
+      const amountStr = `${isIncomeOrPaidPledge ? "+" : "-"}${currency.symbol}${c.amount.toFixed(2)}`;
+
+      return [
+        format(c.date, "MMM dd, yyyy"),
+        status.text,
+        c.sourceOrPurpose,
+        c.accountName,
+        amountStr,
+        c.type === 'pledge' && c.dueDate ? format(c.dueDate, "MMM dd, yyyy") : "-",
+      ];
+    });
+
+    await exportTableToPdf({
+      title: `Detailed Contributions & Pledges for ${memberName} (${filterYear})`,
+      subtitle: currentUser?.name ? `prepared by: ${currentUser.name}` : undefined,
+      fileName: `Member_Contributions_Detailed_${memberName}_${filterYear}`,
+      columns,
+      rows,
+      brandLogoUrl,
+      tagline,
+      mode: "open",
+      orientation: "auto",
+    });
+  };
+
   return (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
-      <CardHeader>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Detailed Contributions & Pledges for {memberName} ({filterYear})</CardTitle> {/* Updated title */}
+        <Button variant="outline" size="sm" onClick={handlePrint}>
+          <Printer className="mr-2 h-4 w-4" /> Print
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">

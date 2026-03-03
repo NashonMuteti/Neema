@@ -31,8 +31,7 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { useBranding } from "@/context/BrandingContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
-import { exportTableToPdf, exportBoardMembersToPdf, exportBoardMembersToExcel } from "@/utils/reportUtils";
-import { maskEmail, maskPhone } from "@/utils/privacy";
+import { exportBoardMembersToPdf, exportBoardMembersToExcel } from "@/utils/reportUtils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
