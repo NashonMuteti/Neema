@@ -12,15 +12,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { useDebounce } from "@/hooks/use-debounce";
 import ReportActions from "@/components/reports/ReportActions";
-import DateRangePicker from "@/components/reports/DateRangePicker";
-import { DateRange } from "react-day-picker";
 
 interface MemberObligationsRow {
   member_id: string;
@@ -31,18 +28,11 @@ interface MemberObligationsRow {
   total_due: number;
 }
 
+const owedHeader = "Total owed (Expected(active projects) + Pledges + Debts)";
+const paidHeader = "Total paid (Collections + Paid pledges + Paid debts)";
+
 const MemberContributions = () => {
   const { currency } = useSystemSettings();
-
-  const defaultRange = React.useMemo<DateRange>(() => {
-    const now = new Date();
-    return {
-      from: new Date(now.getFullYear(), now.getMonth(), 1),
-      to: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
-    };
-  }, []);
-
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(defaultRange);
 
   const [localSearchQuery, setLocalSearchQuery] = React.useState("");
   const debouncedSearchQuery = useDebounce(localSearchQuery, 500);
@@ -55,21 +45,7 @@ const MemberContributions = () => {
     setLoading(true);
     setError(null);
 
-    const from = dateRange?.from ? new Date(dateRange.from) : null;
-    const to = dateRange?.to ? new Date(dateRange.to) : null;
-
-    if (!from || !to) {
-      setRows([]);
-      setLoading(false);
-      return;
-    }
-
-    // make sure the end includes the full day
-    to.setHours(23, 59, 59, 999);
-
-    const { data, error } = await supabase.rpc("get_member_obligations_summary", {
-      p_start_date: from.toISOString(),
-      p_end_date: to.toISOString(),
+    const { data, error } = await supabase.rpc("get_member_obligations_summary_current", {
       p_search_query: debouncedSearchQuery,
     });
 
@@ -84,19 +60,14 @@ const MemberContributions = () => {
 
     setRows((data || []) as MemberObligationsRow[]);
     setLoading(false);
-  }, [dateRange?.from, dateRange?.to, debouncedSearchQuery]);
+  }, [debouncedSearchQuery]);
 
   useEffect(() => {
     fetchReport();
   }, [fetchReport]);
 
-  const periodLabel = React.useMemo(() => {
-    const fromStr = dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : "-";
-    const toStr = dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : "-";
-    return `${fromStr} - ${toStr}`;
-  }, [dateRange?.from, dateRange?.to]);
-
-  const subtitle = `Period: ${periodLabel}${debouncedSearchQuery ? ` • Search: ${debouncedSearchQuery}` : ""}`;
+  const subtitle = "Scope: Active members only • Projects: Open only" +
+    (debouncedSearchQuery ? ` • Search: ${debouncedSearchQuery}` : "");
 
   const totals = React.useMemo(() => {
     return rows.reduce(
@@ -134,7 +105,7 @@ const MemberContributions = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Contributions Summary Report</h1>
       <p className="text-lg text-muted-foreground">
-        Summary of member obligations (pledges) and payments for a selected date range.
+        Summary of member obligations and payments across all open projects, pledges, and debts.
       </p>
 
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
@@ -147,19 +118,9 @@ const MemberContributions = () => {
           <ReportActions
             title="Contributions Summary Report"
             subtitle={subtitle}
-            columns={[
-              "Member Name",
-              "Total owed (all obligations)",
-              "Total paid (all obligations)",
-              "Due to pay",
-            ]}
+            columns={["Member Name", owedHeader, paidHeader, "Due to pay (Owed - Paid)"]}
             rows={[
-              ...rows.map((r) => [
-                r.member_name,
-                money(r.total_owed),
-                money(r.total_paid),
-                money(r.total_due),
-              ]),
+              ...rows.map((r) => [r.member_name, money(r.total_owed), money(r.total_paid), money(r.total_due)]),
               ["TOTAL", money(totals.owed), money(totals.paid), money(totals.due)],
             ]}
           />
@@ -168,13 +129,10 @@ const MemberContributions = () => {
         <CardContent>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4">
             <div className="flex flex-wrap items-end gap-4">
-              <div className="grid gap-1.5">
-                <Label>Date range</Label>
-                <DateRangePicker value={dateRange} onChange={setDateRange} className="w-[280px]" />
-              </div>
-
               <div className="relative flex items-center">
+                <Label className="sr-only" htmlFor="contrib-summary-search">Search member</Label>
                 <Input
+                  id="contrib-summary-search"
                   type="text"
                   placeholder="Search member..."
                   value={localSearchQuery}
@@ -191,9 +149,9 @@ const MemberContributions = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Member Name</TableHead>
-                  <TableHead className="text-right">Total owed (all obligations)</TableHead>
-                  <TableHead className="text-right">Total paid (all obligations)</TableHead>
-                  <TableHead className="text-right">Due to pay</TableHead>
+                  <TableHead className="text-right">{owedHeader}</TableHead>
+                  <TableHead className="text-right">{paidHeader}</TableHead>
+                  <TableHead className="text-right">Due to pay (Owed - Paid)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -216,7 +174,7 @@ const MemberContributions = () => {
             </Table>
           ) : (
             <p className="text-muted-foreground text-center mt-4">
-              No records found for the selected date range or matching your search.
+              No active members found matching your search.
             </p>
           )}
         </CardContent>
