@@ -54,6 +54,18 @@ const PledgeListTable: React.FC<PledgeListTableProps> = ({ // Using the new inte
   currency,
   isProcessing,
 }) => {
+  const totals = React.useMemo(() => {
+    return pledges.reduce(
+      (acc, p) => {
+        acc.pledged += Number(p.original_amount || 0);
+        acc.paid += Number(p.paid_amount || 0);
+        acc.remaining += Math.max(Number(p.original_amount || 0) - Number(p.paid_amount || 0), 0);
+        return acc;
+      },
+      { pledged: 0, paid: 0, remaining: 0 },
+    );
+  }, [pledges]);
+
   return (
     <>
       {pledges.length > 0 ? (
@@ -101,11 +113,11 @@ const PledgeListTable: React.FC<PledgeListTableProps> = ({ // Using the new inte
                             isProcessing={isProcessing}
                           />
                         )}
-                        <EditPledgeDialog // Pass onEditPledge to the dialog
+                        <EditPledgeDialog
                           initialData={pledge as EditPledgeDialogPledge}
                           onSave={onEditPledge}
-                          members={[]} // Members and projects are not directly needed by EditPledgeDialog, but it expects them.
-                          projects={[]} // In a real app, these would be passed from a higher context or fetched within the dialog.
+                          members={[]}
+                          projects={[]}
                           financialAccounts={financialAccounts}
                         />
                         <Button variant="ghost" size="icon" onClick={() => onDeletePledge(pledge.id)}>
@@ -117,6 +129,17 @@ const PledgeListTable: React.FC<PledgeListTableProps> = ({ // Using the new inte
                 </TableRow>
               );
             })}
+
+            <TableRow className="bg-muted/40 font-bold hover:bg-muted/40">
+              <TableCell colSpan={2}>TOTAL</TableCell>
+              <TableCell className="text-right">{currency.symbol}{totals.pledged.toFixed(2)}</TableCell>
+              <TableCell className="text-right">{currency.symbol}{totals.paid.toFixed(2)}</TableCell>
+              <TableCell className="text-right">{currency.symbol}{totals.remaining.toFixed(2)}</TableCell>
+              <TableCell />
+              <TableCell />
+              <TableCell />
+              {canManagePledges ? <TableCell /> : null}
+            </TableRow>
           </TableBody>
         </Table>
       ) : (

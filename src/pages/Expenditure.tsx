@@ -4,6 +4,14 @@ import React from "react";
 import { endOfDay, format, parseISO, startOfDay, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 
+import { showSuccess, showError } from "@/utils/toast";
+import { useAuth } from "@/context/AuthContext";
+import { useUserRoles } from "@/context/UserRolesContext";
+import { supabase } from "@/integrations/supabase/client";
+import { validateFinancialTransaction } from "@/utils/security";
+import { useSystemSettings } from "@/context/SystemSettingsContext";
+import { useQueryClient } from "@tanstack/react-query";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,16 +29,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CalendarIcon, Edit, Trash2 } from "lucide-react";
-import { showSuccess, showError } from "@/utils/toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { useAuth } from "@/context/AuthContext";
-import { useUserRoles } from "@/context/UserRolesContext";
-import { supabase } from "@/integrations/supabase/client";
-import { validateFinancialTransaction } from "@/utils/security";
-import { useSystemSettings } from "@/context/SystemSettingsContext";
-import { useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/use-debounce";
 import ReportActions from "@/components/reports/ReportActions";
 import DateRangePicker from "@/components/reports/DateRangePicker";
@@ -124,10 +125,7 @@ export default function Expenditure() {
       showError("Failed to load financial accounts.");
       setFinancialAccounts([]);
     } else {
-      setFinancialAccounts(accountsData || []);
-      if (!expenditureAccount && accountsData && accountsData.length > 0) {
-        setExpenditureAccount(accountsData[0].id);
-      }
+      setFinancialAccounts((accountsData || []) as any);
     }
 
     const { data: membersData, error: membersError } = await supabase
@@ -137,7 +135,7 @@ export default function Expenditure() {
 
     if (membersError) {
       console.error("Error fetching members:", membersError);
-      showError("Failed to load members for expenditure association.");
+      showError("Failed to load members.");
       setMembers([]);
     } else {
       setMembers(
@@ -148,7 +146,7 @@ export default function Expenditure() {
         })),
       );
     }
-  }, [currentUser, isAdmin, expenditureAccount]);
+  }, [currentUser, isAdmin]);
 
   const fetchExpenditureTransactions = React.useCallback(async () => {
     setLoading(true);
@@ -170,18 +168,32 @@ export default function Expenditure() {
 
     let query = supabase
       .from("expenditure_transactions")
-      .select("id, date, amount, purpose, account_id, profile_id, financial_accounts(name), profiles(name,email)")
+      .select(
+        `
+        id,
+        date,
+        amount,
+        account_id,
+        purpose,
+        profile_id,
+        financial_accounts(name),
+        profiles(name,email)
+      `,
+      )
       .gte("date", from.toISOString())
-      .lte("date", to.toISOString());
+      .lte("date", to.toISOString())
+      .order("date", { ascending: false });
 
     if (!isAdmin) {
       query = query.eq("profile_id", currentUser.id);
-    } else if (memberId !== "All") {
-      query = query.eq("profile_id", memberId);
     }
 
     if (accountId !== "All") {
       query = query.eq("account_id", accountId);
+    }
+
+    if (isAdmin && memberId !== "All") {
+      query = query.eq("profile_id", memberId);
     }
 
     const q = debouncedSearchQuery.trim();
@@ -194,7 +206,7 @@ export default function Expenditure() {
     if (min !== null && Number.isFinite(min)) query = query.gte("amount", min);
     if (max !== null && Number.isFinite(max)) query = query.lte("amount", max);
 
-    const { data, error } = await query.order("date", { ascending: false });
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching expenditure transactions:", error);
@@ -205,19 +217,18 @@ export default function Expenditure() {
       return;
     }
 
-    setTransactions(
-      (data || []).map((tx: any) => ({
-        id: tx.id,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        account_id: tx.account_id,
-        purpose: tx.purpose,
-        profile_id: tx.profile_id,
-        account_name: tx.financial_accounts?.name || "Unknown Account",
-        profile_name: tx.profiles?.name || tx.profiles?.email || undefined,
-      })),
-    );
+    const normalized: ExpenditureTransaction[] = (data || []).map((t: any) => ({
+      id: t.id,
+      date: parseISO(t.date),
+      amount: Number(t.amount || 0),
+      account_id: t.account_id,
+      purpose: t.purpose,
+      profile_id: t.profile_id,
+      account_name: t.financial_accounts?.name || "Unknown",
+      profile_name: t.profiles?.name || t.profiles?.email || undefined,
+    }));
 
+    setTransactions(normalized);
     setLoading(false);
   }, [currentUser, isAdmin, dateRange?.from, dateRange?.to, accountId, memberId, debouncedSearchQuery, minAmount, maxAmount]);
 
@@ -233,48 +244,60 @@ export default function Expenditure() {
     queryClient.invalidateQueries({ queryKey: ["financialData"] });
     queryClient.invalidateQueries({ queryKey: ["financialSummary"] });
     queryClient.invalidateQueries({ queryKey: ["recentTransactions"] });
-    queryClient.invalidateQueries({ queryKey: ["dashboardProjects"] });
-    queryClient.invalidateQueries({ queryKey: ["contributionsProgress"] });
   };
 
   const handlePostExpenditure = async () => {
+    if (!canManageExpenditure) {
+      showError("You do not have permission to record expenditure.");
+      return;
+    }
     if (!currentUser) {
-      showError("You must be logged in to post expenditure.");
+      showError("You must be logged in.");
       return;
     }
 
-    if (!expenditureDate || !expenditureAmount || !expenditureAccount || !expenditurePurpose) {
-      showError("All expenditure fields are required.");
+    const parsedAmount = parseFloat(expenditureAmount);
+    if (!expenditureDate || !parsedAmount || parsedAmount <= 0 || !expenditureAccount || !expenditurePurpose) {
+      showError("Please fill all required fields.");
       return;
     }
 
-    const amount = parseFloat(expenditureAmount);
-
-    const validation = validateFinancialTransaction(amount, expenditureAccount, currentUser.id);
+    const validation = validateFinancialTransaction(parsedAmount, expenditureAccount, currentUser.id);
     if (!validation.isValid) {
       showError(validation.error || "Invalid expenditure amount.");
       return;
     }
 
-    const currentAccount = financialAccounts.find((acc) => acc.id === expenditureAccount);
-    if (!currentAccount) {
-      showError("Selected account not found.");
+    const profileId = selectedExpenditureMemberId || currentUser.id;
+
+    const { data: accountData, error: accountError } = await supabase
+      .from("financial_accounts")
+      .select("id, current_balance, profile_id")
+      .eq("id", expenditureAccount)
+      .single();
+
+    if (accountError || !accountData) {
+      console.error("Error fetching account:", accountError);
+      showError("Failed to fetch account details.");
       return;
     }
 
-    if (currentAccount.current_balance < amount) {
-      showError("Insufficient balance in the selected account.");
+    if (!isAdmin && accountData.profile_id !== currentUser.id) {
+      showError("You can only use your own account.");
       return;
     }
 
-    const transactionProfileId = selectedExpenditureMemberId || currentUser.id;
+    if (accountData.current_balance < parsedAmount) {
+      showError("Insufficient funds in the selected account.");
+      return;
+    }
 
     const { error: insertError } = await supabase.from("expenditure_transactions").insert({
       date: expenditureDate.toISOString(),
-      amount,
+      amount: parsedAmount,
       account_id: expenditureAccount,
-      purpose: expenditurePurpose,
-      profile_id: transactionProfileId,
+      purpose: expenditurePurpose.trim(),
+      profile_id: profileId,
     });
 
     if (insertError) {
@@ -283,12 +306,12 @@ export default function Expenditure() {
       return;
     }
 
-    const newBalance = currentAccount.current_balance - amount;
+    const newBalance = accountData.current_balance - parsedAmount;
     const { error: updateBalanceError } = await supabase
       .from("financial_accounts")
       .update({ current_balance: newBalance })
       .eq("id", expenditureAccount)
-      .eq("profile_id", currentAccount.profile_id);
+      .eq("profile_id", accountData.profile_id);
 
     if (updateBalanceError) {
       console.error("Error updating account balance:", updateBalanceError);
@@ -296,21 +319,184 @@ export default function Expenditure() {
     }
 
     showSuccess("Expenditure posted successfully!");
+    setExpenditureAmount("");
+    setExpenditurePurpose("");
+    setSelectedExpenditureMemberId(undefined);
     fetchExpenditureTransactions();
     fetchFinancialAccountsAndMembers();
     invalidateDashboardQueries();
   };
 
+  const reportSubtitle = React.useMemo(() => {
+    const fromStr = dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : "-";
+    const toStr = dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : "-";
+
+    const accountName =
+      accountId === "All" ? "All Accounts" : financialAccounts.find((a) => a.id === accountId)?.name || "Account";
+
+    const memberName = !isAdmin
+      ? "My Transactions"
+      : memberId === "All"
+        ? "All Members"
+        : members.find((m) => m.id === memberId)?.name || "Member";
+
+    const parts = [`Date: ${fromStr} → ${toStr}`, accountName, memberName];
+    const q = debouncedSearchQuery.trim();
+    if (q) parts.push(`Search: ${q}`);
+    if (minAmount) parts.push(`Min: ${currency.symbol}${minAmount}`);
+    if (maxAmount) parts.push(`Max: ${currency.symbol}${maxAmount}`);
+    return parts.join(" • ");
+  }, [dateRange?.from, dateRange?.to, accountId, memberId, isAdmin, debouncedSearchQuery, minAmount, maxAmount, financialAccounts, members, currency.symbol]);
+
+  const reportRows = React.useMemo(() => {
+    const base = transactions.map((t) => [
+      format(t.date, "MMM dd, yyyy"),
+      t.profile_name || "-",
+      t.purpose,
+      t.account_name,
+      `${currency.symbol}${t.amount.toFixed(2)}`,
+    ]);
+
+    const total = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    return [...base, ["TOTAL", "", "", "", `${currency.symbol}${total.toFixed(2)}`]];
+  }, [transactions, currency.symbol]);
+
+  const totalAmount = React.useMemo(() => transactions.reduce((sum, t) => sum + (t.amount || 0), 0), [transactions]);
+
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editingAmount, setEditingAmount] = React.useState<string>("");
+  const [editingPurpose, setEditingPurpose] = React.useState<string>("");
+  const [editingAccount, setEditingAccount] = React.useState<string>("");
+  const [editingDate, setEditingDate] = React.useState<Date | undefined>(undefined);
+
+  const [deletingTransaction, setDeletingTransaction] = React.useState<ExpenditureTransaction | null>(null);
+
   const handleEditTransaction = (id: string) => {
-    console.log("Editing expenditure transaction:", id);
-    showError("Edit functionality is not yet implemented for expenditure transactions.");
+    const tx = transactions.find((t) => t.id === id);
+    if (!tx) return;
+    setEditingId(id);
+    setEditingAmount(String(tx.amount));
+    setEditingPurpose(tx.purpose);
+    setEditingAccount(tx.account_id);
+    setEditingDate(tx.date);
   };
 
-  const handleDeleteTransaction = async (tx: ExpenditureTransaction) => {
-    if (!currentUser) {
-      showError("You must be logged in to delete expenditure.");
+  const handleSaveEdit = async () => {
+    if (!editingId || !currentUser) return;
+
+    const tx = transactions.find((t) => t.id === editingId);
+    if (!tx) return;
+
+    const parsedAmount = parseFloat(editingAmount);
+    if (!editingDate || !parsedAmount || parsedAmount <= 0 || !editingAccount || !editingPurpose) {
+      showError("Please fill all required fields.");
       return;
     }
+
+    const validation = validateFinancialTransaction(parsedAmount, editingAccount, currentUser.id);
+    if (!validation.isValid) {
+      showError(validation.error || "Invalid expenditure amount.");
+      return;
+    }
+
+    const validatedPurpose = editingPurpose.trim();
+
+    const { data: oldAccount, error: oldAccError } = await supabase
+      .from("financial_accounts")
+      .select("id, current_balance, profile_id")
+      .eq("id", tx.account_id)
+      .single();
+
+    const { data: newAccount, error: newAccError } = await supabase
+      .from("financial_accounts")
+      .select("id, current_balance, profile_id")
+      .eq("id", editingAccount)
+      .single();
+
+    if (oldAccError || newAccError || !oldAccount || !newAccount) {
+      showError("Failed to fetch account details.");
+      return;
+    }
+
+    if (!isAdmin && (oldAccount.profile_id !== currentUser.id || newAccount.profile_id !== currentUser.id)) {
+      showError("You can only use your own account.");
+      return;
+    }
+
+    // Adjust balances
+    if (tx.account_id === editingAccount) {
+      const newBalance = oldAccount.current_balance + tx.amount - parsedAmount;
+      const { error: updateBalanceError } = await supabase
+        .from("financial_accounts")
+        .update({ current_balance: newBalance })
+        .eq("id", oldAccount.id)
+        .eq("profile_id", oldAccount.profile_id);
+      if (updateBalanceError) {
+        console.error("Error updating account balance for same account:", updateBalanceError);
+        showError("Transaction updated, but failed to adjust account balance.");
+      }
+    } else {
+      const oldAccountNewBalance = oldAccount.current_balance + tx.amount;
+      const newAccountNewBalance = newAccount.current_balance - parsedAmount;
+
+      if (newAccountNewBalance < 0) {
+        showError("Insufficient funds in the selected account.");
+        return;
+      }
+
+      const { error: updateOldAccountError } = await supabase
+        .from("financial_accounts")
+        .update({ current_balance: oldAccountNewBalance })
+        .eq("id", oldAccount.id)
+        .eq("profile_id", oldAccount.profile_id);
+
+      const { error: updateNewAccountError } = await supabase
+        .from("financial_accounts")
+        .update({ current_balance: newAccountNewBalance })
+        .eq("id", newAccount.id)
+        .eq("profile_id", newAccount.profile_id);
+
+      if (updateOldAccountError || updateNewAccountError) {
+        console.error("Error updating account balances for different accounts:", updateOldAccountError, updateNewAccountError);
+        showError("Transaction updated, but failed to adjust account balances.");
+      }
+    }
+
+    const { error: updateError } = await supabase
+      .from("expenditure_transactions")
+      .update({
+        date: editingDate.toISOString(),
+        amount: parsedAmount,
+        account_id: editingAccount,
+        purpose: validatedPurpose,
+      })
+      .eq("id", editingId)
+      .eq("profile_id", tx.profile_id);
+
+    if (updateError) {
+      console.error("Error updating expenditure transaction:", updateError);
+      showError("Failed to update expenditure transaction.");
+      return;
+    }
+
+    showSuccess("Expenditure transaction updated successfully!");
+    setEditingId(null);
+    fetchExpenditureTransactions();
+    fetchFinancialAccountsAndMembers();
+    invalidateDashboardQueries();
+  };
+
+  const handleDeleteTransaction = (tx: ExpenditureTransaction) => {
+    setDeletingTransaction(tx);
+  };
+
+  const handleConfirmDeleteTransaction = async () => {
+    if (!deletingTransaction || !currentUser) {
+      showError("No transaction selected for deletion or user not logged in.");
+      return;
+    }
+
+    const tx = deletingTransaction;
 
     const { error: deleteError } = await supabase
       .from("expenditure_transactions")
@@ -340,41 +526,11 @@ export default function Expenditure() {
     }
 
     showSuccess("Expenditure transaction deleted successfully!");
+    setDeletingTransaction(null);
     fetchExpenditureTransactions();
     fetchFinancialAccountsAndMembers();
     invalidateDashboardQueries();
   };
-
-  const reportSubtitle = React.useMemo(() => {
-    const fromStr = dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : "-";
-    const toStr = dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : "-";
-
-    const accountName =
-      accountId === "All" ? "All Accounts" : financialAccounts.find((a) => a.id === accountId)?.name || "Account";
-
-    const memberName = !isAdmin
-      ? "My Transactions"
-      : memberId === "All"
-        ? "All Members"
-        : members.find((m) => m.id === memberId)?.name || "Member";
-
-    const parts = [`Date: ${fromStr} → ${toStr}`, accountName, memberName];
-    const q = debouncedSearchQuery.trim();
-    if (q) parts.push(`Search: ${q}`);
-    if (minAmount) parts.push(`Min: ${currency.symbol}${minAmount}`);
-    if (maxAmount) parts.push(`Max: ${currency.symbol}${maxAmount}`);
-    return parts.join(" • ");
-  }, [dateRange?.from, dateRange?.to, accountId, memberId, isAdmin, debouncedSearchQuery, minAmount, maxAmount, financialAccounts, members, currency.symbol]);
-
-  const reportRows = React.useMemo(() => {
-    return transactions.map((t) => [
-      format(t.date, "MMM dd, yyyy"),
-      t.profile_name || "-",
-      t.purpose,
-      t.account_name,
-      `${currency.symbol}${t.amount.toFixed(2)}`,
-    ]);
-  }, [transactions, currency.symbol]);
 
   if (loading) {
     return (
@@ -616,6 +772,15 @@ export default function Expenditure() {
                       ) : null}
                     </TableRow>
                   ))}
+
+                  <TableRow className="bg-muted/40 font-bold hover:bg-muted/40">
+                    <TableCell colSpan={isAdmin ? 4 : 3}>TOTAL</TableCell>
+                    <TableCell className="text-right">
+                      {currency.symbol}
+                      {totalAmount.toFixed(2)}
+                    </TableCell>
+                    {canManageExpenditure ? <TableCell /> : null}
+                  </TableRow>
                 </TableBody>
               </Table>
             ) : (

@@ -12,7 +12,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Edit, Trash2, Search, Package } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Package, FileText, Printer, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
+import { exportTableToPdf } from "@/utils/reportUtils";
+import { useBranding } from "@/context/BrandingContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { showSuccess, showError } from "@/utils/toast";
 import {
   AlertDialog,
@@ -45,6 +54,7 @@ const Stocks = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { currency } = useSystemSettings();
+  const { brandLogoUrl, tagline } = useBranding();
 
   const { canManageStocks, canManageStockStatus } = useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -184,6 +194,73 @@ const Stocks = () => {
     setDeletingProductId(productId);
   };
 
+  const exportStockPdf = async () => {
+    const title = "Stock Report";
+    const subtitle = `Generated: ${new Date().toLocaleDateString()}`;
+
+    const columns = [
+      "Name",
+      "SKU",
+      "Price",
+      "Current Stock",
+      "Stock Value",
+      "Reorder Point",
+      "Status",
+    ];
+
+    const rows = products.map((p) => {
+      const value = Number(p.price || 0) * Number(p.current_stock || 0);
+      return [
+        p.name,
+        p.sku || "-",
+        `${currency.symbol}${Number(p.price || 0).toFixed(2)}`,
+        Number(p.current_stock || 0),
+        `${currency.symbol}${value.toFixed(2)}`,
+        Number(p.reorder_point || 0),
+        p.is_active ? "Active" : "Inactive",
+      ];
+    });
+
+    await exportTableToPdf({
+      title,
+      subtitle,
+      fileName: `Stock_Report_${new Date().toISOString().slice(0, 10)}`,
+      columns,
+      rows: rows.length ? rows : [["No products found", "", "", "", "", "", ""]],
+      brandLogoUrl,
+      tagline,
+      mode: "open",
+      orientation: "auto",
+    });
+  };
+
+  const exportStockExcel = () => {
+    const columns = [
+      ["Stock Report"],
+      [`Generated: ${new Date().toLocaleDateString()}`],
+      [],
+      ["Name", "SKU", "Price", "Current Stock", "Stock Value", "Reorder Point", "Status"],
+    ];
+
+    const body = products.map((p) => {
+      const value = Number(p.price || 0) * Number(p.current_stock || 0);
+      return [
+        p.name,
+        p.sku || "-",
+        Number(Number(p.price || 0).toFixed(2)),
+        Number(p.current_stock || 0),
+        Number(value.toFixed(2)),
+        Number(p.reorder_point || 0),
+        p.is_active ? "Active" : "Inactive",
+      ];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([...columns, ...body]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Stock");
+    XLSX.writeFile(wb, `Stock_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -213,12 +290,28 @@ const Stocks = () => {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-xl font-semibold">Product List</CardTitle>
           <div className="flex items-center gap-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <FileText className="mr-2 h-4 w-4" /> Report
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => void exportStockPdf()}>
+                  <Printer className="mr-2 h-4 w-4" /> Print (PDF)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportStockExcel}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <div className="relative flex items-center">
               <Input
                 type="text"
                 placeholder="Search products..."
-                value={localSearchQuery} // Use local state for input
-                onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local state
+                value={localSearchQuery}
+                onChange={(e) => setLocalSearchQuery(e.target.value)}
                 className="pl-8"
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
@@ -254,46 +347,51 @@ const Stocks = () => {
                   <TableHead>SKU</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Current Stock</TableHead>
+                  <TableHead className="text-right">Stock Value</TableHead>
                   <TableHead className="text-right">Reorder Point</TableHead>
-                  <TableHead className="text-center">Status</TableHead> {/* New Status Column */}
+                  <TableHead className="text-center">Status</TableHead>
                   {canManageStocks && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{product.description || "-"}</TableCell>
-                    <TableCell>{product.sku || "-"}</TableCell>
-                    <TableCell className="text-right">{currency.symbol}{product.price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
-                      <span className={product.current_stock <= product.reorder_point ? "text-destructive font-semibold" : ""}>
-                        {product.current_stock}
-                      </span>
-                      {product.current_stock <= product.reorder_point && (
-                        <span className="ml-2 text-xs text-destructive">(Low Stock!)</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">{product.reorder_point}</TableCell>
-                    <TableCell className="text-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${product.is_active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"}`}>
-                        {product.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </TableCell>
-                    {canManageStocks && (
-                      <TableCell className="text-center">
-                        <div className="flex justify-center space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => openEditDialog(product)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(product.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                {products.map((product) => {
+                  const value = Number(product.price || 0) * Number(product.current_stock || 0);
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{product.description || "-"}</TableCell>
+                      <TableCell>{product.sku || "-"}</TableCell>
+                      <TableCell className="text-right">{currency.symbol}{product.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <span className={product.current_stock <= product.reorder_point ? "text-destructive font-semibold" : ""}>
+                          {product.current_stock}
+                        </span>
+                        {product.current_stock <= product.reorder_point && (
+                          <span className="ml-2 text-xs text-destructive">(Low Stock!)</span>
+                        )}
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      <TableCell className="text-right">{currency.symbol}{value.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{product.reorder_point}</TableCell>
+                      <TableCell className="text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${product.is_active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"}`}>
+                          {product.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </TableCell>
+                      {canManageStocks && (
+                        <TableCell className="text-center">
+                          <div className="flex justify-center space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => openEditDialog(product)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(product.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (

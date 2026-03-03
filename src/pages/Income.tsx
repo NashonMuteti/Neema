@@ -141,18 +141,32 @@ export default function Income() {
 
     let query = supabase
       .from("income_transactions")
-      .select("id, date, amount, source, account_id, profile_id, financial_accounts(name), profiles(name,email)")
+      .select(
+        `
+        id,
+        date,
+        amount,
+        source,
+        account_id,
+        profile_id,
+        financial_accounts(name),
+        profiles(name,email)
+      `,
+      )
       .gte("date", from.toISOString())
-      .lte("date", to.toISOString());
+      .lte("date", to.toISOString())
+      .order("date", { ascending: false });
 
     if (!isAdmin) {
       query = query.eq("profile_id", currentUser.id);
-    } else if (memberId !== "All") {
-      query = query.eq("profile_id", memberId);
     }
 
     if (accountId !== "All") {
       query = query.eq("account_id", accountId);
+    }
+
+    if (isAdmin && memberId !== "All") {
+      query = query.eq("profile_id", memberId);
     }
 
     const q = debouncedSearchQuery.trim();
@@ -165,7 +179,7 @@ export default function Income() {
     if (min !== null && Number.isFinite(min)) query = query.gte("amount", min);
     if (max !== null && Number.isFinite(max)) query = query.lte("amount", max);
 
-    const { data, error } = await query.order("date", { ascending: false });
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching income transactions:", error);
@@ -176,19 +190,18 @@ export default function Income() {
       return;
     }
 
-    setTransactions(
-      (data || []).map((tx: any) => ({
-        id: tx.id,
-        date: parseISO(tx.date),
-        amount: tx.amount,
-        source: tx.source,
-        account_id: tx.account_id,
-        profile_id: tx.profile_id,
-        account_name: tx.financial_accounts?.name || "Unknown Account",
-        profile_name: tx.profiles?.name || tx.profiles?.email || undefined,
-      })),
-    );
+    const normalized: IncomeTransaction[] = (data || []).map((t: any) => ({
+      id: t.id,
+      date: parseISO(t.date),
+      amount: Number(t.amount || 0),
+      source: t.source,
+      account_id: t.account_id,
+      profile_id: t.profile_id,
+      account_name: t.financial_accounts?.name || "Unknown",
+      profile_name: t.profiles?.name || t.profiles?.email || undefined,
+    }));
 
+    setTransactions(normalized);
     setLoading(false);
   }, [currentUser, isAdmin, dateRange?.from, dateRange?.to, accountId, memberId, debouncedSearchQuery, minAmount, maxAmount]);
 
@@ -204,44 +217,56 @@ export default function Income() {
     queryClient.invalidateQueries({ queryKey: ["financialData"] });
     queryClient.invalidateQueries({ queryKey: ["financialSummary"] });
     queryClient.invalidateQueries({ queryKey: ["recentTransactions"] });
-    queryClient.invalidateQueries({ queryKey: ["dashboardProjects"] });
-    queryClient.invalidateQueries({ queryKey: ["contributionsProgress"] });
   };
 
-  const handlePostIncome = async (formData: {
+  const handlePostIncome = async (data: {
     incomeDate: Date;
     incomeAmount: number;
     incomeAccount: string;
     incomeSource: string;
     selectedIncomeMemberId?: string;
   }) => {
+    if (!canManageIncome) {
+      showError("You do not have permission to record income.");
+      return;
+    }
     if (!currentUser) {
-      showError("You must be logged in to post income.");
+      showError("You must be logged in.");
       return;
     }
 
-    const { incomeDate, incomeAmount, incomeAccount, incomeSource, selectedIncomeMemberId } = formData;
-
-    const validation = validateFinancialTransaction(incomeAmount, incomeAccount, currentUser.id);
+    const validation = validateFinancialTransaction(data.incomeAmount, data.incomeAccount, currentUser.id);
     if (!validation.isValid) {
       showError(validation.error || "Invalid income amount.");
       return;
     }
 
-    const currentAccount = financialAccounts.find((acc) => acc.id === incomeAccount);
-    if (!currentAccount) {
-      showError("Selected account not found.");
+    const { data: accountData, error: accountError } = await supabase
+      .from("financial_accounts")
+      .select("id, current_balance, profile_id")
+      .eq("id", data.incomeAccount)
+      .single();
+
+    if (accountError || !accountData) {
+      console.error("Error fetching account:", accountError);
+      showError("Failed to fetch account details.");
       return;
     }
 
-    const transactionProfileId = selectedIncomeMemberId || currentUser.id;
+    if (!isAdmin && accountData.profile_id !== currentUser.id) {
+      showError("You can only use your own account.");
+      return;
+    }
+
+    const profileId = data.selectedIncomeMemberId || currentUser.id;
 
     const { error: insertError } = await supabase.from("income_transactions").insert({
-      date: incomeDate.toISOString(),
-      amount: incomeAmount,
-      account_id: incomeAccount,
-      source: incomeSource,
-      profile_id: transactionProfileId,
+      date: data.incomeDate.toISOString(),
+      amount: data.incomeAmount,
+      account_id: data.incomeAccount,
+      source: data.incomeSource.trim(),
+      profile_id: profileId,
+      pledge_id: null,
     });
 
     if (insertError) {
@@ -250,12 +275,12 @@ export default function Income() {
       return;
     }
 
-    const newBalance = currentAccount.current_balance + incomeAmount;
+    const newBalance = accountData.current_balance + data.incomeAmount;
     const { error: updateBalanceError } = await supabase
       .from("financial_accounts")
       .update({ current_balance: newBalance })
-      .eq("id", incomeAccount)
-      .eq("profile_id", currentAccount.profile_id);
+      .eq("id", data.incomeAccount)
+      .eq("profile_id", accountData.profile_id);
 
     if (updateBalanceError) {
       console.error("Error updating account balance:", updateBalanceError);
@@ -268,7 +293,15 @@ export default function Income() {
     invalidateDashboardQueries();
   };
 
-  const handleSaveEditedTransaction = async (updatedTx: any) => {
+  const handleEditTransaction = async (updatedTx: {
+    id: string;
+    date: Date;
+    amount: number;
+    account_id: string;
+    source: string;
+    profile_id: string;
+    account_name: string;
+  }) => {
     if (!currentUser) {
       showError("You must be logged in to edit income.");
       return;
@@ -280,10 +313,31 @@ export default function Income() {
       return;
     }
 
-    const parsedAmount = parseFloat(updatedTx.amount.toString());
-    const validation = validateFinancialTransaction(parsedAmount, updatedTx.account_id, currentUser.id);
+    const validation = validateFinancialTransaction(updatedTx.amount, updatedTx.account_id, currentUser.id);
     if (!validation.isValid) {
       showError(validation.error || "Invalid income amount.");
+      return;
+    }
+
+    const { data: oldAccount, error: oldAccError } = await supabase
+      .from("financial_accounts")
+      .select("id, current_balance, profile_id")
+      .eq("id", oldTx.account_id)
+      .single();
+
+    const { data: newAccount, error: newAccError } = await supabase
+      .from("financial_accounts")
+      .select("id, current_balance, profile_id")
+      .eq("id", updatedTx.account_id)
+      .single();
+
+    if (oldAccError || newAccError || !oldAccount || !newAccount) {
+      showError("Failed to fetch account details.");
+      return;
+    }
+
+    if (!isAdmin && (oldAccount.profile_id !== currentUser.id || newAccount.profile_id !== currentUser.id)) {
+      showError("You can only use your own account.");
       return;
     }
 
@@ -291,9 +345,9 @@ export default function Income() {
       .from("income_transactions")
       .update({
         date: updatedTx.date.toISOString(),
-        amount: parsedAmount,
+        amount: updatedTx.amount,
         account_id: updatedTx.account_id,
-        source: updatedTx.source,
+        source: updatedTx.source.trim(),
         profile_id: updatedTx.profile_id,
       })
       .eq("id", updatedTx.id)
@@ -305,44 +359,37 @@ export default function Income() {
       return;
     }
 
-    const oldAccount = financialAccounts.find((acc) => acc.id === oldTx.account_id);
-    const newAccount = financialAccounts.find((acc) => acc.id === updatedTx.account_id);
-
-    if (!oldAccount || !newAccount) {
-      showError("One or more financial accounts not found for balance adjustment.");
-      return;
-    }
-
     if (oldTx.account_id === updatedTx.account_id) {
-      const amountDifference = parsedAmount - oldTx.amount;
-      const newBalance = oldAccount.current_balance + amountDifference;
+      const amountDifference = updatedTx.amount - oldTx.amount;
       const { error: updateBalanceError } = await supabase
         .from("financial_accounts")
-        .update({ current_balance: newBalance })
+        .update({ current_balance: oldAccount.current_balance + amountDifference })
         .eq("id", oldAccount.id)
         .eq("profile_id", oldAccount.profile_id);
+
       if (updateBalanceError) {
         console.error("Error updating account balance for same account:", updateBalanceError);
         showError("Transaction updated, but failed to adjust account balance.");
       }
     } else {
-      const oldAccountNewBalance = oldAccount.current_balance - oldTx.amount;
-      const newAccountNewBalance = newAccount.current_balance + parsedAmount;
-
       const { error: updateOldAccountError } = await supabase
         .from("financial_accounts")
-        .update({ current_balance: oldAccountNewBalance })
+        .update({ current_balance: oldAccount.current_balance - oldTx.amount })
         .eq("id", oldAccount.id)
         .eq("profile_id", oldAccount.profile_id);
 
       const { error: updateNewAccountError } = await supabase
         .from("financial_accounts")
-        .update({ current_balance: newAccountNewBalance })
+        .update({ current_balance: newAccount.current_balance + updatedTx.amount })
         .eq("id", newAccount.id)
         .eq("profile_id", newAccount.profile_id);
 
       if (updateOldAccountError || updateNewAccountError) {
-        console.error("Error updating account balances for different accounts:", updateOldAccountError, updateNewAccountError);
+        console.error(
+          "Error updating account balances for different accounts:",
+          updateOldAccountError,
+          updateNewAccountError,
+        );
         showError("Transaction updated, but failed to adjust account balances.");
       }
     }
@@ -418,14 +465,19 @@ export default function Income() {
   }, [dateRange?.from, dateRange?.to, accountId, memberId, isAdmin, debouncedSearchQuery, minAmount, maxAmount, financialAccounts, members, currency.symbol]);
 
   const reportRows = React.useMemo(() => {
-    return transactions.map((t) => [
+    const base = transactions.map((t) => [
       format(t.date, "MMM dd, yyyy"),
       t.profile_name || "-",
       t.source,
       t.account_name,
       `${currency.symbol}${t.amount.toFixed(2)}`,
     ]);
+
+    const total = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    return [...base, ["TOTAL", "", "", "", `${currency.symbol}${total.toFixed(2)}`]];
   }, [transactions, currency.symbol]);
+
+  const totalAmount = React.useMemo(() => transactions.reduce((sum, t) => sum + (t.amount || 0), 0), [transactions]);
 
   if (loading) {
     return (
@@ -558,9 +610,9 @@ export default function Income() {
           isOpen={!!editingTransaction}
           setIsOpen={() => setEditingTransaction(null)}
           initialData={editingTransaction as any}
-          onSave={handleSaveEditedTransaction}
           financialAccounts={financialAccounts}
           members={members}
+          onSave={handleEditTransaction}
           canManageIncome={canManageIncome}
           currency={currency}
         />
@@ -571,7 +623,7 @@ export default function Income() {
           isOpen={!!deletingTransaction}
           setIsOpen={() => setDeletingTransaction(null)}
           transaction={deletingTransaction as any}
-          onConfirm={handleConfirmDeleteTransaction}
+          onConfirm={() => void handleConfirmDeleteTransaction()}
           currency={currency}
         />
       ) : null}

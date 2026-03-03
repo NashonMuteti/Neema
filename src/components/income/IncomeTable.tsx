@@ -44,6 +44,7 @@ export default function IncomeTable({
   }
 
   const showMember = transactions.some((t) => !!t.profile_name);
+  const totalAmount = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
 
   return (
     <Table>
@@ -82,6 +83,15 @@ export default function IncomeTable({
             ) : null}
           </TableRow>
         ))}
+
+        <TableRow className="bg-muted/40 font-bold hover:bg-muted/40">
+          <TableCell colSpan={showMember ? 4 : 3}>TOTAL</TableCell>
+          <TableCell className="text-right">
+            {currency.symbol}
+            {totalAmount.toFixed(2)}
+          </TableCell>
+          {canManageIncome ? <TableCell /> : null}
+        </TableRow>
       </TableBody>
     </Table>
   );

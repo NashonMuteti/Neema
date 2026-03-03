@@ -100,6 +100,18 @@ export default function PledgeReport() {
     return `Due Date: ${fromStr} → ${toStr} • ${projectName} • ${memberName} • Status: ${filterStatus}`;
   }, [dateRange?.from, dateRange?.to, projectId, memberId, filterStatus, projects, members]);
 
+  const totals = React.useMemo(() => {
+    return rows.reduce(
+      (acc, r) => {
+        acc.original += Number(r.original_amount || 0);
+        acc.paid += Number(r.paid_amount || 0);
+        acc.balance += Number(r.balance_due || 0);
+        return acc;
+      },
+      { original: 0, paid: 0, balance: 0 },
+    );
+  }, [rows]);
+
   const fetchFilters = useCallback(async () => {
     // Projects
     const { data: projectData, error: projectError } = await supabase
@@ -241,6 +253,27 @@ export default function PledgeReport() {
     );
   }
 
+  const exportRows: Array<Array<string | number>> = [
+    ...rows.map((r) => [
+      r.member_name,
+      r.project_name,
+      `${currency.symbol}${r.original_amount.toFixed(2)}`,
+      `${currency.symbol}${r.paid_amount.toFixed(2)}`,
+      `${currency.symbol}${r.balance_due.toFixed(2)}`,
+      format(new Date(r.due_date), "MMM dd, yyyy"),
+      r.status,
+    ]),
+    [
+      "TOTAL",
+      "",
+      `${currency.symbol}${totals.original.toFixed(2)}`,
+      `${currency.symbol}${totals.paid.toFixed(2)}`,
+      `${currency.symbol}${totals.balance.toFixed(2)}`,
+      "",
+      "",
+    ],
+  ];
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Pledge Report</h1>
@@ -266,15 +299,7 @@ export default function PledgeReport() {
               "Due Date",
               "Status",
             ]}
-            rows={rows.map((r) => [
-              r.member_name,
-              r.project_name,
-              r.original_amount.toFixed(2),
-              r.paid_amount.toFixed(2),
-              r.balance_due.toFixed(2),
-              format(new Date(r.due_date), "MMM dd, yyyy"),
-              r.status,
-            ])}
+            rows={exportRows}
           />
         </CardHeader>
         <CardContent>
@@ -428,6 +453,15 @@ export default function PledgeReport() {
                       </TableCell>
                     </TableRow>
                   ))}
+
+                  <TableRow className="bg-muted/40 font-bold hover:bg-muted/40">
+                    <TableCell colSpan={2}>TOTAL</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{totals.original.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{totals.paid.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{currency.symbol}{totals.balance.toFixed(2)}</TableCell>
+                    <TableCell />
+                    <TableCell />
+                  </TableRow>
                 </TableBody>
               </Table>
             ) : (

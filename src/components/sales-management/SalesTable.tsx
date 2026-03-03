@@ -42,6 +42,8 @@ export default function SalesTable({ salesTransactions }: Props) {
     return <p className="text-muted-foreground">No sales transactions found for the selected filters.</p>;
   }
 
+  const total = salesTransactions.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+
   return (
     <Table>
       <TableHeader>
@@ -74,6 +76,14 @@ export default function SalesTable({ salesTransactions }: Props) {
             </TableCell>
           </TableRow>
         ))}
+
+        <TableRow className="bg-muted/40 font-bold hover:bg-muted/40">
+          <TableCell colSpan={5}>TOTAL</TableCell>
+          <TableCell className="text-right">
+            {currency.symbol}
+            {total.toFixed(2)}
+          </TableCell>
+        </TableRow>
       </TableBody>
     </Table>
   );

@@ -232,7 +232,7 @@ export default function DailySales() {
     customer_name?: string;
     sale_date: string;
     payment_method: string;
-    received_into_account_id: string;
+    received_into_account_id: string | null;
     notes?: string;
     sale_items: Array<{
       product_id: string;
@@ -240,6 +240,7 @@ export default function DailySales() {
       unit_price: number;
       subtotal: number;
     }>;
+    payments: Array<{ account_id: string; amount: number }>;
   }) => {
     if (!canManageDailySales) {
       showError("You do not have permission to record sales.");
@@ -302,13 +303,16 @@ export default function DailySales() {
   }, [dateRange?.from, dateRange?.to, accountId, isAdmin, debouncedSearchQuery, minTotal, maxTotal, financialAccounts, currency.symbol]);
 
   const reportRows = useMemo(() => {
-    return salesTransactions.map((s) => [
+    const base = salesTransactions.map((s) => [
       format(s.sale_date, "MMM dd, yyyy"),
       s.customer_name || "-",
       s.notes || "-",
       s.account_name,
       `${currency.symbol}${s.total_amount.toFixed(2)}`,
     ]);
+
+    const total = salesTransactions.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+    return [...base, ["TOTAL", "", "", "", `${currency.symbol}${total.toFixed(2)}`]];
   }, [salesTransactions, currency.symbol]);
 
   if (loading) {

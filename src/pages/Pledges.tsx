@@ -314,6 +314,18 @@ const Pledges = () => {
     }
   };
 
+  const pledgeTotals = useMemo(() => {
+    return pledges.reduce(
+      (acc, p) => {
+        acc.pledged += Number(p.original_amount || 0);
+        acc.paid += Number(p.paid_amount || 0);
+        acc.remaining += Math.max(Number(p.original_amount || 0) - Number(p.paid_amount || 0), 0);
+        return acc;
+      },
+      { pledged: 0, paid: 0, remaining: 0 },
+    );
+  }, [pledges]);
+
   const reportSubtitle = useMemo(() => {
     const fromStr = dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : "-";
     const toStr = dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : "-";
@@ -323,7 +335,7 @@ const Pledges = () => {
   }, [dateRange?.from, dateRange?.to, projectId, memberId, filterStatus, projects, members]);
 
   const reportRows = useMemo(() => {
-    return pledges.map((p) => {
+    const base = pledges.map((p) => {
       const remaining = Math.max(p.original_amount - p.paid_amount, 0);
       const status = p.paid_amount >= p.original_amount ? "Paid" : "Unpaid";
       return [
@@ -336,7 +348,20 @@ const Pledges = () => {
         `${currency.symbol}${remaining.toFixed(2)}`,
       ];
     });
-  }, [pledges, currency.symbol]);
+
+    return [
+      ...base,
+      [
+        "TOTAL",
+        "",
+        "",
+        "",
+        `${currency.symbol}${pledgeTotals.pledged.toFixed(2)}`,
+        `${currency.symbol}${pledgeTotals.paid.toFixed(2)}`,
+        `${currency.symbol}${pledgeTotals.remaining.toFixed(2)}`,
+      ],
+    ];
+  }, [pledges, currency.symbol, pledgeTotals]);
 
   if (loading) {
     return (

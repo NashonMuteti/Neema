@@ -162,6 +162,21 @@ const Debts = () => {
     fetchInitialData();
   }, [fetchInitialData]);
 
+  const debtTotals = useMemo(() => {
+    return debts.reduce(
+      (acc, d) => {
+        const original = Number(d.original_amount || 0);
+        const due = Number(d.amount_due || 0);
+        const paid = Math.max(original - due, 0);
+        acc.original += original;
+        acc.paid += paid;
+        acc.due += due;
+        return acc;
+      },
+      { original: 0, paid: 0, due: 0 },
+    );
+  }, [debts]);
+
   const handleSaveDebt = async (
     debtData: Omit<
       Debt,
@@ -685,6 +700,16 @@ const Debts = () => {
                     ) : null}
                   </TableRow>
                 ))}
+
+                <TableRow className="bg-muted/40 font-bold hover:bg-muted/40">
+                  <TableCell colSpan={2}>TOTAL</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{debtTotals.original.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{debtTotals.paid.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency.symbol}{debtTotals.due.toFixed(2)}</TableCell>
+                  <TableCell />
+                  <TableCell />
+                  {canManageDebts ? <TableCell /> : null}
+                </TableRow>
               </TableBody>
             </Table>
           ) : (
