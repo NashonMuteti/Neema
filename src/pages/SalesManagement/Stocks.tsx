@@ -10,6 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Edit, Trash2, Search, Package, FileText, Printer, FileSpreadsheet } from "lucide-react";
@@ -434,6 +435,26 @@ const Stocks = () => {
                   );
                 })}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="font-semibold">TOTAL</TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {currency.symbol}
+                    {products.reduce((sum, p) => sum + Number(p.price || 0), 0).toFixed(2)}
+                  </TableCell>
+                  <TableCell />
+                  <TableCell className="text-right font-semibold">
+                    {currency.symbol}
+                    {products
+                      .reduce(
+                        (sum, p) => sum + Number(p.price || 0) * Number(p.current_stock || 0),
+                        0,
+                      )
+                      .toFixed(2)}
+                  </TableCell>
+                  <TableCell colSpan={canManageStocks ? 3 : 2} />
+                </TableRow>
+              </TableFooter>
             </Table>
           ) : (
             <p className="text-muted-foreground text-center mt-4">No products found matching your search.</p>

@@ -40,6 +40,28 @@ export type AccountExpenditureTxRow = {
   purpose: string;
 };
 
+export type SalesTxRow = {
+  id: string;
+  sale_date: string;
+  total_amount: number;
+  received_into_account_id: string | null;
+};
+
+export type SalePaymentRow = {
+  id: string;
+  sale_id: string;
+  account_id: string;
+  amount: number;
+};
+
+export type ProjectCollectionRow = {
+  id: string;
+  project_id: string;
+  amount: number;
+  date: string;
+  projects: { name: string; status: string } | { name: string; status: string }[] | null;
+};
+
 interface UseTableBankingDataProps {
   filterPeriod: "daily" | "weekly" | "monthly" | "yearly" | "range";
   selectedDate?: Date;
@@ -65,6 +87,9 @@ export const useTableBankingData = ({
   const [debts, setDebts] = useState<Debt[]>([]);
   const [incomeTx, setIncomeTx] = useState<AccountIncomeTxRow[]>([]);
   const [expenditureTx, setExpenditureTx] = useState<AccountExpenditureTxRow[]>([]);
+  const [salesTx, setSalesTx] = useState<SalesTxRow[]>([]);
+  const [salePayments, setSalePayments] = useState<SalePaymentRow[]>([]);
+  const [projectCollections, setProjectCollections] = useState<ProjectCollectionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -257,6 +282,50 @@ export const useTableBankingData = ({
       if (expError) throw expError;
       setExpenditureTx((expData || []) as AccountExpenditureTxRow[]);
 
+      // Sales for selected period
+      let salesQuery = supabase
+        .from("sales_transactions")
+        .select("id, sale_date, total_amount, received_into_account_id")
+        .gte("sale_date", start.toISOString())
+        .lte("sale_date", end.toISOString());
+
+      if (!isAdmin) {
+        salesQuery = salesQuery.eq("profile_id", currentUser.id);
+      }
+
+      const endSales = perfStart("useTableBankingData:sales_transactions");
+      const { data: salesData, error: salesError } = await salesQuery;
+      endSales({ rows: salesData?.length ?? 0, errorCode: salesError?.code });
+      if (salesError) throw salesError;
+      const salesRows = (salesData || []) as SalesTxRow[];
+      setSalesTx(salesRows);
+
+      // Split payments (if available) to allocate sales to accounts
+      const saleIds = salesRows.map((s) => s.id);
+      if (saleIds.length) {
+        const endSalePayments = perfStart("useTableBankingData:sale_payments");
+        const { data: payData, error: payError } = await supabase
+          .from("sale_payments")
+          .select("id, sale_id, account_id, amount")
+          .in("sale_id", saleIds);
+        endSalePayments({ rows: payData?.length ?? 0, errorCode: payError?.code });
+        if (payError) throw payError;
+        setSalePayments((payData || []) as SalePaymentRow[]);
+      } else {
+        setSalePayments([]);
+      }
+
+      // Project collections (contributions) for selected period
+      const endCollections = perfStart("useTableBankingData:project_collections");
+      const { data: collectionsData, error: collectionsError } = await supabase
+        .from("project_collections")
+        .select("id, project_id, amount, date, projects(name,status)")
+        .gte("date", start.toISOString())
+        .lte("date", end.toISOString());
+      endCollections({ rows: collectionsData?.length ?? 0, errorCode: collectionsError?.code });
+      if (collectionsError) throw collectionsError;
+      setProjectCollections((collectionsData || []) as ProjectCollectionRow[]);
+
       endAll({ ok: true });
     } catch (err: any) {
       console.error("Error fetching table banking data:", err);
@@ -339,6 +408,67 @@ export const useTableBankingData = ({
     return { income, expenditure, net: income - expenditure };
   }, [accountCashflow]);
 
+  const salesTotals = useMemo(() => {
+    const total = salesTx.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+
+    const byAccount: Record<string, number> = {};
+
+    // Prefer sale_payments if present
+    for (const p of salePayments) {
+      byAccount[p.account_id] = (byAccount[p.account_id] || 0) + Number(p.amount || 0);
+    }
+
+    // Backfill legacy sales without split payments
+    const paidSaleIds = new Set(salePayments.map((p) => p.sale_id));
+    for (const s of salesTx) {
+      if (paidSaleIds.has(s.id)) continue;
+      const accountId = s.received_into_account_id;
+      if (!accountId) continue;
+      byAccount[accountId] = (byAccount[accountId] || 0) + Number(s.total_amount || 0);
+    }
+
+    return { total, byAccount };
+  }, [salePayments, salesTx]);
+
+  const activeProjectContributionTx = useMemo(() => {
+    return projectCollections
+      .map((c) => {
+        const proj = c.projects
+          ? Array.isArray(c.projects)
+            ? c.projects[0]
+            : c.projects
+          : null;
+        return {
+          id: c.id,
+          project_id: c.project_id,
+          project_name: proj?.name || "Unknown",
+          project_status: proj?.status || "Unknown",
+          date: c.date,
+          amount: Number(c.amount || 0),
+        };
+      })
+      .filter((c) => c.project_status === "Open");
+  }, [projectCollections]);
+
+  const contributionsByProject = useMemo(() => {
+    const byId: Record<string, { project_id: string; project_name: string; total: number }> = {};
+    for (const t of activeProjectContributionTx) {
+      byId[t.project_id] = byId[t.project_id] || {
+        project_id: t.project_id,
+        project_name: t.project_name,
+        total: 0,
+      };
+      byId[t.project_id].total += Number(t.amount || 0);
+    }
+
+    return Object.values(byId).sort((a, b) => b.total - a.total);
+  }, [activeProjectContributionTx]);
+
+  const contributionsGrandTotalByProject = useMemo(
+    () => contributionsByProject.reduce((sum, r) => sum + r.total, 0),
+    [contributionsByProject],
+  );
+
   const getPeriodLabel = useCallback(() => {
     switch (filterPeriod) {
       case "daily":
@@ -372,5 +502,9 @@ export const useTableBankingData = ({
     years,
     accountCashflow,
     cashflowTotals,
+    salesTotals,
+    contributionsByProject,
+    activeProjectContributionTx,
+    contributionsGrandTotalByProject,
   };
 };

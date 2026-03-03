@@ -555,8 +555,9 @@ export default function Expenditure() {
       <h1 className="text-3xl font-bold text-foreground">Expenditure</h1>
       <p className="text-lg text-muted-foreground">Record and manage all financial outflows.</p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Record New Expenditure */}
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl lg:col-span-1">
           <CardHeader>
             <CardTitle>Record New Expenditure</CardTitle>
           </CardHeader>
@@ -654,7 +655,7 @@ export default function Expenditure() {
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl">
+        <Card className="transition-all duration-300 ease-in-out hover:shadow-xl lg:col-span-2">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle>Expenditure Transactions</CardTitle>
@@ -672,7 +673,7 @@ export default function Expenditure() {
             <div className="flex flex-wrap gap-4">
               <div className="grid gap-1.5 min-w-[260px]">
                 <Label>Date range</Label>
-                <DateRangePicker value={dateRange} onChange={setDateRange} className="w-[260px]" />
+                <DateRangePicker value={dateRange} onChange={setDateRange} className="w-full" />
               </div>
 
               <div className="grid gap-1.5 min-w-[220px]">

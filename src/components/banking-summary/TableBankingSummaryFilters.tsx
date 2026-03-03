@@ -70,20 +70,22 @@ const TableBankingSummaryFilters: React.FC<TableBankingSummaryFiltersProps> = ({
       </div>
 
       {(filterPeriod === "daily" || filterPeriod === "weekly") && (
-        <div className="grid gap-1.5">
+        <div className="grid gap-1.5 min-w-[200px]">
           <Label htmlFor="table-banking-select-date">Select Date</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
                 className={cn(
-                  "w-[180px] justify-start text-left font-normal",
+                  "w-full justify-start text-left font-normal whitespace-normal h-auto py-2 leading-snug",
                   !selectedDate && "text-muted-foreground"
                 )}
                 id="table-banking-select-date"
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                <span className="break-words">
+                  {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -99,27 +101,25 @@ const TableBankingSummaryFilters: React.FC<TableBankingSummaryFiltersProps> = ({
       )}
 
       {filterPeriod === "range" && (
-        <div className="grid gap-1.5">
+        <div className="grid gap-1.5 min-w-[280px]">
           <Label>Date Range</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
                 className={cn(
-                  "w-[280px] justify-start text-left font-normal",
+                  "w-full justify-start text-left font-normal whitespace-normal h-auto py-2 leading-snug",
                   !selectedRange?.from && "text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedRange?.from ? (
-                  selectedRange.to ? (
-                    `${format(selectedRange.from, "PPP")} - ${format(selectedRange.to, "PPP")}`
-                  ) : (
-                    format(selectedRange.from, "PPP")
-                  )
-                ) : (
-                  <span>Pick a date range</span>
-                )}
+                <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                <span className="break-words">
+                  {selectedRange?.from
+                    ? selectedRange.to
+                      ? `${format(selectedRange.from, "PPP")} - ${format(selectedRange.to, "PPP")}`
+                      : format(selectedRange.from, "PPP")
+                    : "Pick a date range"}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">

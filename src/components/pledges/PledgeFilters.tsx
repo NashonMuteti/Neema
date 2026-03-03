@@ -53,7 +53,7 @@ export default function PledgeFilters({
     <div className="flex flex-wrap gap-4">
       <div className="grid gap-1.5 min-w-[260px]">
         <Label>Due date range</Label>
-        <DateRangePicker value={dateRange} onChange={setDateRange} className="w-[260px]" />
+        <DateRangePicker value={dateRange} onChange={setDateRange} className="w-full" />
       </div>
 
       <div className="grid gap-1.5 min-w-[160px]">

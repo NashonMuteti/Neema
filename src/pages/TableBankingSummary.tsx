@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTableBankingData } from "@/hooks/useTableBankingData";
 import TableBankingSummaryFilters from "@/components/banking-summary/TableBankingSummaryFilters";
 import ContributionsSummaryTable from "@/components/banking-summary/ContributionsSummaryTable";
+import ProjectContributionsSummaryTable from "@/components/banking-summary/ProjectContributionsSummaryTable";
 import DebtsSummaryTable from "@/components/banking-summary/DebtsSummaryTable";
 import { format, getMonth, getYear, startOfMonth, endOfMonth } from "date-fns";
 import ReportActions from "@/components/reports/ReportActions";
@@ -41,6 +42,10 @@ const TableBankingSummary: React.FC = () => {
     years,
     accountCashflow,
     cashflowTotals,
+    salesTotals,
+    contributionsByProject,
+    activeProjectContributionTx,
+    contributionsGrandTotalByProject,
   } = useTableBankingData({
     filterPeriod,
     selectedDate,
@@ -119,6 +124,44 @@ const TableBankingSummary: React.FC = () => {
             years={years}
           />
 
+          {/* Period totals */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Sales (period)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{currency.symbol}{salesTotals.total.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Income (period)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-700">{currency.symbol}{cashflowTotals.income.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Expenditure (period)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-700">{currency.symbol}{cashflowTotals.expenditure.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Net cashflow (period)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("text-2xl font-bold", cashflowTotals.net >= 0 ? "text-green-700" : "text-destructive")}>
+                  {currency.symbol}{cashflowTotals.net.toFixed(2)}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Account cashflow (Income/Expenditure) */}
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -192,21 +235,29 @@ const TableBankingSummary: React.FC = () => {
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h3 className="text-xl font-semibold">Contributions Summary</h3>
+                <h3 className="text-xl font-semibold">Contributions Summary (Active Projects)</h3>
                 <p className="text-sm text-muted-foreground">{subtitle}</p>
               </div>
               <ReportActions
-                title="Table Banking Summary (Contributions)"
+                title="Table Banking Summary (Contributions by Project)"
                 subtitle={subtitle}
-                columns={["Financial Account", "Total Contributions"]}
-                rows={[...contributionRows, ["Grand Total", `${currency.symbol}${grandTotal.toFixed(2)}`]]}
+                columns={["Project", "Total Contributions"]}
+                rows={[
+                  ...contributionsByProject.map((r) => [r.project_name, `${currency.symbol}${r.total.toFixed(2)}`]),
+                  ["Grand Total", `${currency.symbol}${contributionsGrandTotalByProject.toFixed(2)}`],
+                ]}
               />
             </div>
-            <ContributionsSummaryTable
-              financialAccounts={financialAccounts}
-              groupedContributions={groupedContributions}
-              contributionIncomeTx={contributionIncomeTx}
-              grandTotal={grandTotal}
+            <ProjectContributionsSummaryTable
+              rows={contributionsByProject}
+              tx={activeProjectContributionTx.map((t) => ({
+                id: t.id,
+                project_id: t.project_id,
+                project_name: t.project_name,
+                date: t.date,
+                amount: t.amount,
+              }))}
+              grandTotal={contributionsGrandTotalByProject}
               getPeriodLabel={getPeriodLabel}
             />
           </div>
