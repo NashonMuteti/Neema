@@ -29,10 +29,14 @@ export default function DateRangePicker({ value, onChange, className }: Props) {
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className={cn("justify-start text-left font-normal", !value?.from && "text-muted-foreground", className)}
+          className={cn(
+            "justify-start text-left font-normal whitespace-normal h-auto py-2 leading-snug",
+            !value?.from && "text-muted-foreground",
+            className,
+          )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {label}
+          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+          <span className="break-words">{label}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">

@@ -208,6 +208,17 @@ const Stocks = () => {
       "Status",
     ];
 
+    const totals = products.reduce(
+      (acc, p) => {
+        const price = Number(p.price || 0);
+        const stock = Number(p.current_stock || 0);
+        acc.price += price;
+        acc.value += price * stock;
+        return acc;
+      },
+      { price: 0, value: 0 },
+    );
+
     const rows = products.map((p) => {
       const value = Number(p.price || 0) * Number(p.current_stock || 0);
       return [
@@ -221,12 +232,27 @@ const Stocks = () => {
       ];
     });
 
+    const exportRows = rows.length
+      ? [
+          ...rows,
+          [
+            "TOTAL",
+            "",
+            `${currency.symbol}${totals.price.toFixed(2)}`,
+            "",
+            `${currency.symbol}${totals.value.toFixed(2)}`,
+            "",
+            "",
+          ],
+        ]
+      : [["No products found", "", "", "", "", "", ""]];
+
     await exportTableToPdf({
       title,
       subtitle,
       fileName: `Stock_Report_${new Date().toISOString().slice(0, 10)}`,
       columns,
-      rows: rows.length ? rows : [["No products found", "", "", "", "", "", ""]],
+      rows: exportRows,
       brandLogoUrl,
       tagline,
       mode: "open",
@@ -235,12 +261,23 @@ const Stocks = () => {
   };
 
   const exportStockExcel = () => {
-    const columns = [
+    const header = [
       ["Stock Report"],
       [`Generated: ${new Date().toLocaleDateString()}`],
       [],
       ["Name", "SKU", "Price", "Current Stock", "Stock Value", "Reorder Point", "Status"],
     ];
+
+    const totals = products.reduce(
+      (acc, p) => {
+        const price = Number(p.price || 0);
+        const stock = Number(p.current_stock || 0);
+        acc.price += price;
+        acc.value += price * stock;
+        return acc;
+      },
+      { price: 0, value: 0 },
+    );
 
     const body = products.map((p) => {
       const value = Number(p.price || 0) * Number(p.current_stock || 0);
@@ -255,7 +292,11 @@ const Stocks = () => {
       ];
     });
 
-    const ws = XLSX.utils.aoa_to_sheet([...columns, ...body]);
+    const exportBody = body.length
+      ? [...body, ["TOTAL", "", Number(totals.price.toFixed(2)), "", Number(totals.value.toFixed(2)), "", ""]]
+      : [["No products found", "", "", "", "", "", ""]];
+
+    const ws = XLSX.utils.aoa_to_sheet([...header, ...exportBody]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Stock");
     XLSX.writeFile(wb, `Stock_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
