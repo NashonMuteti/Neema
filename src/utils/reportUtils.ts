@@ -429,13 +429,17 @@ export const exportMembersToPdf = async (
     const tableColumn = ["#", "Photo", "Name", "Email", "Phone", "Other details", "Status"];
     const tableRows = sorted.map((member, idx) => [
       idx + 1,
-      member.id, // Used to draw the image
+      member.id, // Used to draw the image (text is hidden in didParseCell)
       member.name,
       emailValue(member.email),
       phoneValue(member.phone),
       member.otherDetails || "",
       member.status,
     ]);
+
+    // Make the # column only as wide as needed for the largest number.
+    doc.setFontSize(9);
+    const numberColWidth = Math.max(14, doc.getTextWidth(String(sorted.length)) + 8);
 
     autoTable(doc, {
       startY: subtitle ? 48 : 36,
@@ -457,14 +461,22 @@ export const exportMembersToPdf = async (
         fillColor: [245, 245, 245],
       },
       columnStyles: {
-        1: { cellWidth: 28 }, // Photo
-        0: { cellWidth: 24 },
+        0: { cellWidth: numberColWidth, halign: "center" },
+        1: { cellWidth: 26 }, // Photo
+      },
+      didParseCell: (data) => {
+        // Hide the member id text in the Photo column (it is only used as a key).
+        if (data.section === "body" && data.column.index === 1) {
+          data.cell.text = [""];
+          data.cell.styles.textColor = [255, 255, 255];
+        }
       },
       didDrawCell: (data) => {
         if (data.section !== "body") return;
         if (data.column.index !== 1) return;
 
-        const memberId = String((data.cell.raw as any) ?? "");
+        const rawRow = data.row?.raw as any[] | undefined;
+        const memberId = String((rawRow?.[1] ?? data.cell.raw) ?? "");
         const img = imageMap.get(memberId);
         if (!img) return;
 
@@ -600,7 +612,7 @@ export const exportBoardMembersToPdf = async (
   const columns = ["#", "Photo", "Name", "Role", "Email", "Phone", "Address", "Notes"];
   const rows: Array<Array<string | number>> = sorted.map((m, idx) => [
     idx + 1,
-    m.id,
+    m.id, // Used to draw image (text hidden in didParseCell)
     m.name,
     m.role,
     emailValue(m.email),
@@ -608,6 +620,9 @@ export const exportBoardMembersToPdf = async (
     m.address || "",
     m.notes || "",
   ]);
+
+  doc.setFontSize(9);
+  const numberColWidth = Math.max(14, doc.getTextWidth(String(sorted.length)) + 8);
 
   autoTable(doc, {
     startY,
@@ -630,14 +645,21 @@ export const exportBoardMembersToPdf = async (
       fillColor: [245, 245, 245],
     },
     columnStyles: {
-      1: { cellWidth: 28 },
-      0: { cellWidth: 24 },
+      0: { cellWidth: numberColWidth, halign: "center" },
+      1: { cellWidth: 26 },
+    },
+    didParseCell: (data) => {
+      if (data.section === "body" && data.column.index === 1) {
+        data.cell.text = [""];
+        data.cell.styles.textColor = [255, 255, 255];
+      }
     },
     didDrawCell: (data) => {
       if (data.section !== "body") return;
       if (data.column.index !== 1) return;
 
-      const memberId = String((data.cell.raw as any) ?? "");
+      const rawRow = data.row?.raw as any[] | undefined;
+      const memberId = String((rawRow?.[1] ?? data.cell.raw) ?? "");
       const img = imageMap.get(memberId);
       if (!img) return;
 
@@ -657,7 +679,6 @@ export const exportBoardMembersToPdf = async (
 
   addFooter(doc, options.tagline);
 
-  const safeName = `Board_Members_${new Date().toISOString().slice(0, 10)}`;
   const url = doc.output("bloburl");
   window.open(url, "_blank", "noopener,noreferrer");
 };
