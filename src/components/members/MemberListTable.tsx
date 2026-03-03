@@ -58,8 +58,7 @@ const MemberListTable: React.FC<MemberListTableProps> = ({
                 <TableHead className="hidden lg:table-cell">Other details</TableHead>
                 <TableHead className="text-center">Login Enabled</TableHead>
                 <TableHead className="text-center">Status</TableHead>
-                {canManageMembers && <TableHead className="text-center">Actions</TableHead>}
-                <TableHead className="text-center">Contributions</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -92,27 +91,30 @@ const MemberListTable: React.FC<MemberListTableProps> = ({
                       {member.status}
                     </span>
                   </TableCell>
-                  {canManageMembers && (
-                    <TableCell className="flex justify-center space-x-2">
-                      <EditMemberDialog member={member} onEditMember={onEditMember} />
-                      {member.status !== "Suspended" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onToggleMemberStatus(member.id, member.status)}
-                        >
-                          {member.status === "Active" ? "Deactivate" : "Activate"}
+                  <TableCell>
+                    <div className="flex justify-center gap-2">
+                      <Link to={`/members/${member.id}/contributions`}>
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4 mr-2" /> View
                         </Button>
+                      </Link>
+
+                      {canManageMembers && (
+                        <>
+                          <EditMemberDialog member={member} onEditMember={onEditMember} />
+                          {member.status !== "Suspended" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onToggleMemberStatus(member.id, member.status)}
+                            >
+                              {member.status === "Active" ? "Deactivate" : "Activate"}
+                            </Button>
+                          )}
+                          <DeleteMemberDialog member={member} onDeleteMember={onDeleteMember} />
+                        </>
                       )}
-                      <DeleteMemberDialog member={member} onDeleteMember={onDeleteMember} />
-                    </TableCell>
-                  )}
-                  <TableCell className="text-center">
-                    <Link to={`/members/${member.id}/contributions`}>
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4 mr-2" /> View
-                      </Button>
-                    </Link>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
