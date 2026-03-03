@@ -34,6 +34,7 @@ const Members = () => {
 
   const [members, setMembers] = React.useState<User[]>([]);
   const [filterStatus, setFilterStatus] = React.useState<"All" | "Active" | "Inactive" | "Suspended">("All");
+  const [maskPersonalData, setMaskPersonalData] = React.useState(false);
   
   const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
   const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
@@ -138,10 +139,11 @@ const Members = () => {
     brandLogoUrl: brandLogoUrl,
     tagline: tagline,
     preparedBy: currentUser?.name,
+    maskPersonalData,
   };
 
-  const handlePrintPdf = () => {
-    exportMembersToPdf(members, reportOptions);
+  const handlePrintPdf = async () => {
+    await exportMembersToPdf(members, reportOptions);
     showSuccess("Generating PDF report...");
   };
 
@@ -189,6 +191,8 @@ const Members = () => {
             onPrintPdf={handlePrintPdf}
             onExportExcel={handleExportExcel}
             onAddMember={handleAddMember}
+            maskPersonalData={maskPersonalData}
+            onMaskPersonalDataChange={setMaskPersonalData}
           />
         </CardHeader>
         <CardContent>

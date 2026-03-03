@@ -31,7 +31,10 @@ import { useUserRoles } from "@/context/UserRolesContext";
 import { useBranding } from "@/context/BrandingContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
-import { exportTableToPdf } from "@/utils/reportUtils";
+import { exportTableToPdf, exportBoardMembersToPdf, exportBoardMembersToExcel } from "@/utils/reportUtils";
+import { maskEmail, maskPhone } from "@/utils/privacy";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const BoardMembers = () => {
   const { currentUser } = useAuth();
@@ -55,6 +58,7 @@ const BoardMembers = () => {
   
   const [localSearchQuery, setLocalSearchQuery] = React.useState(""); // Local state for input
   const debouncedSearchQuery = useDebounce(localSearchQuery, 500); // Debounced search query
+  const [maskPersonalData, setMaskPersonalData] = React.useState(false);
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -143,54 +147,43 @@ const BoardMembers = () => {
   };
 
   const exportPdf = async () => {
-    const sorted = [...boardMembers].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
-
-    await exportTableToPdf({
-      title: "Board Members Report",
-      subtitle: currentUser?.name ? `prepared by: ${currentUser.name}` : undefined,
-      fileName: `Board_Members_${new Date().toISOString().slice(0, 10)}`,
-      brandLogoUrl,
-      tagline,
-      mode: "open",
-      orientation: "auto",
-      columns: ["#", "Name", "Role", "Email", "Phone", "Address", "Notes"],
-      rows: sorted.map((m, idx) => [
-        idx + 1,
-        m.name,
-        m.role,
-        m.email,
-        m.phone,
-        m.address || "",
-        m.notes || "",
-      ]),
-    });
+    await exportBoardMembersToPdf(
+      boardMembers.map((m) => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
+        email: m.email,
+        phone: m.phone,
+        address: m.address || undefined,
+        notes: m.notes || undefined,
+        imageUrl: m.image_url || undefined,
+      })),
+      {
+        preparedBy: currentUser?.name,
+        brandLogoUrl,
+        tagline,
+        maskPersonalData,
+      },
+    );
   };
 
   const exportExcel = () => {
-    const sorted = [...boardMembers].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
-
-    const data = sorted.map((m, idx) => ({
-      "#": idx + 1,
-      Name: m.name,
-      Role: m.role,
-      Email: m.email,
-      Phone: m.phone,
-      Address: m.address || "",
-      Notes: m.notes || "",
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-
-    const metaRows = [
-      ["Board Members Report"],
-      ...(currentUser?.name ? [[`prepared by: ${currentUser.name}`]] : []),
-      [],
-    ];
-    XLSX.utils.sheet_add_aoa(ws, metaRows, { origin: "A1" });
-
-    XLSX.utils.book_append_sheet(wb, ws, "Board Members");
-    XLSX.writeFile(wb, `Board_Members_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    exportBoardMembersToExcel(
+      boardMembers.map((m) => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
+        email: m.email,
+        phone: m.phone,
+        address: m.address || undefined,
+        notes: m.notes || undefined,
+        imageUrl: m.image_url || undefined,
+      })),
+      {
+        preparedBy: currentUser?.name,
+        maskPersonalData,
+      },
+    );
   };
 
   if (loading) {
@@ -231,6 +224,17 @@ const BoardMembers = () => {
                 className="pl-8"
               />
               <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+            </div>
+
+            <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2">
+              <Switch
+                id="mask-board-personal-data"
+                checked={maskPersonalData}
+                onCheckedChange={setMaskPersonalData}
+              />
+              <Label htmlFor="mask-board-personal-data" className="text-sm">
+                Mask email/phone
+              </Label>
             </div>
 
             <Button variant="outline" onClick={exportPdf}>

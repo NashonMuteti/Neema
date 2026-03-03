@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { maskEmail, maskPhone } from "@/utils/privacy";
 
 interface Member {
   id: string;
@@ -18,6 +19,43 @@ interface ReportOptions {
   brandLogoUrl?: string; // Now dynamic
   tagline?: string; // Now dynamic
   preparedBy?: string;
+}
+
+type MemberReportPrivacyOptions = {
+  maskPersonalData?: boolean;
+};
+
+type BoardMembersReportItem = {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  address?: string;
+  notes?: string;
+  imageUrl?: string;
+};
+
+function dataUrlFormat(dataUrl: string): "PNG" | "JPEG" {
+  return dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+}
+
+async function loadImageDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { mode: "cors" });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("failed to read image"));
+      reader.readAsDataURL(blob);
+    });
+    if (!dataUrl.startsWith("data:image/")) return null;
+    return dataUrl;
+  } catch {
+    return null;
+  }
 }
 
 type TablePdfOptions = {
@@ -347,14 +385,33 @@ export async function exportMultiTableToPdf(options: MultiTablePdfOptions) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-export const exportMembersToPdf = (members: Member[], options: ReportOptions) => {
+export const exportMembersToPdf = async (
+  members: Member[],
+  options: ReportOptions & MemberReportPrivacyOptions,
+) => {
   const doc = new jsPDF();
 
+  const subtitle = options.preparedBy ? `prepared by: ${options.preparedBy}` : undefined;
+
+  const sorted = [...members].sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }),
+  );
+
+  const emailValue = (email: string) => (options.maskPersonalData ? maskEmail(email) : email);
+  const phoneValue = (phone?: string) => (options.maskPersonalData ? maskPhone(phone || "") : phone || "");
+
+  // Preload thumbnails (best-effort). Keyed by member id.
+  const imageMap = new Map<string, { dataUrl: string; format: "PNG" | "JPEG" }>();
+  await Promise.all(
+    sorted.map(async (m) => {
+      if (!m.imageUrl) return;
+      const dataUrl = await loadImageDataUrl(m.imageUrl);
+      if (!dataUrl) return;
+      imageMap.set(m.id, { dataUrl, format: dataUrlFormat(dataUrl) });
+    }),
+  );
+
   const addTableAndFooter = () => {
-    const subtitle = options.preparedBy ? `prepared by: ${options.preparedBy}` : undefined;
-
-    const sorted = [...members].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
-
     // Header
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
@@ -369,12 +426,13 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
     }
 
     // Prepare table data
-    const tableColumn = ["#", "Name", "Email", "Phone", "Other details", "Status"];
+    const tableColumn = ["#", "Photo", "Name", "Email", "Phone", "Other details", "Status"];
     const tableRows = sorted.map((member, idx) => [
       idx + 1,
+      member.id, // Used to draw the image
       member.name,
-      member.email,
-      member.phone || "",
+      emailValue(member.email),
+      phoneValue(member.phone),
       member.otherDetails || "",
       member.status,
     ]);
@@ -388,6 +446,7 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
         fontSize: 9,
         cellPadding: 3,
         overflow: "linebreak",
+        valign: "middle",
       },
       headStyles: {
         fillColor: [22, 47, 79],
@@ -396,6 +455,29 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
       },
       alternateRowStyles: {
         fillColor: [245, 245, 245],
+      },
+      columnStyles: {
+        1: { cellWidth: 28 }, // Photo
+        0: { cellWidth: 24 },
+      },
+      didDrawCell: (data) => {
+        if (data.section !== "body") return;
+        if (data.column.index !== 1) return;
+
+        const memberId = String((data.cell.raw as any) ?? "");
+        const img = imageMap.get(memberId);
+        if (!img) return;
+
+        const padding = 2;
+        const size = Math.min(data.cell.height - padding * 2, data.cell.width - padding * 2);
+        const x = data.cell.x + (data.cell.width - size) / 2;
+        const y = data.cell.y + (data.cell.height - size) / 2;
+
+        try {
+          doc.addImage(img.dataUrl, img.format, x, y, size, size);
+        } catch {
+          // ignore
+        }
       },
       margin: { left: 14, right: 14 },
     });
@@ -445,14 +527,19 @@ export const exportMembersToPdf = (members: Member[], options: ReportOptions) =>
   }
 };
 
-export const exportMembersToExcel = (members: Member[], options: ReportOptions) => {
+export const exportMembersToExcel = (
+  members: Member[],
+  options: ReportOptions & MemberReportPrivacyOptions,
+) => {
   const sorted = [...members].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
 
+  // Keep the photo URL in Excel so recipients can still reference it if needed.
   const data = sorted.map((member, idx) => ({
     "#": idx + 1,
+    "Photo URL": member.imageUrl || "",
     Name: member.name,
-    Email: member.email,
-    Phone: member.phone || "",
+    Email: options.maskPersonalData ? maskEmail(member.email) : member.email,
+    Phone: options.maskPersonalData ? maskPhone(member.phone || "") : member.phone || "",
     "Other details": member.otherDetails || "",
     Status: member.status,
   }));
@@ -470,4 +557,141 @@ export const exportMembersToExcel = (members: Member[], options: ReportOptions) 
   XLSX.utils.book_append_sheet(wb, ws, options.reportName);
 
   XLSX.writeFile(wb, `${options.reportName.replace(/\s/g, "_")}.xlsx`);
+};
+
+export const exportBoardMembersToPdf = async (
+  members: BoardMembersReportItem[],
+  options: {
+    preparedBy?: string;
+    brandLogoUrl?: string;
+    tagline?: string;
+    maskPersonalData?: boolean;
+  },
+) => {
+  const sorted = [...members].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+
+  const doc = new jsPDF({ orientation: chooseOrientation(["#", "Photo", "Name", "Role", "Email", "Phone", "Address", "Notes"], []), unit: "pt", format: "a4" });
+  const marginX = 40;
+
+  const subtitle = options.preparedBy ? `prepared by: ${options.preparedBy}` : undefined;
+
+  const startY = addWrappedHeader(doc, {
+    title: "Board Members Report",
+    subtitle,
+    marginX,
+    hasLogo: !!options.brandLogoUrl,
+  });
+
+  await addLogo(doc, options.brandLogoUrl);
+
+  const imageMap = new Map<string, { dataUrl: string; format: "PNG" | "JPEG" }>();
+  await Promise.all(
+    sorted.map(async (m) => {
+      if (!m.imageUrl) return;
+      const dataUrl = await loadImageDataUrl(m.imageUrl);
+      if (!dataUrl) return;
+      imageMap.set(m.id, { dataUrl, format: dataUrlFormat(dataUrl) });
+    }),
+  );
+
+  const emailValue = (email: string) => (options.maskPersonalData ? maskEmail(email) : email);
+  const phoneValue = (phone: string) => (options.maskPersonalData ? maskPhone(phone) : phone);
+
+  const columns = ["#", "Photo", "Name", "Role", "Email", "Phone", "Address", "Notes"];
+  const rows: Array<Array<string | number>> = sorted.map((m, idx) => [
+    idx + 1,
+    m.id,
+    m.name,
+    m.role,
+    emailValue(m.email),
+    phoneValue(m.phone),
+    m.address || "",
+    m.notes || "",
+  ]);
+
+  autoTable(doc, {
+    startY,
+    head: [columns],
+    body: rows,
+    theme: "striped",
+    styles: {
+      fontSize: 9,
+      cellPadding: 4,
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [22, 47, 79],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      overflow: "linebreak",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245],
+    },
+    columnStyles: {
+      1: { cellWidth: 28 },
+      0: { cellWidth: 24 },
+    },
+    didDrawCell: (data) => {
+      if (data.section !== "body") return;
+      if (data.column.index !== 1) return;
+
+      const memberId = String((data.cell.raw as any) ?? "");
+      const img = imageMap.get(memberId);
+      if (!img) return;
+
+      const padding = 2;
+      const size = Math.min(data.cell.height - padding * 2, data.cell.width - padding * 2);
+      const x = data.cell.x + (data.cell.width - size) / 2;
+      const y = data.cell.y + (data.cell.height - size) / 2;
+
+      try {
+        doc.addImage(img.dataUrl, img.format, x, y, size, size);
+      } catch {
+        // ignore
+      }
+    },
+    margin: { left: marginX, right: marginX },
+  });
+
+  addFooter(doc, options.tagline);
+
+  const safeName = `Board_Members_${new Date().toISOString().slice(0, 10)}`;
+  const url = doc.output("bloburl");
+  window.open(url, "_blank", "noopener,noreferrer");
+};
+
+export const exportBoardMembersToExcel = (
+  members: BoardMembersReportItem[],
+  options: {
+    preparedBy?: string;
+    maskPersonalData?: boolean;
+  },
+) => {
+  const sorted = [...members].sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+
+  const data = sorted.map((m, idx) => ({
+    "#": idx + 1,
+    "Photo URL": m.imageUrl || "",
+    Name: m.name,
+    Role: m.role,
+    Email: options.maskPersonalData ? maskEmail(m.email) : m.email,
+    Phone: options.maskPersonalData ? maskPhone(m.phone) : m.phone,
+    Address: m.address || "",
+    Notes: m.notes || "",
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+
+  const metaRows = [
+    ["Board Members Report"],
+    ...(options.preparedBy ? [[`prepared by: ${options.preparedBy}`]] : []),
+    [],
+  ];
+  XLSX.utils.sheet_add_aoa(ws, metaRows, { origin: "A1" });
+
+  XLSX.utils.book_append_sheet(wb, ws, "Board Members");
+  XLSX.writeFile(wb, `Board_Members_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
