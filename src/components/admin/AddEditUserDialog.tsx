@@ -56,7 +56,8 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
   const [name, setName] = React.useState(initialData?.name || "");
   const [email, setEmail] = React.useState(initialData?.email || "");
   const [role, setRole] = React.useState<string>(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : ""));
-  const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(initialData?.status || "Active");
+  const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">(initialData?.status || "Inactive");
+
   const [enableLogin, setEnableLogin] = React.useState(initialData?.enableLogin || false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
@@ -71,10 +72,15 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
 
   React.useEffect(() => {
     if (isOpen) {
+      const defaultRole =
+        availableRoles.find((r) => r.name === "New user")?.name ||
+        availableRoles.find((r) => r.name === "Contributor")?.name ||
+        (availableRoles.length > 0 ? availableRoles[0].name : "");
+
       setName(initialData?.name || "");
       setEmail(initialData?.email || "");
-      setRole(initialData?.role || (availableRoles.length > 0 ? availableRoles[0].name : ""));
-      setStatus(initialData?.status || "Active");
+      setRole(initialData?.role || defaultRole);
+      setStatus(initialData?.status || "Inactive");
       setEnableLogin(initialData?.enableLogin || false);
       setSelectedFile(null); // Clear selected file on open
       setBase64Image(null); // Clear Base64 image on open

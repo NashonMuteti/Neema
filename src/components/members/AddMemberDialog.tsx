@@ -42,8 +42,13 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [base64Image, setBase64Image] = React.useState<string | null>(null); // State for Base64 image
   const [enableLogin, setEnableLogin] = React.useState(false);
-  const [selectedRole, setSelectedRole] = React.useState<string>(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
-  const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Active");
+  const [selectedRole, setSelectedRole] = React.useState(
+    definedRoles.length > 0
+      ? definedRoles.find((r) => r.name === "New user")?.name || definedRoles.find((r) => r.name === "Contributor")?.name || definedRoles[0].name
+      : "",
+  );
+  const [status, setStatus] = React.useState<"Active" | "Inactive" | "Suspended">("Inactive");
+
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false); // Changed from isUploading to isSaving for broader scope
 
@@ -57,8 +62,13 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
       setSelectedFile(null); // Clear selected file on open
       setBase64Image(null); // Clear Base64 image on open
       setEnableLogin(false);
-      setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
-      setStatus("Active");
+      setSelectedRole(
+        definedRoles.length > 0
+          ? definedRoles.find((r) => r.name === "New user")?.name || definedRoles.find((r) => r.name === "Contributor")?.name || definedRoles[0].name
+          : "",
+      );
+      setStatus("Inactive");
+      setIsSaving(false);
     }
   }, [isOpen, definedRoles]);
 
@@ -199,8 +209,12 @@ const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onAddMember }) => {
     setSelectedFile(null);
     setBase64Image(null);
     setEnableLogin(false);
-    setSelectedRole(definedRoles.length > 0 ? definedRoles.find(r => r.name === "Contributor")?.name || definedRoles[0].name : "");
-    setStatus("Active");
+    setSelectedRole(
+      definedRoles.length > 0
+        ? definedRoles.find((r) => r.name === "New user")?.name || definedRoles.find((r) => r.name === "Contributor")?.name || definedRoles[0].name
+        : "",
+    );
+    setStatus("Inactive");
     setIsSaving(false);
   };
 

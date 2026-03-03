@@ -16,6 +16,8 @@ import { User as UserIcon } from "lucide-react";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import ReportActions from "@/components/reports/ReportActions";
 
 // Define the expected structure of a collection row with joined project data
 interface CollectionRowWithProject {
@@ -315,20 +317,87 @@ const MyContributions = () => {
     };
   }, [activeProjectSummaries]);
 
+  const reportSubtitle = useMemo(() => {
+    return `Member: ${currentUser.name || currentUser.email} • Generated: ${new Date().toLocaleDateString()}`;
+  }, [currentUser.email, currentUser.name]);
+
+  const reportRows = useMemo(() => {
+    const money = (v: number) => `${currency.symbol}${Number(v || 0).toFixed(2)}`;
+
+    const summaryTable: Array<Array<string | number>> = [
+      ["Active projects", summaryTotals.activeProjects],
+      ["Fully paid projects", summaryTotals.paidProjects],
+      ["Expected contribution total", money(summaryTotals.expectedTotal)],
+      ["Total contributed (collections)", money(summaryTotals.totalContributed)],
+      ["Total pledged", money(summaryTotals.totalPledged)],
+      ["Total paid (pledges)", money(summaryTotals.totalPaid)],
+      ["Total amount paid", money(summaryTotals.totalAmountPaid)],
+      ["Total balance to pay", money(summaryTotals.balanceToPay)],
+    ];
+
+    const activeProjectsTable: Array<Array<string | number>> = activeProjectSummaries.map((p) => [
+      p.projectName,
+      money(p.expectedTotal),
+      money(p.totalContributed),
+      money(p.totalPledged),
+      money(p.totalPaid),
+      money(p.totalAmountPaid),
+      money(p.balanceToPay),
+    ]);
+
+    const contributionsTable: Array<Array<string | number>> = [...contributions]
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .map((c) => [
+        format(c.date, "MMM dd, yyyy"),
+        c.project_name || c.description || "N/A",
+        c.type,
+        c.expected_amount !== undefined ? money(c.expected_amount) : "-",
+        c.type === "Collection" ? money(c.amount) : money(c.paid_amount || 0),
+        c.balance_amount !== undefined ? money(c.balance_amount) : "-",
+        c.type !== "Collection" && c.due_date ? format(c.due_date, "MMM dd, yyyy") : "-",
+        c.type !== "Collection" ? (c.status || "-") : "-",
+      ]);
+
+    // Build a single table export by inserting section headers.
+    return [
+      ["SUMMARY"],
+      ...summaryTable,
+      [],
+      ["ACTIVE PROJECTS"],
+      ["Project", "Expected", "Contributed", "Pledged", "Paid", "Amount Paid", "Balance"],
+      ...(activeProjectsTable.length ? activeProjectsTable : [["No active project data", "", "", "", "", "", ""]]),
+      [],
+      ["ALL CONTRIBUTIONS & DEBTS"],
+      ["Date", "Item", "Type", "Expected/Original", "Actual Paid", "Balance", "Due Date", "Status"],
+      ...(contributionsTable.length ? contributionsTable : [["-", "No contributions found", "", "", "", "", "", ""]]),
+    ];
+  }, [activeProjectSummaries, contributions, currency.symbol, currentUser.email, currentUser.name, summaryTotals]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Avatar className="h-9 w-9">
-          {currentUser.imageUrl ? (
-            <AvatarImage src={currentUser.imageUrl} alt={currentUser.name} />
-          ) : (
-            <AvatarFallback>
-              <UserIcon className="h-5 w-5 text-muted-foreground" />
-            </AvatarFallback>
-          )}
-        </Avatar>
-        <h1 className="text-3xl font-bold text-foreground">My Contributions</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-9 w-9">
+            {currentUser.imageUrl ? (
+              <AvatarImage src={currentUser.imageUrl} alt={currentUser.name} />
+            ) : (
+              <AvatarFallback>
+                <UserIcon className="h-5 w-5 text-muted-foreground" />
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <h1 className="text-3xl font-bold text-foreground">My Contributions</h1>
+        </div>
+
+        <ReportActions
+          title="My Contributions Report"
+          subtitle={reportSubtitle}
+          columns={["Section / Field", "Value"]}
+          rows={reportRows}
+          fileName={`My_Contributions_${format(new Date(), "yyyy-MM-dd")}`}
+        />
       </div>
+
       <p className="text-lg text-muted-foreground">
         View your personal financial contributions, pledges, and outstanding debts.
       </p>

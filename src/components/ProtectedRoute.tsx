@@ -27,6 +27,11 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
+  // If the account is inactive/suspended, block access
+  if (currentUser && currentUser.status !== "Active") {
+    return <Navigate to="/login" replace />;
+  }
+
   // If allowedRoles are specified, check if the user has one of them
   if (allowedRoles && currentUser && !allowedRoles.includes(currentUser.role)) {
     // User is authenticated but doesn't have the required role, redirect to a forbidden page or dashboard

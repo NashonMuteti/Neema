@@ -5,7 +5,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Search, Edit, Trash2, User as UserIcon, Eye, PlusCircle } from "lucide-react";
+import { Search, Edit, Trash2, User as UserIcon, PlusCircle } from "lucide-react";
+
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, } from "@/components/ui/alert-dialog";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth, User } from "@/context/AuthContext";
@@ -184,7 +185,6 @@ const UserProfileSettingsAdmin = () => {
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-center">Login</TableHead>
                 {canManageUserProfiles && <TableHead className="text-center">Actions</TableHead>}
-                <TableHead className="text-center">Contributions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -222,14 +222,6 @@ const UserProfileSettingsAdmin = () => {
                       </div>
                     </TableCell>
                   )}
-                  <TableCell className="text-center">
-                    <Link to={`/members/${user.id}/contributions`}>
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
-                    </Link>
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
