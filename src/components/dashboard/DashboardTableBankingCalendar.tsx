@@ -3,7 +3,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import {
+  format,
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+  addMonths,
+  subMonths,
+  startOfDay,
+  endOfDay,
+} from "date-fns";
 import { useSystemSettings } from "@/context/SystemSettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +37,11 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { perfStart } from "@/utils/perf";
 
+type ActiveProject = {
+  id: string;
+  name: string;
+};
+
 const DashboardTableBankingCalendar: React.FC = () => {
   const { currency } = useSystemSettings();
   const { currentUser } = useAuth();
@@ -41,6 +55,12 @@ const DashboardTableBankingCalendar: React.FC = () => {
 
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
+  const [activeProjects, setActiveProjects] = useState<ActiveProject[]>([]);
+
+  const [dailyMatrixLoading, setDailyMatrixLoading] = useState(false);
+  const [salesByAccount, setSalesByAccount] = useState<Record<string, number>>({});
+  const [collectionsByAccountProject, setCollectionsByAccountProject] = useState<Record<string, Record<string, number>>>({});
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,6 +178,17 @@ const DashboardTableBankingCalendar: React.FC = () => {
       if (accountsError) console.error("Error fetching financial accounts:", accountsError);
       setFinancialAccounts(accountsData || []);
 
+      // Active projects (for the daily matrix)
+      const endProjects = perfStart("DashboardTableBankingCalendar:projects");
+      const { data: projectsData, error: projectsError } = await supabase
+        .from("projects")
+        .select("id, name")
+        .eq("status", "Open")
+        .order("name", { ascending: true });
+      endProjects({ rows: projectsData?.length ?? 0, errorCode: projectsError?.code });
+      if (projectsError) console.error("Error fetching projects:", projectsError);
+      setActiveProjects((projectsData || []) as ActiveProject[]);
+
       endAll({ ok: true, txs: allFetchedTransactions.length, accounts: accountsData?.length ?? 0 });
     } catch (err) {
       console.error("Unexpected error in fetchAllData:", err);
@@ -174,6 +205,104 @@ const DashboardTableBankingCalendar: React.FC = () => {
       fetchAllData();
     }
   }, [currentUser, fetchAllData]);
+
+  // Fetch sales + project collections for the selected day to build the matrix.
+  useEffect(() => {
+    const fetchDailyMatrix = async () => {
+      if (!selectedDate) {
+        setSalesByAccount({});
+        setCollectionsByAccountProject({});
+        return;
+      }
+
+      const start = startOfDay(selectedDate);
+      const end = endOfDay(selectedDate);
+
+      setDailyMatrixLoading(true);
+
+      // SALES
+      let salesQuery = supabase
+        .from("sales_transactions")
+        .select("id, sale_date, total_amount, received_into_account_id, profile_id")
+        .gte("sale_date", start.toISOString())
+        .lte("sale_date", end.toISOString());
+      if (!isAdmin && currentUser?.id) {
+        salesQuery = salesQuery.eq("profile_id", currentUser.id);
+      }
+
+      const { data: salesData, error: salesError } = await salesQuery;
+      if (salesError) {
+        console.error("Error fetching sales transactions:", salesError);
+        setSalesByAccount({});
+      }
+
+      const saleIds = (salesData || []).map((s: any) => s.id).filter(Boolean);
+
+      const paymentsBySale = new Map<string, Array<{ account_id: string; amount: number }>>();
+
+      if (saleIds.length > 0) {
+        const { data: salePaymentsData, error: salePaymentsError } = await supabase
+          .from("sale_payments")
+          .select("sale_id, account_id, amount")
+          .in("sale_id", saleIds);
+
+        if (salePaymentsError) {
+          console.error("Error fetching sale payments:", salePaymentsError);
+        } else {
+          (salePaymentsData || []).forEach((p: any) => {
+            const list = paymentsBySale.get(p.sale_id) || [];
+            list.push({ account_id: p.account_id, amount: Number(p.amount || 0) });
+            paymentsBySale.set(p.sale_id, list);
+          });
+        }
+      }
+
+      const computedSalesByAccount: Record<string, number> = {};
+      (salesData || []).forEach((s: any) => {
+        const total = Number(s.total_amount || 0);
+
+        const split = paymentsBySale.get(s.id);
+        if (split && split.length > 0) {
+          split.forEach((p) => {
+            computedSalesByAccount[p.account_id] = (computedSalesByAccount[p.account_id] || 0) + Number(p.amount || 0);
+          });
+          return;
+        }
+
+        if (s.received_into_account_id) {
+          const accId = String(s.received_into_account_id);
+          computedSalesByAccount[accId] = (computedSalesByAccount[accId] || 0) + total;
+        }
+      });
+      setSalesByAccount(computedSalesByAccount);
+
+      // PROJECT COLLECTIONS
+      const { data: collectionsData, error: collectionsError } = await supabase
+        .from("project_collections")
+        .select("project_id, receiving_account_id, amount, date")
+        .gte("date", start.toISOString())
+        .lte("date", end.toISOString());
+
+      if (collectionsError) {
+        console.error("Error fetching project collections:", collectionsError);
+        setCollectionsByAccountProject({});
+      } else {
+        const computed: Record<string, Record<string, number>> = {};
+        (collectionsData || []).forEach((c: any) => {
+          const accId = c.receiving_account_id ? String(c.receiving_account_id) : null;
+          const projectId = c.project_id ? String(c.project_id) : null;
+          if (!accId || !projectId) return;
+          if (!computed[accId]) computed[accId] = {};
+          computed[accId][projectId] = (computed[accId][projectId] || 0) + Number(c.amount || 0);
+        });
+        setCollectionsByAccountProject(computed);
+      }
+
+      setDailyMatrixLoading(false);
+    };
+
+    fetchDailyMatrix();
+  }, [selectedDate, currentUser?.id, isAdmin]);
 
   const transactionsByDate = useMemo(() => {
     return allTransactions.reduce((acc, transaction) => {
@@ -269,6 +398,35 @@ const DashboardTableBankingCalendar: React.FC = () => {
     };
   }, [selectedDayTransactions]);
 
+  const activeReceivingAccounts = useMemo(() => {
+    return financialAccounts
+      .filter((a) => a.can_receive_payments)
+      .slice()
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+  }, [financialAccounts]);
+
+  const matrixTotals = useMemo(() => {
+    const salesTotal = activeReceivingAccounts.reduce((sum, a) => sum + (salesByAccount[a.id] || 0), 0);
+
+    const projectTotals: Record<string, number> = {};
+    activeProjects.forEach((p) => {
+      projectTotals[p.id] = activeReceivingAccounts.reduce(
+        (sum, a) => sum + (collectionsByAccountProject[a.id]?.[p.id] || 0),
+        0,
+      );
+    });
+
+    const rowTotals: Record<string, number> = {};
+    activeReceivingAccounts.forEach((a) => {
+      const projectSum = activeProjects.reduce((sum, p) => sum + (collectionsByAccountProject[a.id]?.[p.id] || 0), 0);
+      rowTotals[a.id] = (salesByAccount[a.id] || 0) + projectSum;
+    });
+
+    const grandTotal = Object.values(rowTotals).reduce((s, v) => s + v, 0);
+
+    return { salesTotal, projectTotals, rowTotals, grandTotal };
+  }, [activeReceivingAccounts, activeProjects, salesByAccount, collectionsByAccountProject]);
+
   if (loading) {
     return (
       <Card className="transition-all duration-300 ease-in-out hover:shadow-xl col-span-full">
@@ -301,134 +459,219 @@ const DashboardTableBankingCalendar: React.FC = () => {
       <CardHeader>
         <CardTitle>Table Banking Calendar</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col lg:flex-row gap-6">
-        <div className="flex-1">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            // Show previous + current month (current on the right)
-            month={firstDisplayedMonth}
-            onMonthChange={(newFirstMonth) => {
-              // DayPicker reports the FIRST displayed month.
-              // Keep `currentMonth` as the month displayed last.
-              setCurrentMonth(startOfMonth(addMonths(newFirstMonth, 1)));
-            }}
-            numberOfMonths={2}
-            className="rounded-md border shadow w-full"
-            components={{
-              DayContent: ({ date }) => renderDay(date),
-            }}
-            modifiers={modifiers}
-            modifiersClassNames={{
-              income: "bg-green-100 dark:bg-green-900/50",
-              expenditure: "bg-red-100 dark:bg-red-900/50",
-              pledge: "bg-blue-100 dark:bg-blue-900/50",
-            }}
-          />
-        </div>
+      <CardContent className="space-y-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex-1">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              // Show previous + current month (current on the right)
+              month={firstDisplayedMonth}
+              onMonthChange={(newFirstMonth) => {
+                // DayPicker reports the FIRST displayed month.
+                // Keep `currentMonth` as the month displayed last.
+                setCurrentMonth(startOfMonth(addMonths(newFirstMonth, 1)));
+              }}
+              numberOfMonths={2}
+              className="rounded-md border shadow w-full"
+              components={{
+                DayContent: ({ date }) => renderDay(date),
+              }}
+              modifiers={modifiers}
+              modifiersClassNames={{
+                income: "bg-green-100 dark:bg-green-900/50",
+                expenditure: "bg-red-100 dark:bg-red-900/50",
+                pledge: "bg-blue-100 dark:bg-blue-900/50",
+              }}
+            />
+          </div>
 
-        <div className="flex-1 space-y-4">
-          <h3 className="text-lg font-semibold">
-            Summary for {selectedDate ? format(selectedDate, "PPP") : "Selected Date"}
-          </h3>
+          <div className="flex-1 space-y-4">
+            <h3 className="text-lg font-semibold">
+              Summary for {selectedDate ? format(selectedDate, "PPP") : "Selected Date"}
+            </h3>
 
-          {selectedDate ? (
-            <>
-              {financialAccounts.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account</TableHead>
-                      <TableHead className="text-right">Income</TableHead>
-                      <TableHead className="text-right">Expenditure</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {financialAccounts.map((account) => (
-                      <TableRow key={account.id}>
-                        <TableCell>{account.name}</TableCell>
+            {selectedDate ? (
+              <>
+                {financialAccounts.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account</TableHead>
+                        <TableHead className="text-right">Income</TableHead>
+                        <TableHead className="text-right">Expenditure</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {financialAccounts.map((account) => (
+                        <TableRow key={account.id}>
+                          <TableCell>{account.name}</TableCell>
+                          <TableCell className="text-right text-green-600">
+                            {currency.symbol}
+                            {(summaryByAccount.incomeSummary[account.id] || 0).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right text-red-600">
+                            {currency.symbol}
+                            {(summaryByAccount.expenditureSummary[account.id] || 0).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                        <TableCell>Grand Total</TableCell>
                         <TableCell className="text-right text-green-600">
                           {currency.symbol}
-                          {(summaryByAccount.incomeSummary[account.id] || 0).toFixed(2)}
+                          {summaryByAccount.totalIncome.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right text-red-600">
                           {currency.symbol}
-                          {(summaryByAccount.expenditureSummary[account.id] || 0).toFixed(2)}
+                          {summaryByAccount.totalExpenditure.toFixed(2)}
                         </TableCell>
                       </TableRow>
-                    ))}
-                    <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
-                      <TableCell>Grand Total</TableCell>
-                      <TableCell className="text-right text-green-600">
-                        {currency.symbol}
-                        {summaryByAccount.totalIncome.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right text-red-600">
-                        {currency.symbol}
-                        {summaryByAccount.totalExpenditure.toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground">No financial accounts found.</p>
-              )}
-
-              <div className="rounded-lg border bg-card p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pledges due on selected date</p>
-                    <p className="text-base font-semibold">
-                      {pledgesSummary.pledges.length} pledge{pledgesSummary.pledges.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline">
-                      Total: {currency.symbol}
-                      {pledgesSummary.total.toFixed(2)}
-                    </Badge>
-                    <Badge className="bg-green-600 hover:bg-green-600/90 text-white">
-                      Paid: {currency.symbol}
-                      {pledgesSummary.paid.toFixed(2)}
-                    </Badge>
-                    <Badge className="bg-blue-600 hover:bg-blue-600/90 text-white">
-                      Unpaid: {currency.symbol}
-                      {pledgesSummary.unpaid.toFixed(2)}
-                    </Badge>
-                  </div>
-                </div>
-
-                {pledgesSummary.pledges.length > 0 ? (
-                  <div className="space-y-2">
-                    {pledgesSummary.pledges.map((p) => (
-                      <div key={p.id} className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{p.accountOrProjectName}</p>
-                          {p.description ? (
-                            <p className="text-xs text-muted-foreground truncate">{p.description}</p>
-                          ) : null}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={(p.status || "").toLowerCase() === "paid" ? "default" : "secondary"}>
-                            {(p.status || "Unpaid").toString()}
-                          </Badge>
-                          <span className="text-sm font-semibold">
-                            {currency.symbol}
-                            {p.amount.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                    </TableBody>
+                  </Table>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No pledges due on this date.</p>
+                  <p className="text-muted-foreground">No financial accounts found.</p>
                 )}
+
+                <div className="rounded-lg border bg-card p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Pledges due on selected date</p>
+                      <p className="text-base font-semibold">
+                        {pledgesSummary.pledges.length} pledge{pledgesSummary.pledges.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline">
+                        Total: {currency.symbol}
+                        {pledgesSummary.total.toFixed(2)}
+                      </Badge>
+                      <Badge className="bg-green-600 hover:bg-green-600/90 text-white">
+                        Paid: {currency.symbol}
+                        {pledgesSummary.paid.toFixed(2)}
+                      </Badge>
+                      <Badge className="bg-blue-600 hover:bg-blue-600/90 text-white">
+                        Unpaid: {currency.symbol}
+                        {pledgesSummary.unpaid.toFixed(2)}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {pledgesSummary.pledges.length > 0 ? (
+                    <div className="space-y-2">
+                      {pledgesSummary.pledges.map((p) => (
+                        <div key={p.id} className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{p.accountOrProjectName}</p>
+                            {p.description ? (
+                              <p className="text-xs text-muted-foreground truncate">{p.description}</p>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={(p.status || "").toLowerCase() === "paid" ? "default" : "secondary"}>
+                              {(p.status || "Unpaid").toString()}
+                            </Badge>
+                            <span className="text-sm font-semibold">
+                              {currency.symbol}
+                              {p.amount.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No pledges due on this date.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-muted-foreground">Select a date on the calendar to view its financial summary.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-lg font-semibold">
+              Daily collections by account ({selectedDate ? format(selectedDate, "PPP") : "Select a date"})
+            </h3>
+            {dailyMatrixLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </div>
-            </>
-          ) : (
-            <p className="text-muted-foreground">Select a date on the calendar to view its financial summary.</p>
-          )}
+            ) : null}
+          </div>
+
+          <div className="rounded-lg border bg-card">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[180px]">Account</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Sales</TableHead>
+                    {activeProjects.map((p) => (
+                      <TableHead key={p.id} className="text-right min-w-[140px]">
+                        {p.name}
+                      </TableHead>
+                    ))}
+                    <TableHead className="text-right min-w-[120px]">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeReceivingAccounts.map((acc) => {
+                    const rowSales = salesByAccount[acc.id] || 0;
+                    const rowTotal = matrixTotals.rowTotals[acc.id] || 0;
+
+                    return (
+                      <TableRow key={acc.id}>
+                        <TableCell className="font-medium whitespace-nowrap">{acc.name}</TableCell>
+                        <TableCell className="text-right">
+                          {currency.symbol}
+                          {rowSales.toFixed(2)}
+                        </TableCell>
+                        {activeProjects.map((p) => {
+                          const v = collectionsByAccountProject[acc.id]?.[p.id] || 0;
+                          return (
+                            <TableCell key={p.id} className="text-right">
+                              {currency.symbol}
+                              {v.toFixed(2)}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="text-right font-semibold">
+                          {currency.symbol}
+                          {rowTotal.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+
+                  <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
+                    <TableCell>Totals</TableCell>
+                    <TableCell className="text-right">
+                      {currency.symbol}
+                      {matrixTotals.salesTotal.toFixed(2)}
+                    </TableCell>
+                    {activeProjects.map((p) => (
+                      <TableCell key={p.id} className="text-right">
+                        {currency.symbol}
+                        {(matrixTotals.projectTotals[p.id] || 0).toFixed(2)}
+                      </TableCell>
+                    ))}
+                    <TableCell className="text-right">
+                      {currency.symbol}
+                      {matrixTotals.grandTotal.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            {activeReceivingAccounts.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">No active financial accounts found.</div>
+            ) : null}
+          </div>
         </div>
       </CardContent>
     </Card>
