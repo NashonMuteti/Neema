@@ -20,6 +20,7 @@ const UserProfileSettingsAdmin = () => {
   const { userRoles: definedRoles } = useUserRoles();
   
   const isSuperAdmin = currentUser?.role === "Super Admin";
+  const canReadAllProfiles = currentUser?.role === "Admin" || isSuperAdmin;
   
   const { canManageUserProfiles } = useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -48,8 +49,17 @@ const UserProfileSettingsAdmin = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
+
+    if (!canReadAllProfiles) {
+      setUsers([]);
+      setError("Viewing all user profiles is restricted to administrators.");
+      setLoading(false);
+      return;
+    }
     
-    let query = supabase.from('profiles').select('*');
+    let query = supabase
+      .from('profiles')
+      .select('id, name, email, role, status, enable_login, image_url, receive_notifications');
     
     if (searchQuery) {
       query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%,status.ilike.%${searchQuery}%`);
@@ -76,7 +86,7 @@ const UserProfileSettingsAdmin = () => {
     }
     
     setLoading(false);
-  }, [searchQuery]);
+  }, [canReadAllProfiles, searchQuery]);
 
   useEffect(() => {
     fetchUsers();

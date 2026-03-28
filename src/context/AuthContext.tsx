@@ -76,7 +76,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const fetchProfileEnd = perfStart('AuthContext:fetchUserProfile:profiles.select');
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, name, email, role, status, enable_login, image_url, receive_notifications, phone, other_details')
         .eq('id', user.id)
         .single();
       fetchProfileEnd({ hasProfileRow: !!profileData, errorCode: profileError?.code });

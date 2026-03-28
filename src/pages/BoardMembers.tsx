@@ -39,6 +39,7 @@ const BoardMembers = () => {
   const { currentUser } = useAuth();
   const { userRoles: definedRoles } = useUserRoles();
   const { brandLogoUrl, tagline } = useBranding();
+  const canReadBoardMembers = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
   const { canManageBoardMembers } = useMemo(() => {
     if (!currentUser || !definedRoles) {
@@ -66,7 +67,16 @@ const BoardMembers = () => {
     setLoading(true);
     setError(null);
 
-    let query = supabase.from('board_members').select('*');
+    if (!canReadBoardMembers) {
+      setBoardMembers([]);
+      setError("Viewing board member contact details is restricted to administrators.");
+      setLoading(false);
+      return;
+    }
+
+    let query = supabase
+      .from('board_members')
+      .select('id, name, role, email, phone, address, notes, image_url, created_at');
 
     if (debouncedSearchQuery) { // Use debounced query
       query = query.or(`name.ilike.%${debouncedSearchQuery}%,role.ilike.%${debouncedSearchQuery}%,email.ilike.%${debouncedSearchQuery}%,phone.ilike.%${debouncedSearchQuery}%`);
@@ -83,7 +93,7 @@ const BoardMembers = () => {
       setBoardMembers(data || []);
     }
     setLoading(false);
-  }, [debouncedSearchQuery]); // Depend on debounced query
+  }, [canReadBoardMembers, debouncedSearchQuery]); // Depend on debounced query
 
   useEffect(() => {
     fetchBoardMembers();
