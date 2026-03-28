@@ -59,6 +59,7 @@ export interface SaleFormPayload {
   payment_method: string;
   received_into_account_id: string | null;
   notes?: string;
+  discount: number;
   sale_items: Array<{
     product_id: string;
     quantity: number;
@@ -92,6 +93,27 @@ interface SaleFormProps {
   onRecordSale: (payload: SaleFormPayload) => Promise<void>;
 }
 
+const DISCOUNT_NOTE_REGEX = /(?:^|\n)Discount:\s*[A-Z]{0,3}?\$?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*$/i;
+
+const parseDiscountFromNotes = (notes?: string) => {
+  if (!notes) {
+    return { baseNotes: "", discount: 0 };
+  }
+
+  const match = notes.match(DISCOUNT_NOTE_REGEX);
+  if (!match) {
+    return { baseNotes: notes, discount: 0 };
+  }
+
+  const discount = Number(match[1] || 0);
+  const baseNotes = notes.replace(DISCOUNT_NOTE_REGEX, "").trim();
+
+  return {
+    baseNotes,
+    discount: Number.isFinite(discount) ? discount : 0,
+  };
+};
+
 const SaleForm: React.FC<SaleFormProps> = ({
   products,
   financialAccounts,
@@ -110,6 +132,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
   const [saleDate, setSaleDate] = useState<Date | undefined>(new Date());
   const [customerName, setCustomerName] = useState("");
   const [saleNotes, setSaleNotes] = useState("");
+  const [discount, setDiscount] = useState("0");
   const [currentSaleItems, setCurrentSaleItems] = useState<SaleFormItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string | undefined>(undefined);
   const [itemQuantity, setItemQuantity] = useState("1");
@@ -127,6 +150,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
     setSaleDate(new Date());
     setCustomerName("");
     setSaleNotes("");
+    setDiscount("0");
     setCurrentSaleItems([]);
     setSelectedProductId(products[0]?.id);
     setItemQuantity("1");
@@ -135,9 +159,12 @@ const SaleForm: React.FC<SaleFormProps> = ({
 
   useEffect(() => {
     if (editingSale) {
+      const { baseNotes, discount: parsedDiscount } = parseDiscountFromNotes(editingSale.notes);
+
       setSaleDate(editingSale.sale_date);
       setCustomerName(editingSale.customer_name || "");
-      setSaleNotes(editingSale.notes || "");
+      setSaleNotes(baseNotes);
+      setDiscount(parsedDiscount.toFixed(2));
       setCurrentSaleItems(editingSale.sale_items);
       setSelectedProductId(editingSale.sale_items[0]?.product_id || products[0]?.id);
       setItemQuantity("1");
@@ -171,6 +198,11 @@ const SaleForm: React.FC<SaleFormProps> = ({
       setPayments([]);
     }
   }, [editingSale, payments.length, receivableAccounts]);
+
+  const parsedDiscount = useMemo(() => {
+    const value = Number(discount || 0);
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  }, [discount]);
 
   const getAvailableStock = (productId: string) => {
     const product = products.find((item) => item.id === productId);
@@ -250,8 +282,8 @@ const SaleForm: React.FC<SaleFormProps> = ({
   }, [payments]);
 
   const remainingDue = useMemo(() => {
-    return Math.max(calculateCartTotal - totalPaid, 0);
-  }, [calculateCartTotal, totalPaid]);
+    return Math.max(calculateCartTotal - totalPaid - parsedDiscount, 0);
+  }, [calculateCartTotal, totalPaid, parsedDiscount]);
 
   const addPaymentRow = () => {
     if (receivableAccounts.length === 0) return;
@@ -272,6 +304,11 @@ const SaleForm: React.FC<SaleFormProps> = ({
       return;
     }
 
+    if (parsedDiscount < 0) {
+      showError("Discount cannot be negative.");
+      return;
+    }
+
     const normalizedPayments = payments
       .map((payment) => ({
         account_id: payment.account_id,
@@ -284,17 +321,26 @@ const SaleForm: React.FC<SaleFormProps> = ({
       return;
     }
 
-    if (totalPaid > calculateCartTotal + 0.00001) {
-      showError("Total paid cannot exceed sale total.");
+    if (totalPaid + parsedDiscount - calculateCartTotal > 0.00001) {
+      showError("Received total plus discount cannot exceed sale total.");
       return;
     }
+
+    if (Math.abs(totalPaid + parsedDiscount - calculateCartTotal) > 0.00001) {
+      showError("Received total plus discount must exactly match the sale total.");
+      return;
+    }
+
+    const discountNote = parsedDiscount > 0 ? `Discount: ${currency.symbol}${parsedDiscount.toFixed(2)}` : "";
+    const combinedNotes = [saleNotes.trim(), discountNote].filter(Boolean).join("\n");
 
     await onRecordSale({
       customer_name: customerName.trim() || undefined,
       sale_date: saleDate.toISOString(),
       payment_method: "Split",
       received_into_account_id: normalizedPayments[0]?.account_id || null,
-      notes: saleNotes.trim() || undefined,
+      notes: combinedNotes || undefined,
+      discount: parsedDiscount,
       sale_items: currentSaleItems.map((item) => ({
         product_id: item.product_id,
         quantity: item.quantity,
@@ -409,7 +455,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
                 Add payment row
               </Button>
               <div className="text-sm text-muted-foreground">
-                Paid: <span className="font-medium">{currency.symbol}{totalPaid.toFixed(2)}</span> • Remaining: <span className="font-medium">{currency.symbol}{remainingDue.toFixed(2)}</span>
+                Paid: <span className="font-medium">{currency.symbol}{totalPaid.toFixed(2)}</span> • Discount: <span className="font-medium">{currency.symbol}{parsedDiscount.toFixed(2)}</span> • Remaining: <span className="font-medium">{currency.symbol}{remainingDue.toFixed(2)}</span>
               </div>
             </div>
 
@@ -419,6 +465,25 @@ const SaleForm: React.FC<SaleFormProps> = ({
               </p>
             ) : null}
           </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="sale-discount">Discount</Label>
+          <Input
+            id="sale-discount"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            value={discount}
+            onChange={(e) => setDiscount(e.target.value)}
+            disabled={!canManageDailySales || isProcessing}
+          />
+          {parsedDiscount > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              A discount note will be added automatically to the notes field when you save.
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-1.5">

@@ -75,6 +75,14 @@ const buildSaleIncomeSource = (saleId: string, customerName: string | null | und
     .join(" • ");
 };
 
+const buildNotesWithDiscount = (notes: string | null, discount: number) => {
+  const trimmedNotes = (notes || "").replace(DISCOUNT_NOTE_REGEX, "").trim();
+  const discountNote = discount > 0 ? `Discount: $${discount.toFixed(2)}` : "";
+  return [trimmedNotes, discountNote].filter(Boolean).join("\n") || null;
+};
+
+const DISCOUNT_NOTE_REGEX = /(?:^|\n)Discount:\s*[A-Z]{0,3}?\$?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*$/i;
+
 const getCurrentUserContext = async (supabaseServiceRole: ReturnType<typeof getServiceClient>, token: string) => {
   const {
     data: { user },
@@ -388,7 +396,7 @@ const insertSalePaymentsAndIncome = async (
   }
 };
 
-const validateInputs = (saleItemsRaw: unknown, paymentsRaw: unknown) => {
+const validateInputs = (saleItemsRaw: unknown, paymentsRaw: unknown, discountRaw: unknown) => {
   if (!Array.isArray(saleItemsRaw) || saleItemsRaw.length === 0) {
     throw new Error("No sale items provided.");
   }
@@ -410,10 +418,16 @@ const validateInputs = (saleItemsRaw: unknown, paymentsRaw: unknown) => {
     }))
     .filter((payment) => payment.account_id && Number.isFinite(payment.amount) && payment.amount > 0);
 
+  const discount = Number(discountRaw || 0);
+
   for (const item of saleItems) {
     if (!item.product_id || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unit_price) || item.unit_price <= 0) {
       throw new Error("Invalid sale item data.");
     }
+  }
+
+  if (!Number.isFinite(discount) || discount < 0) {
+    throw new Error("Discount must be a non-negative number.");
   }
 
   if (payments.length === 0) {
@@ -427,13 +441,18 @@ const validateInputs = (saleItemsRaw: unknown, paymentsRaw: unknown) => {
     throw new Error("Total paid must be greater than 0.");
   }
 
-  if (totalPaid > totalAmount + 0.00001) {
-    throw new Error("Total paid cannot exceed sale total.");
+  if (totalPaid + discount - totalAmount > 0.00001) {
+    throw new Error("Received total plus discount cannot exceed sale total.");
+  }
+
+  if (Math.abs(totalPaid + discount - totalAmount) > 0.00001) {
+    throw new Error("Received total plus discount must exactly match the sale total.");
   }
 
   return {
     saleItems,
     payments,
+    discount,
     totalAmount,
   };
 };
@@ -504,7 +523,8 @@ serve(async (req) => {
     const receivedIntoAccountId = typeof body?.received_into_account_id === "string" ? body.received_into_account_id : null;
     const notes = typeof body?.notes === "string" ? body.notes : null;
 
-    const { saleItems, payments, totalAmount } = validateInputs(body?.sale_items, body?.payments);
+    const { saleItems, payments, totalAmount, discount } = validateInputs(body?.sale_items, body?.payments, body?.discount);
+    const finalNotes = buildNotesWithDiscount(notes, discount);
 
     if (action === "update") {
       if (!saleId) {
@@ -541,7 +561,7 @@ serve(async (req) => {
           total_amount: totalAmount,
           payment_method: paymentMethod,
           received_into_account_id: primaryAccountId,
-          notes,
+          notes: finalNotes,
         })
         .eq("id", existingSale.id);
 
@@ -578,7 +598,7 @@ serve(async (req) => {
         total_amount: totalAmount,
         payment_method: paymentMethod,
         received_into_account_id: primaryAccountId,
-        notes,
+        notes: finalNotes,
       })
       .select("id")
       .single();
