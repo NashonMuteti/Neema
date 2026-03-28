@@ -1,277 +1,608 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const FUNCTION_NAME = "record-daily-sale";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+type SaleItemInput = {
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  subtotal?: number;
+};
+
+type PaymentInput = {
+  account_id: string;
+  amount: number;
+};
+
+type ExistingSale = {
+  id: string;
+  profile_id: string;
+  customer_name: string | null;
+  sale_date: string;
+  total_amount: number;
+  payment_method: string;
+  received_into_account_id: string | null;
+  notes: string | null;
+  sale_items: Array<{
+    product_id: string;
+    quantity: number;
+    unit_price: number;
+    subtotal: number;
+  }>;
+  sale_payments: Array<{
+    account_id: string;
+    amount: number;
+  }>;
+};
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const errorResponse = (message: string, status: number) => jsonResponse({ error: message }, status);
+
+const getServiceClient = () =>
+  createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+
+const toIdTotals = (entries: Array<{ id: string; amount: number }>) => {
+  const totals = new Map<string, number>();
+  entries.forEach((entry) => {
+    totals.set(entry.id, (totals.get(entry.id) || 0) + entry.amount);
+  });
+  return totals;
+};
+
+const buildSaleIncomeSource = (saleId: string, customerName: string | null | undefined, itemLabels: string[]) => {
+  const customerLabel = String(customerName || "").trim() || "Walk-in";
+  const itemsSummary = itemLabels.length
+    ? `Items: ${itemLabels.slice(0, 3).join(", ")}${itemLabels.length > 3 ? ` +${itemLabels.length - 3} more` : ""}`
+    : "";
+
+  return [
+    `Sale: ${customerLabel}`,
+    itemsSummary,
+    `[sale:${saleId}]`,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+};
+
+const getCurrentUserContext = async (supabaseServiceRole: ReturnType<typeof getServiceClient>, token: string) => {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabaseServiceRole.auth.getUser(token);
+
+  if (authError || !user) {
+    console.error(`[${FUNCTION_NAME}] Auth error`, { message: authError?.message });
+    return { error: errorResponse("Unauthorized: Invalid or expired token", 401) };
+  }
+
+  const { data: profile, error: profileError } = await supabaseServiceRole
+    .from("profiles")
+    .select("id, role, status, enable_login")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`[${FUNCTION_NAME}] Profile lookup failed`, { message: profileError?.message, userId: user.id });
+    return { error: errorResponse("Forbidden: User profile not found or access denied", 403) };
+  }
+
+  const { data: roleRow, error: roleError } = await supabaseServiceRole
+    .from("roles")
+    .select("menu_privileges")
+    .eq("name", profile.role)
+    .maybeSingle();
+
+  if (roleError) {
+    console.error(`[${FUNCTION_NAME}] Role lookup failed`, { message: roleError.message, role: profile.role });
+    return { error: errorResponse("Forbidden: Could not validate user privileges", 403) };
+  }
+
+  const menuPrivileges = roleRow?.menu_privileges || [];
+  const isAdmin = profile.role === "Admin" || profile.role === "Super Admin";
+  const canManageDailySales =
+    profile.status === "Active" &&
+    profile.enable_login === true &&
+    (isAdmin || menuPrivileges.includes("Manage Daily Sales"));
+
+  if (!canManageDailySales) {
+    console.warn(`[${FUNCTION_NAME}] Insufficient privileges`, { userId: user.id, role: profile.role });
+    return { error: errorResponse("Forbidden: Insufficient privileges to manage daily sales", 403) };
+  }
+
+  return {
+    user,
+    profile,
+    isAdmin,
+  };
+};
+
+const fetchExistingSale = async (
+  supabaseServiceRole: ReturnType<typeof getServiceClient>,
+  saleId: string,
+  actorUserId: string,
+  isAdmin: boolean,
+): Promise<ExistingSale | null> => {
+  const { data: sale, error: saleError } = await supabaseServiceRole
+    .from("sales_transactions")
+    .select("id, profile_id, customer_name, sale_date, total_amount, payment_method, received_into_account_id, notes")
+    .eq("id", saleId)
+    .single();
+
+  if (saleError || !sale) {
+    console.error(`[${FUNCTION_NAME}] Existing sale lookup failed`, { message: saleError?.message, saleId });
+    return null;
+  }
+
+  if (!isAdmin && sale.profile_id !== actorUserId) {
+    console.warn(`[${FUNCTION_NAME}] Unauthorized sale access blocked`, { actorUserId, saleId, ownerId: sale.profile_id });
+    return null;
+  }
+
+  const { data: saleItems, error: saleItemsError } = await supabaseServiceRole
+    .from("sale_items")
+    .select("product_id, quantity, unit_price, subtotal")
+    .eq("sale_id", saleId);
+
+  if (saleItemsError) {
+    console.error(`[${FUNCTION_NAME}] Sale items lookup failed`, { message: saleItemsError.message, saleId });
+    return null;
+  }
+
+  const { data: salePayments, error: salePaymentsError } = await supabaseServiceRole
+    .from("sale_payments")
+    .select("account_id, amount")
+    .eq("sale_id", saleId);
+
+  if (salePaymentsError) {
+    console.error(`[${FUNCTION_NAME}] Sale payments lookup failed`, { message: salePaymentsError.message, saleId });
+    return null;
+  }
+
+  return {
+    ...sale,
+    total_amount: Number(sale.total_amount || 0),
+    sale_items: (saleItems || []).map((item) => ({
+      product_id: item.product_id,
+      quantity: Number(item.quantity || 0),
+      unit_price: Number(item.unit_price || 0),
+      subtotal: Number(item.subtotal || 0),
+    })),
+    sale_payments: (salePayments || []).map((payment) => ({
+      account_id: payment.account_id,
+      amount: Number(payment.amount || 0),
+    })),
+  };
+};
+
+const deleteTrackedIncomeTransactions = async (
+  supabaseServiceRole: ReturnType<typeof getServiceClient>,
+  saleId: string,
+  saleProfileId: string,
+) => {
+  const shortSaleId = saleId.slice(0, 8);
+  const { error } = await supabaseServiceRole
+    .from("income_transactions")
+    .delete()
+    .eq("profile_id", saleProfileId)
+    .or(`source.ilike.%[sale:${saleId}]%,source.ilike.%#${shortSaleId}%`);
+
+  if (error) {
+    console.error(`[${FUNCTION_NAME}] Failed to delete linked income transactions`, {
+      message: error.message,
+      saleId,
+    });
+    throw new Error(error.message);
+  }
+};
+
+const applyProductStocks = async (
+  supabaseServiceRole: ReturnType<typeof getServiceClient>,
+  items: SaleItemInput[],
+  previousItems: ExistingSale["sale_items"],
+) => {
+  const allProductIds = Array.from(new Set([...items.map((item) => item.product_id), ...previousItems.map((item) => item.product_id)]));
+
+  if (allProductIds.length === 0) return [];
+
+  const { data: products, error } = await supabaseServiceRole
+    .from("products")
+    .select("id, name, current_stock")
+    .in("id", allProductIds);
+
+  if (error) {
+    console.error(`[${FUNCTION_NAME}] Failed to fetch products`, { message: error.message, allProductIds });
+    throw new Error(error.message);
+  }
+
+  const productMap = new Map((products || []).map((product) => [product.id, product]));
+  const oldQuantities = toIdTotals(previousItems.map((item) => ({ id: item.product_id, amount: item.quantity })));
+  const newQuantities = toIdTotals(items.map((item) => ({ id: item.product_id, amount: item.quantity })));
+  const itemLabels: string[] = [];
+
+  for (const item of items) {
+    const product = productMap.get(item.product_id);
+    if (!product) {
+      throw new Error(`Product with ID ${item.product_id} not found.`);
+    }
+    itemLabels.push(`${item.quantity}× ${product.name}`);
+  }
+
+  for (const productId of allProductIds) {
+    const product = productMap.get(productId);
+    if (!product) {
+      throw new Error(`Product with ID ${productId} not found.`);
+    }
+
+    const oldQuantity = oldQuantities.get(productId) || 0;
+    const newQuantity = newQuantities.get(productId) || 0;
+    const availableStock = Number(product.current_stock || 0) + oldQuantity;
+
+    if (newQuantity > availableStock) {
+      throw new Error(`Insufficient stock for ${product.name}. Available: ${availableStock}`);
+    }
+
+    const nextStock = availableStock - newQuantity;
+    const { error: updateError } = await supabaseServiceRole
+      .from("products")
+      .update({ current_stock: nextStock })
+      .eq("id", productId);
+
+    if (updateError) {
+      console.error(`[${FUNCTION_NAME}] Failed to update product stock`, {
+        message: updateError.message,
+        productId,
+      });
+      throw new Error(updateError.message);
+    }
+  }
+
+  return itemLabels;
+};
+
+const applyAccountBalances = async (
+  supabaseServiceRole: ReturnType<typeof getServiceClient>,
+  payments: PaymentInput[],
+  previousPayments: ExistingSale["sale_payments"],
+  actorUserId: string,
+  isAdmin: boolean,
+) => {
+  const allAccountIds = Array.from(new Set([...payments.map((payment) => payment.account_id), ...previousPayments.map((payment) => payment.account_id)]));
+
+  if (allAccountIds.length === 0) return;
+
+  const { data: accounts, error } = await supabaseServiceRole
+    .from("financial_accounts")
+    .select("id, profile_id, current_balance")
+    .in("id", allAccountIds);
+
+  if (error) {
+    console.error(`[${FUNCTION_NAME}] Failed to fetch financial accounts`, { message: error.message, allAccountIds });
+    throw new Error(error.message);
+  }
+
+  const accountMap = new Map((accounts || []).map((account) => [account.id, account]));
+  const oldTotals = toIdTotals(previousPayments.map((payment) => ({ id: payment.account_id, amount: payment.amount })));
+  const newTotals = toIdTotals(payments.map((payment) => ({ id: payment.account_id, amount: payment.amount })));
+
+  for (const accountId of allAccountIds) {
+    const account = accountMap.get(accountId);
+    if (!account) {
+      throw new Error(`Financial account with ID ${accountId} not found.`);
+    }
+
+    if (!isAdmin && account.profile_id !== actorUserId) {
+      throw new Error("You can only receive sales payments into your own accounts.");
+    }
+
+    const oldAmount = oldTotals.get(accountId) || 0;
+    const newAmount = newTotals.get(accountId) || 0;
+    const nextBalance = Number(account.current_balance || 0) - oldAmount + newAmount;
+
+    const { error: updateError } = await supabaseServiceRole
+      .from("financial_accounts")
+      .update({ current_balance: nextBalance })
+      .eq("id", accountId);
+
+    if (updateError) {
+      console.error(`[${FUNCTION_NAME}] Failed to update account balance`, {
+        message: updateError.message,
+        accountId,
+      });
+      throw new Error(updateError.message);
+    }
+  }
+};
+
+const insertSaleItems = async (
+  supabaseServiceRole: ReturnType<typeof getServiceClient>,
+  saleId: string,
+  items: SaleItemInput[],
+) => {
+  if (items.length === 0) return;
+
+  const rows = items.map((item) => ({
+    sale_id: saleId,
+    product_id: item.product_id,
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    subtotal: item.quantity * item.unit_price,
+  }));
+
+  const { error } = await supabaseServiceRole.from("sale_items").insert(rows);
+  if (error) {
+    console.error(`[${FUNCTION_NAME}] Failed to insert sale items`, { message: error.message, saleId });
+    throw new Error(error.message);
+  }
+};
+
+const insertSalePaymentsAndIncome = async (
+  supabaseServiceRole: ReturnType<typeof getServiceClient>,
+  saleId: string,
+  saleProfileId: string,
+  saleDate: string,
+  paymentMethod: string,
+  customerName: string | null | undefined,
+  payments: PaymentInput[],
+  itemLabels: string[],
+) => {
+  if (payments.length === 0) return;
+
+  const incomeSource = buildSaleIncomeSource(saleId, customerName, itemLabels);
+
+  const paymentRows = payments.map((payment) => ({
+    sale_id: saleId,
+    account_id: payment.account_id,
+    amount: payment.amount,
+    payment_method: paymentMethod,
+  }));
+
+  const { error: paymentsError } = await supabaseServiceRole.from("sale_payments").insert(paymentRows);
+  if (paymentsError) {
+    console.error(`[${FUNCTION_NAME}] Failed to insert sale payments`, { message: paymentsError.message, saleId });
+    throw new Error(paymentsError.message);
+  }
+
+  const incomeRows = payments.map((payment) => ({
+    profile_id: saleProfileId,
+    account_id: payment.account_id,
+    amount: payment.amount,
+    source: incomeSource,
+    date: saleDate,
+  }));
+
+  const { error: incomeError } = await supabaseServiceRole.from("income_transactions").insert(incomeRows);
+  if (incomeError) {
+    console.error(`[${FUNCTION_NAME}] Failed to insert income transactions`, { message: incomeError.message, saleId });
+    throw new Error(incomeError.message);
+  }
+};
+
+const validateInputs = (saleItemsRaw: unknown, paymentsRaw: unknown) => {
+  if (!Array.isArray(saleItemsRaw) || saleItemsRaw.length === 0) {
+    throw new Error("No sale items provided.");
+  }
+
+  if (!Array.isArray(paymentsRaw) || paymentsRaw.length === 0) {
+    throw new Error("No payments provided.");
+  }
+
+  const saleItems = saleItemsRaw.map((item) => ({
+    product_id: typeof item?.product_id === "string" ? item.product_id : "",
+    quantity: Number(item?.quantity),
+    unit_price: Number(item?.unit_price),
+  }));
+
+  const payments = paymentsRaw
+    .map((payment) => ({
+      account_id: typeof payment?.account_id === "string" ? payment.account_id : "",
+      amount: Number(payment?.amount),
+    }))
+    .filter((payment) => payment.account_id && Number.isFinite(payment.amount) && payment.amount > 0);
+
+  for (const item of saleItems) {
+    if (!item.product_id || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unit_price) || item.unit_price <= 0) {
+      throw new Error("Invalid sale item data.");
+    }
+  }
+
+  if (payments.length === 0) {
+    throw new Error("At least one valid payment is required.");
+  }
+
+  const totalAmount = saleItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+  if (totalPaid <= 0) {
+    throw new Error("Total paid must be greater than 0.");
+  }
+
+  if (totalPaid > totalAmount + 0.00001) {
+    throw new Error("Total paid cannot exceed sale total.");
+  }
+
+  return {
+    saleItems,
+    payments,
+    totalAmount,
+  };
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response('Unauthorized: Missing Authorization header', { status: 401, headers: corsHeaders });
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      console.error(`[${FUNCTION_NAME}] Missing or invalid authorization header`);
+      return errorResponse("Unauthorized: Missing Authorization header", 401);
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace("Bearer ", "");
+    const supabaseServiceRole = getServiceClient();
 
-    const supabaseServiceRole = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const { data: { user }, error: authError } = await supabaseServiceRole.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error("[record-daily-sale] Edge Function Auth Error:", authError?.message);
-      return new Response('Unauthorized: Invalid or expired token', { status: 401, headers: corsHeaders });
+    const userContext = await getCurrentUserContext(supabaseServiceRole, token);
+    if ("error" in userContext) {
+      return userContext.error;
     }
 
-    const { data: profile, error: profileError } = await supabaseServiceRole
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const { user, isAdmin } = userContext;
+    const body = await req.json();
+    const action = typeof body?.action === "string" ? body.action : "create";
+    const saleId = typeof body?.sale_id === "string" ? body.sale_id : "";
 
-    if (profileError || !profile) {
-      console.error("[record-daily-sale] Edge Function Profile Error:", profileError?.message);
-      return new Response('Forbidden: User profile not found or access denied', { status: 403, headers: corsHeaders });
-    }
-
-    const userRole = profile.role;
-    const allowedRoles = ['Admin', 'Super Admin', 'Project Manager'];
-
-    if (!allowedRoles.includes(userRole)) {
-      return new Response('Forbidden: Insufficient privileges to record sales', { status: 403, headers: corsHeaders });
-    }
-
-    const {
-      customer_name,
-      sale_date,
-      payment_method,
-      received_into_account_id,
-      notes,
-      sale_items,
-      payments,
-    } = await req.json();
-
-    if (!sale_items || sale_items.length === 0) {
-      return new Response('Bad Request: No sale items provided', { status: 400, headers: corsHeaders });
-    }
-
-    if (!payments || !Array.isArray(payments) || payments.length === 0) {
-      return new Response('Bad Request: No payments provided', { status: 400, headers: corsHeaders });
-    }
-
-    let total_amount = 0;
-    const productUpdates: Array<{ id: string; new_stock: number }> = [];
-    const itemLabels: string[] = [];
-
-    for (const item of sale_items) {
-      const { product_id, quantity, unit_price } = item;
-      if (!product_id || !quantity || !unit_price) {
-        return new Response('Bad Request: Invalid sale item data', { status: 400, headers: corsHeaders });
+    if (action === "delete") {
+      if (!saleId) {
+        return errorResponse("Bad Request: sale_id is required", 400);
       }
 
-      const { data: product, error: productError } = await supabaseServiceRole
-        .from('products')
-        .select('current_stock, name')
-        .eq('id', product_id)
-        .single();
-
-      if (productError || !product) {
-        return new Response(`Bad Request: Product with ID ${product_id} not found.`, { status: 400, headers: corsHeaders });
+      const existingSale = await fetchExistingSale(supabaseServiceRole, saleId, user.id, isAdmin);
+      if (!existingSale) {
+        return errorResponse("Sale not found or access denied.", 404);
       }
 
-      if (product.current_stock < quantity) {
-        return new Response(`Bad Request: Insufficient stock for product ID ${product_id}. Available: ${product.current_stock}, Requested: ${quantity}`, { status: 400, headers: corsHeaders });
+      await applyProductStocks(supabaseServiceRole, [], existingSale.sale_items);
+      await applyAccountBalances(supabaseServiceRole, [], existingSale.sale_payments, user.id, isAdmin);
+      await deleteTrackedIncomeTransactions(supabaseServiceRole, existingSale.id, existingSale.profile_id);
+
+      const { error: deletePaymentsError } = await supabaseServiceRole.from("sale_payments").delete().eq("sale_id", existingSale.id);
+      if (deletePaymentsError) {
+        console.error(`[${FUNCTION_NAME}] Failed to delete sale payments`, { message: deletePaymentsError.message, saleId });
+        return errorResponse(deletePaymentsError.message, 500);
       }
 
-      const subtotal = quantity * unit_price;
-      total_amount += subtotal;
-      productUpdates.push({
-        id: product_id,
-        new_stock: product.current_stock - quantity,
-      });
-
-      if (product.name) {
-        itemLabels.push(`${quantity}× ${product.name}`);
+      const { error: deleteItemsError } = await supabaseServiceRole.from("sale_items").delete().eq("sale_id", existingSale.id);
+      if (deleteItemsError) {
+        console.error(`[${FUNCTION_NAME}] Failed to delete sale items`, { message: deleteItemsError.message, saleId });
+        return errorResponse(deleteItemsError.message, 500);
       }
+
+      const { error: deleteSaleError } = await supabaseServiceRole.from("sales_transactions").delete().eq("id", existingSale.id);
+      if (deleteSaleError) {
+        console.error(`[${FUNCTION_NAME}] Failed to delete sale transaction`, { message: deleteSaleError.message, saleId });
+        return errorResponse(deleteSaleError.message, 500);
+      }
+
+      return jsonResponse({ message: "Sale deleted successfully", sale_id: existingSale.id });
     }
 
-    const total_paid = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-    if (total_paid <= 0) {
-      return new Response('Bad Request: Total paid must be greater than 0', { status: 400, headers: corsHeaders });
-    }
-    if (total_paid > total_amount + 0.00001) {
-      return new Response('Bad Request: Total paid cannot exceed sale total', { status: 400, headers: corsHeaders });
+    const customerName = typeof body?.customer_name === "string" ? body.customer_name : null;
+    const saleDate = typeof body?.sale_date === "string" ? body.sale_date : new Date().toISOString();
+    const paymentMethod = typeof body?.payment_method === "string" && body.payment_method ? body.payment_method : "Split";
+    const receivedIntoAccountId = typeof body?.received_into_account_id === "string" ? body.received_into_account_id : null;
+    const notes = typeof body?.notes === "string" ? body.notes : null;
+
+    const { saleItems, payments, totalAmount } = validateInputs(body?.sale_items, body?.payments);
+
+    if (action === "update") {
+      if (!saleId) {
+        return errorResponse("Bad Request: sale_id is required", 400);
+      }
+
+      const existingSale = await fetchExistingSale(supabaseServiceRole, saleId, user.id, isAdmin);
+      if (!existingSale) {
+        return errorResponse("Sale not found or access denied.", 404);
+      }
+
+      const primaryAccountId = receivedIntoAccountId || payments[0]?.account_id || null;
+      const itemLabels = await applyProductStocks(supabaseServiceRole, saleItems, existingSale.sale_items);
+      await applyAccountBalances(supabaseServiceRole, payments, existingSale.sale_payments, user.id, isAdmin);
+      await deleteTrackedIncomeTransactions(supabaseServiceRole, existingSale.id, existingSale.profile_id);
+
+      const { error: deletePaymentsError } = await supabaseServiceRole.from("sale_payments").delete().eq("sale_id", existingSale.id);
+      if (deletePaymentsError) {
+        console.error(`[${FUNCTION_NAME}] Failed to delete old sale payments`, { message: deletePaymentsError.message, saleId });
+        return errorResponse(deletePaymentsError.message, 500);
+      }
+
+      const { error: deleteItemsError } = await supabaseServiceRole.from("sale_items").delete().eq("sale_id", existingSale.id);
+      if (deleteItemsError) {
+        console.error(`[${FUNCTION_NAME}] Failed to delete old sale items`, { message: deleteItemsError.message, saleId });
+        return errorResponse(deleteItemsError.message, 500);
+      }
+
+      const { error: updateSaleError } = await supabaseServiceRole
+        .from("sales_transactions")
+        .update({
+          customer_name: customerName,
+          sale_date: saleDate,
+          total_amount: totalAmount,
+          payment_method: paymentMethod,
+          received_into_account_id: primaryAccountId,
+          notes,
+        })
+        .eq("id", existingSale.id);
+
+      if (updateSaleError) {
+        console.error(`[${FUNCTION_NAME}] Failed to update sale transaction`, { message: updateSaleError.message, saleId });
+        return errorResponse(updateSaleError.message, 500);
+      }
+
+      await insertSaleItems(supabaseServiceRole, existingSale.id, saleItems);
+      await insertSalePaymentsAndIncome(
+        supabaseServiceRole,
+        existingSale.id,
+        existingSale.profile_id,
+        saleDate,
+        paymentMethod,
+        customerName,
+        payments,
+        itemLabels,
+      );
+
+      return jsonResponse({ message: "Sale updated successfully", sale_id: existingSale.id });
     }
 
-    const primaryAccountId = received_into_account_id || payments[0]?.account_id || null;
+    const primaryAccountId = receivedIntoAccountId || payments[0]?.account_id || null;
+    const itemLabels = await applyProductStocks(supabaseServiceRole, saleItems, []);
+    await applyAccountBalances(supabaseServiceRole, payments, [], user.id, isAdmin);
 
     const { data: saleData, error: saleError } = await supabaseServiceRole
-      .from('sales_transactions')
+      .from("sales_transactions")
       .insert({
         profile_id: user.id,
-        customer_name,
-        sale_date,
-        total_amount,
-        payment_method: payment_method || 'Split',
+        customer_name: customerName,
+        sale_date: saleDate,
+        total_amount: totalAmount,
+        payment_method: paymentMethod,
         received_into_account_id: primaryAccountId,
         notes,
       })
-      .select()
+      .select("id")
       .single();
 
     if (saleError || !saleData) {
-      console.error("[record-daily-sale] Error inserting sales_transaction:", saleError);
-      return new Response(JSON.stringify({ error: saleError?.message || 'Failed to create sale transaction.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      });
+      console.error(`[${FUNCTION_NAME}] Failed to create sale transaction`, { message: saleError?.message });
+      return errorResponse(saleError?.message || "Failed to create sale transaction.", 500);
     }
 
-    const sale_id = saleData.id;
+    await insertSaleItems(supabaseServiceRole, saleData.id, saleItems);
+    await insertSalePaymentsAndIncome(
+      supabaseServiceRole,
+      saleData.id,
+      user.id,
+      saleDate,
+      paymentMethod,
+      customerName,
+      payments,
+      itemLabels,
+    );
 
-    const shortSaleId = String(sale_id).slice(0, 8);
-    const customerLabel = String(customer_name || "").trim() || "Walk-in";
-    const itemsSummary = itemLabels.length
-      ? `Items: ${itemLabels.slice(0, 3).join(", ")}${itemLabels.length > 3 ? ` +${itemLabels.length - 3} more` : ""}`
-      : "";
-
-    const makeSaleIncomeSource = () => {
-      const base = [
-        `Sale: ${customerLabel}`,
-        itemsSummary,
-        `#${shortSaleId}`,
-      ].filter(Boolean).join(" • ");
-
-      return base.length > 140 ? `${base.slice(0, 137)}...` : base;
-    };
-
-    for (const item of sale_items) {
-      const { product_id, quantity, unit_price } = item;
-      const subtotal = quantity * unit_price;
-
-      const { error: saleItemError } = await supabaseServiceRole
-        .from('sale_items')
-        .insert({
-          sale_id,
-          product_id,
-          quantity,
-          unit_price,
-          subtotal,
-        });
-
-      if (saleItemError) {
-        console.error("[record-daily-sale] Error inserting sale_item:", saleItemError);
-        return new Response(JSON.stringify({ error: saleItemError?.message || 'Failed to create sale item.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        });
-      }
-
-      const productUpdate = productUpdates.find(pu => pu.id === product_id);
-      if (productUpdate) {
-        const { error: stockUpdateError } = await supabaseServiceRole
-          .from('products')
-          .update({ current_stock: productUpdate.new_stock })
-          .eq('id', product_id);
-
-        if (stockUpdateError) {
-          console.error("[record-daily-sale] Error updating product stock:", stockUpdateError);
-          return new Response(JSON.stringify({ error: stockUpdateError?.message || 'Failed to update product stock.' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
-          });
-        }
-      }
-    }
-
-    // Insert payments and apply each to income + account balances
-    for (const p of payments) {
-      const account_id = p.account_id;
-      const amount = Number(p.amount);
-      if (!account_id || !Number.isFinite(amount) || amount <= 0) continue;
-
-      const { error: payInsertErr } = await supabaseServiceRole
-        .from('sale_payments')
-        .insert({
-          sale_id,
-          account_id,
-          amount,
-          payment_method: payment_method || 'Split',
-        });
-
-      if (payInsertErr) {
-        console.error("[record-daily-sale] Error inserting sale_payment:", payInsertErr);
-        return new Response(JSON.stringify({ error: payInsertErr?.message || 'Failed to record sale payment.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        });
-      }
-
-      const { error: incomeError } = await supabaseServiceRole
-        .from('income_transactions')
-        .insert({
-          profile_id: user.id,
-          account_id,
-          amount,
-          source: makeSaleIncomeSource(),
-          date: sale_date,
-        });
-
-      if (incomeError) {
-        console.error("[record-daily-sale] Error recording income transaction:", incomeError);
-        return new Response(JSON.stringify({ error: incomeError?.message || 'Failed to record income transaction.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        });
-      }
-
-      const { data: accountData, error: fetchAccountError } = await supabaseServiceRole
-        .from('financial_accounts')
-        .select('current_balance')
-        .eq('id', account_id)
-        .single();
-
-      if (fetchAccountError || !accountData) {
-        console.error("[record-daily-sale] Error fetching financial account for balance update:", fetchAccountError);
-        return new Response(JSON.stringify({ error: fetchAccountError?.message || 'Failed to fetch financial account for balance update.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        });
-      }
-
-      const newBalance = Number(accountData.current_balance) + amount;
-      const { error: updateBalanceError } = await supabaseServiceRole
-        .from('financial_accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', account_id);
-
-      if (updateBalanceError) {
-        console.error("[record-daily-sale] Error updating financial account balance:", updateBalanceError);
-        return new Response(JSON.stringify({ error: updateBalanceError?.message || 'Failed to update financial account balance.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        });
-      }
-    }
-
-    return new Response(JSON.stringify({ message: 'Sale recorded successfully', sale_id }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
-
+    return jsonResponse({ message: "Sale recorded successfully", sale_id: saleData.id });
   } catch (error) {
-    console.error("[record-daily-sale] Unexpected error in Edge Function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    console.error(`[${FUNCTION_NAME}] Unexpected error`, { error: error instanceof Error ? error.message : error });
+    return errorResponse(error instanceof Error ? error.message : "Unexpected error", 500);
   }
 });
