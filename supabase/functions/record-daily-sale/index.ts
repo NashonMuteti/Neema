@@ -75,13 +75,13 @@ const buildSaleIncomeSource = (saleId: string, customerName: string | null | und
     .join(" • ");
 };
 
-const buildNotesWithDiscount = (notes: string | null, discount: number) => {
+const buildNotesWithDiscount = (notes: string | null, discount: number, discountCurrencySymbol: string) => {
   const trimmedNotes = (notes || "").replace(DISCOUNT_NOTE_REGEX, "").trim();
-  const discountNote = discount > 0 ? `Discount: $${discount.toFixed(2)}` : "";
+  const discountNote = discount > 0 ? `Discount: ${discountCurrencySymbol}${discount.toFixed(2)}` : "";
   return [trimmedNotes, discountNote].filter(Boolean).join("\n") || null;
 };
 
-const DISCOUNT_NOTE_REGEX = /(?:^|\n)Discount:\s*[A-Z]{0,3}?\$?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*$/i;
+const DISCOUNT_NOTE_REGEX = /(?:^|\n)Discount:\s*[^0-9\n-]*([0-9]+(?:\.[0-9]{1,2})?)\s*$/i;
 
 const getCurrentUserContext = async (supabaseServiceRole: ReturnType<typeof getServiceClient>, token: string) => {
   const {
@@ -434,18 +434,18 @@ const validateInputs = (saleItemsRaw: unknown, paymentsRaw: unknown, discountRaw
     throw new Error("At least one valid payment is required.");
   }
 
-  const totalAmount = saleItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  const grossTotal = saleItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
   const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
 
   if (totalPaid <= 0) {
     throw new Error("Total paid must be greater than 0.");
   }
 
-  if (totalPaid + discount - totalAmount > 0.00001) {
+  if (totalPaid + discount - grossTotal > 0.00001) {
     throw new Error("Received total plus discount cannot exceed sale total.");
   }
 
-  if (Math.abs(totalPaid + discount - totalAmount) > 0.00001) {
+  if (Math.abs(totalPaid + discount - grossTotal) > 0.00001) {
     throw new Error("Received total plus discount must exactly match the sale total.");
   }
 
@@ -453,7 +453,8 @@ const validateInputs = (saleItemsRaw: unknown, paymentsRaw: unknown, discountRaw
     saleItems,
     payments,
     discount,
-    totalAmount,
+    grossTotal,
+    netTotal: grossTotal - discount,
   };
 };
 
@@ -522,9 +523,12 @@ serve(async (req) => {
     const paymentMethod = typeof body?.payment_method === "string" && body.payment_method ? body.payment_method : "Split";
     const receivedIntoAccountId = typeof body?.received_into_account_id === "string" ? body.received_into_account_id : null;
     const notes = typeof body?.notes === "string" ? body.notes : null;
+    const discountCurrencySymbol = typeof body?.discount_currency_symbol === "string" && body.discount_currency_symbol.length > 0
+      ? body.discount_currency_symbol
+      : "$";
 
-    const { saleItems, payments, totalAmount, discount } = validateInputs(body?.sale_items, body?.payments, body?.discount);
-    const finalNotes = buildNotesWithDiscount(notes, discount);
+    const { saleItems, payments, netTotal, discount } = validateInputs(body?.sale_items, body?.payments, body?.discount);
+    const finalNotes = buildNotesWithDiscount(notes, discount, discountCurrencySymbol);
 
     if (action === "update") {
       if (!saleId) {
@@ -558,11 +562,12 @@ serve(async (req) => {
         .update({
           customer_name: customerName,
           sale_date: saleDate,
-          total_amount: totalAmount,
+          total_amount: netTotal,
           payment_method: paymentMethod,
           received_into_account_id: primaryAccountId,
           notes: finalNotes,
         })
+
         .eq("id", existingSale.id);
 
       if (updateSaleError) {
@@ -595,11 +600,12 @@ serve(async (req) => {
         profile_id: user.id,
         customer_name: customerName,
         sale_date: saleDate,
-        total_amount: totalAmount,
+        total_amount: netTotal,
         payment_method: paymentMethod,
         received_into_account_id: primaryAccountId,
         notes: finalNotes,
       })
+
       .select("id")
       .single();
 

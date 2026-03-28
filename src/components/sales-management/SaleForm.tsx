@@ -60,6 +60,7 @@ export interface SaleFormPayload {
   received_into_account_id: string | null;
   notes?: string;
   discount: number;
+  discount_currency_symbol: string;
   sale_items: Array<{
     product_id: string;
     quantity: number;
@@ -93,7 +94,7 @@ interface SaleFormProps {
   onRecordSale: (payload: SaleFormPayload) => Promise<void>;
 }
 
-const DISCOUNT_NOTE_REGEX = /(?:^|\n)Discount:\s*[A-Z]{0,3}?\$?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*$/i;
+const DISCOUNT_NOTE_REGEX = /(?:^|\n)Discount:\s*[^0-9\n-]*([0-9]+(?:\.[0-9]{1,2})?)\s*$/i;
 
 const parseDiscountFromNotes = (notes?: string) => {
   if (!notes) {
@@ -341,6 +342,7 @@ const SaleForm: React.FC<SaleFormProps> = ({
       received_into_account_id: normalizedPayments[0]?.account_id || null,
       notes: combinedNotes || undefined,
       discount: parsedDiscount,
+      discount_currency_symbol: currency.symbol,
       sale_items: currentSaleItems.map((item) => ({
         product_id: item.product_id,
         quantity: item.quantity,
