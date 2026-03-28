@@ -1,10 +1,10 @@
 "use client";
+
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { perfMark, perfStart } from '@/utils/perf';
 
-// Centralized User interface
 export interface User {
   id: string;
   name: string;
@@ -15,7 +15,7 @@ export interface User {
   status: "Active" | "Inactive" | "Suspended";
   enableLogin: boolean;
   imageUrl?: string;
-  receiveNotifications: boolean; // Added receiveNotifications
+  receiveNotifications: boolean;
 }
 
 interface AuthContextType {
@@ -23,10 +23,24 @@ interface AuthContextType {
   supabaseUser: SupabaseUser | null;
   currentUser: User | null;
   isLoading: boolean;
-  refreshSession: () => Promise<void>; // Added method to refresh session
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const getSafeRole = (user: SupabaseUser | null) => {
+  const role = user?.app_metadata?.role;
+  return typeof role === 'string' && role.length > 0 ? role : 'New user';
+};
+
+const getSafeStatus = (user: SupabaseUser | null): User['status'] => {
+  const status = user?.app_metadata?.status;
+  return status === 'Active' || status === 'Inactive' || status === 'Suspended' ? status : 'Inactive';
+};
+
+const getSafeEnableLogin = (user: SupabaseUser | null) => {
+  return user?.app_metadata?.enable_login === true;
+};
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -34,7 +48,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Function to refresh the session
   const refreshSession = async () => {
     const end = perfStart('AuthContext:refreshSession');
     try {
@@ -43,112 +56,93 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setSession(refreshedSession);
       setSupabaseUser(refreshedSession?.user || null);
-      // NOTE: do NOT run Supabase queries from inside auth callbacks/refresh flows.
-      // Profile fetching is handled by a separate effect below.
     } catch (error) {
-      console.error("Error refreshing session:", error);
+      console.error('Error refreshing session:', error);
     } finally {
       end({ hasSession: !!session, hasSupabaseUser: !!supabaseUser });
     }
   };
 
-  // Function to fetch and set the application's currentUser profile
   const fetchUserProfile = async (user: SupabaseUser | null) => {
     const end = perfStart('AuthContext:fetchUserProfile');
-    if (user) {
-      try {
-        const fetchProfileEnd = perfStart('AuthContext:fetchUserProfile:profiles.select');
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        fetchProfileEnd({ hasProfileRow: !!profileData, errorCode: profileError?.code });
 
-        let userRole = "Contributor"; // Default role
-        let userStatus: "Active" | "Inactive" | "Suspended" = "Active";
-        let userEnableLogin = true;
-        let userImageUrl: string | undefined = undefined;
-        let userReceiveNotifications = true;
-        let userName = user.user_metadata?.full_name || user.email || "User";
-        let userEmail = user.email || "";
-        let userPhone: string | undefined = undefined;
-        let userOtherDetails: string | undefined = undefined;
-
-        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found
-          console.error("AuthContext: Error fetching user profile from DB, falling back to metadata:", profileError);
-          // Fallback to user_metadata if DB fetch fails (but not if row simply doesn't exist)
-          userRole = user.user_metadata?.role || "Contributor";
-          userStatus = user.user_metadata?.status || "Active";
-          userEnableLogin = user.user_metadata?.enable_login ?? true;
-          userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
-          userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
-          userPhone = user.user_metadata?.phone;
-          userOtherDetails = user.user_metadata?.other_details;
-        } else if (profileData) {
-          // Use full profile data if available
-          userRole = profileData.role || user.user_metadata?.role || "Contributor";
-          userStatus = profileData.status || "Active";
-          userEnableLogin = profileData.enable_login ?? true;
-          userImageUrl = profileData.image_url || user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${profileData.name || user.email}`;
-          userReceiveNotifications = profileData.receive_notifications ?? true;
-          userName = profileData.name || user.user_metadata?.full_name || user.email || "User";
-          userEmail = profileData.email || user.email || "";
-          userPhone = profileData.phone || undefined;
-          userOtherDetails = profileData.other_details || undefined;
-        } else {
-          // Profile not found in DB, likely a new user or a user whose profile wasn't created by trigger
-          console.warn("AuthContext: User profile not found in public.profiles, using user_metadata defaults.");
-          userRole = user.user_metadata?.role || "Contributor";
-          userStatus = user.user_metadata?.status || "Active";
-          userEnableLogin = user.user_metadata?.enable_login ?? true;
-          userImageUrl = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
-          userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
-          userPhone = user.user_metadata?.phone;
-          userOtherDetails = user.user_metadata?.other_details;
-        }
-
-        const finalUser: User = {
-          id: user.id,
-          name: userName,
-          email: userEmail,
-          phone: userPhone,
-          otherDetails: userOtherDetails,
-          role: userRole,
-          status: userStatus,
-          enableLogin: userEnableLogin,
-          imageUrl: userImageUrl,
-          receiveNotifications: userReceiveNotifications,
-        };
-        setCurrentUser(finalUser);
-
-      } catch (error) {
-        console.error("AuthContext: Error in fetchUserProfile:", error);
-        setCurrentUser(null);
-      } finally {
-        end({ hasUser: true });
-      }
-    } else {
+    if (!user) {
       setCurrentUser(null);
       end({ hasUser: false });
+      return;
+    }
+
+    try {
+      const fetchProfileEnd = perfStart('AuthContext:fetchUserProfile:profiles.select');
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      fetchProfileEnd({ hasProfileRow: !!profileData, errorCode: profileError?.code });
+
+      const fallbackRole = getSafeRole(user);
+      const fallbackStatus = getSafeStatus(user);
+      const fallbackEnableLogin = getSafeEnableLogin(user);
+
+      let userRole = fallbackRole;
+      let userStatus: User['status'] = fallbackStatus;
+      let userEnableLogin = fallbackEnableLogin;
+      let userImageUrl: string | undefined = user.user_metadata?.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${user.email}`;
+      let userReceiveNotifications = user.user_metadata?.receive_notifications ?? true;
+      let userName = user.user_metadata?.full_name || user.email || 'User';
+      let userEmail = user.email || '';
+      let userPhone: string | undefined = undefined;
+      let userOtherDetails: string | undefined = undefined;
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('AuthContext: Error fetching user profile from DB, using secure auth defaults:', profileError);
+      } else if (profileData) {
+        userRole = profileData.role || fallbackRole;
+        userStatus = profileData.status || fallbackStatus;
+        userEnableLogin = profileData.enable_login ?? fallbackEnableLogin;
+        userImageUrl = profileData.image_url || userImageUrl;
+        userReceiveNotifications = profileData.receive_notifications ?? userReceiveNotifications;
+        userName = profileData.name || userName;
+        userEmail = profileData.email || userEmail;
+        userPhone = profileData.phone || undefined;
+        userOtherDetails = profileData.other_details || undefined;
+      } else {
+        console.warn('AuthContext: User profile not found in public.profiles, using secure auth defaults.');
+      }
+
+      const finalUser: User = {
+        id: user.id,
+        name: userName,
+        email: userEmail,
+        phone: userPhone,
+        otherDetails: userOtherDetails,
+        role: userRole,
+        status: userStatus,
+        enableLogin: userEnableLogin,
+        imageUrl: userImageUrl,
+        receiveNotifications: userReceiveNotifications,
+      };
+
+      setCurrentUser(finalUser);
+    } catch (error) {
+      console.error('AuthContext: Error in fetchUserProfile:', error);
+      setCurrentUser(null);
+    } finally {
+      end({ hasUser: true });
     }
   };
 
   useEffect(() => {
     perfMark('AuthContext:mount');
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        // Workaround for Supabase JS issue (#762): avoid doing Supabase queries inside
-        // onAuthStateChange, as it can cause subsequent queries to hang.
-        const end = perfStart(`AuthContext:onAuthStateChange:${event}`);
-        setSession(currentSession);
-        setSupabaseUser(currentSession?.user || null);
-        end({ hasSession: !!currentSession, hasUser: !!currentSession?.user });
-      }
-    );
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      const end = perfStart(`AuthContext:onAuthStateChange:${event}`);
+      setSession(currentSession);
+      setSupabaseUser(currentSession?.user || null);
+      end({ hasSession: !!currentSession, hasUser: !!currentSession?.user });
+    });
 
-    // Initial session check
     const initialEnd = perfStart('AuthContext:getSession');
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       setSession(initialSession);
@@ -161,7 +155,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  // Fetch profile OUTSIDE auth callbacks (see Supabase JS issue #762)
   useEffect(() => {
     const run = async () => {
       if (!supabaseUser) {
@@ -181,13 +174,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [supabaseUser?.id]);
 
   return (
-    <AuthContext.Provider value={{ 
-      session, 
-      supabaseUser, 
-      currentUser, 
-      isLoading,
-      refreshSession
-    }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        supabaseUser,
+        currentUser,
+        isLoading,
+        refreshSession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

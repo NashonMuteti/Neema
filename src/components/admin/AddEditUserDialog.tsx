@@ -238,7 +238,15 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
                 userId: initialData.id,
                 updates: {
                   email: email,
-                  user_metadata: { full_name: name, avatar_url: userImageUrl },
+                  user_metadata: {
+                    full_name: name,
+                    avatar_url: userImageUrl,
+                  },
+                  app_metadata: {
+                    role,
+                    status,
+                    enable_login: newEnableLogin,
+                  },
                 },
               },
             }),
@@ -301,8 +309,10 @@ const AddEditUserDialog: React.FC<AddEditUserDialogProps> = ({
                 user_metadata: {
                   full_name: name,
                   avatar_url: userImageUrl,
-                  role: role,
-                  status: status,
+                },
+                app_metadata: {
+                  role,
+                  status,
                   enable_login: enableLogin,
                 },
               },

@@ -13,7 +13,6 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-// Define the schema for form validation
 const userSettingsSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
@@ -23,20 +22,20 @@ const userSettingsSchema = z.object({
 type UserSettingsFormValues = z.infer<typeof userSettingsSchema>;
 
 const UserSettings = () => {
-  const { currentUser, supabaseUser, isLoading, refreshSession } = useAuth(); // Added refreshSession
+  const { currentUser, supabaseUser, isLoading, refreshSession } = useAuth();
 
   const {
     register,
     handleSubmit,
     control,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<UserSettingsFormValues>({
     resolver: zodResolver(userSettingsSchema),
     defaultValues: {
       name: currentUser?.name || "",
       email: currentUser?.email || "",
-      receiveNotifications: currentUser?.receiveNotifications ?? true, // Use actual value or default
+      receiveNotifications: currentUser?.receiveNotifications ?? true,
     },
   });
 
@@ -52,12 +51,10 @@ const UserSettings = () => {
 
   const onSubmit = async (data: UserSettingsFormValues) => {
     if (!currentUser || !supabaseUser) {
-      console.error("No current user to update settings for.");
       showError("User not logged in.");
       return;
     }
 
-    // Update Supabase auth user metadata (for full_name)
     const { error: authUpdateError } = await supabase.auth.updateUser({
       data: { full_name: data.name },
     });
@@ -68,23 +65,19 @@ const UserSettings = () => {
       return;
     }
 
-    // Update public.profiles table (for name, and other profile-specific settings like notifications)
-    const { error: profileUpdateError } = await supabase
-      .from('profiles')
-      .update({ 
-        name: data.name, 
-        receive_notifications: data.receiveNotifications 
-      })
-      .eq('id', currentUser.id);
+    const { error: profileUpdateError } = await supabase.rpc('update_own_profile_settings', {
+      p_name: data.name,
+      p_receive_notifications: data.receiveNotifications,
+    });
 
     if (profileUpdateError) {
-      console.error("Error updating user profile:", profileUpdateError);
+      console.error("Error updating user profile settings:", profileUpdateError);
       showError("Failed to update user profile details.");
       return;
     }
 
+    await refreshSession();
     showSuccess("Settings saved successfully!");
-    refreshSession(); // Refresh session to update currentUser in context
   };
 
   if (isLoading) {
@@ -121,19 +114,15 @@ const UserSettings = () => {
             <div className="grid w-full max-w-sm items-center gap-1.5">
               <Label htmlFor="name">Name</Label>
               <Input id="name" type="text" {...register("name")} />
-              {errors.name && (
-                <p className="text-sm text-destructive">{errors.name.message}</p>
-              )}
+              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
             <div className="grid w-full max-w-sm items-center gap-1.5">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" {...register("email")} disabled />
               <p className="text-sm text-muted-foreground">Email cannot be changed here.</p>
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email.message}</p>
-              )}
+              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
             </div>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" disabled={isSubmitting}>Save Changes</Button>
           </CardContent>
         </Card>
 
@@ -156,8 +145,7 @@ const UserSettings = () => {
                 )}
               />
             </div>
-            {/* Theme preference is handled by the ThemeToggle in the header */}
-            <Button type="submit">Save Preferences</Button>
+            <Button type="submit" disabled={isSubmitting}>Save Preferences</Button>
           </CardContent>
         </Card>
       </form>
